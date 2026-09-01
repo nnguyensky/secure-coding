@@ -68,7 +68,11 @@ cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
 
 Run verification to confirm zero open issues:
 
-1. **Auto-Scan:** `node hooks/scan.js --staged` (runs in $<20\text{ms}$).
+1. **Auto-Scan:** `node hooks/scan.js --staged` (~1ms for a typical file,
+   ~20ms for a 2000-line one). This includes
+   multi-line taint tracking: request data assigned to a variable and later
+   used in a file, HTTP, process, or query call is reported as `taint-*`.
+   Disable with `"taintTracking": false` in `.securecodingrc.json`.
 2. **Review Guidance:** Fix any flagged patterns using the provided `When / Wrong / Right / Watch` blocks.
 3. **Autofix:** Run `node hooks/fix.js --apply` to automatically refactor common deterministic issues.
 4. **Audit Dependencies:** `node hooks/audit.js` (scans package lockfiles).
@@ -96,9 +100,10 @@ answer; silence is not:
       unauthenticated or under-privileged caller? Deny-by-default, or a named
       middleware. An admin route with no guard scans clean. (Smell 2, 4)
 - [ ] **Untrusted input reaching a sink:** Trace each request value to where
-      it lands — query, file path, shell, outbound URL, template. The scanner
-      catches these only when the input sits *inside* the sink call; assign it
-      to a variable first and it is invisible. (Smell 1)
+      it lands — query, file path, shell, outbound URL, template. Taint
+      tracking catches the direct cases (`taint-*` findings), but only within
+      one function and one hop; anything through a helper, an object field, or
+      another module is yours to trace. (Smell 1)
 - [ ] **Failure direction:** If the auth or permission check throws, does the
       request end up denied? (Smell 4)
 
@@ -192,7 +197,7 @@ means "no known bad patterns matched" — never "this code is secure."**
 | Blind spot | Why | Who catches it |
 |---|---|---|
 | **Missing checks** (IDOR/BOLA, absent authz, no rate limit) | A regex sees what is *present*. There is no pattern for a guard that was never written. | Done Gate manual review |
-| **Multi-line taint** | Patterns require untrusted input *inside* the sink call. `readfile($_GET["f"])` is caught; `$f = $_GET["f"]; readfile($f);` is not. | Done Gate manual review |
+| **Taint beyond one hop** | The taint pass follows `var = <request data>` into a sink, plus one hop through interpolation, within a single function. Longer chains, helper calls, and object fields are not followed. | Done Gate manual review |
 | **Cross-file / cross-function flow** | Each file is matched in isolation, with no call graph. | Design review, threat model |
 | **Logic and business rules** | Price manipulation, workflow bypass, race conditions in app logic. | `checks/threat-model.md` |
 | **Runtime and config state** | What is actually deployed, which env vars are set, real TLS termination. | Deployment review |

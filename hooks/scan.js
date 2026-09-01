@@ -147,6 +147,88 @@ function maskSecret(snippet, id) {
   return masked;
 }
 
+// --- multi-line taint ---
+// Regex patterns only match when untrusted input sits INSIDE the sink call.
+// `$f = $_GET["f"]; readfile($f);` is the same bug split over two lines and
+// slips past. This pass tracks `var = <source>` then `sink(var)` within one
+// function, straight-line only. Deliberately conservative: a missed edge case
+// costs less than a false positive on safe code.
+
+// Request-controlled values. Anchored to the framework accessors the pattern
+// files already treat as untrusted.
+const TAINT_SOURCE = /(?:\breq(?:uest)?\s*\.\s*(?:query|body|params|args|form|GET|POST|cookies|headers)\b|\$_(?:GET|POST|REQUEST|COOKIE)\s*\[|\br\s*\.\s*(?:FormValue|PostFormValue)\s*\(|\bparams\s*\[|getParameter\s*\()/;
+
+// Sinks where request data causes a named vulnerability, and what to call it.
+const TAINT_SINKS = [
+  { id: 'taint-path-traversal', severity: 'critical', section: '12',
+    re: /\b(?:readFile|readFileSync|writeFile|writeFileSync|createReadStream|createWriteStream|sendFile|open|readfile|file_get_contents|fopen|File\.read|File\.open|os\.Open|os\.ReadFile|Paths\.get)\s*\(/,
+    hint: 'request data reaches a filesystem call — resolve the path and verify it stays inside the intended directory' },
+  { id: 'taint-ssrf', severity: 'critical', section: '21',
+    re: /\b(?:fetch|(?:axios|requests|httpx|session|urllib3)\s*\.\s*(?:get|post|put|patch|delete|head|request)|request|urlopen|urlretrieve|curl_setopt|http\.Get|HttpClient|WebClient|got|superagent)\s*\(/,
+    hint: 'request data reaches an outbound HTTP call — allowlist the host and block internal ranges' },
+  { id: 'taint-command', severity: 'critical', section: '29',
+    re: /\b(?:exec|execSync|spawn|spawnSync|system|popen|shell_exec|passthru|proc_open|Runtime\.getRuntime|subprocess\.(?:run|call|Popen))\s*\(/,
+    hint: 'request data reaches a process call — pass an argument array and never a shell string' },
+  { id: 'taint-sql', severity: 'critical', section: '02',
+    re: /\.\s*(?:query|execute|exec|raw|prepare)\s*\(/,
+    hint: 'request data reaches a query call — use a parameterized query' },
+];
+
+// Any of these on the assignment or the sink line means the value was handled.
+const TAINT_SANITIZED = /\b(?:sanitiz|escape|validate|allowlist|whitelist|basename|realpath|resolve|normaliz|encodeURI|parseInt|parseFloat|Number|Boolean|String|schema|zod|joi|yup|isSafe|is_safe|safe_path|assert|check)\w*\s*\(|\?\?|\|\||\bparameteriz/i;
+
+// Function/block boundary — taint does not cross it.
+const TAINT_BOUNDARY = /^\s*(?:(?:export\s+)?(?:async\s+)?function\b|def\b|func\b|(?:public|private|protected)\s|class\b|\}\s*$)/;
+
+function findTaintFlows(fileLines) {
+  const found = [];
+  let tainted = new Map(); // varName -> line it was assigned on
+
+  for (let i = 0; i < fileLines.length; i++) {
+    const line = fileLines[i];
+    if (line.trim().startsWith('//') || line.trim().startsWith('#')) continue;
+
+    // A new function resets what we know.
+    if (TAINT_BOUNDARY.test(line)) tainted = new Map();
+
+    // Assignment from an untrusted source: `const x = req.query.y`
+    const assign = line.match(/(?:const|let|var|my)?\s*\$?([A-Za-z_]\w*)\s*(?::=|=)\s*(.+)$/);
+    if (assign && !/[=!<>]=/.test(assign[2].slice(0, 2))) {
+      const [, name, rhs] = assign;
+      if (TAINT_SOURCE.test(rhs)) {
+        if (TAINT_SANITIZED.test(rhs)) tainted.delete(name);
+        else tainted.set(name, i + 1);
+        continue;
+      }
+      // Propagate one hop: `const full = `/data/${p}`` where p is tainted.
+      // Interpolation/concatenation of a tainted value stays tainted.
+      let carried = null;
+      for (const [t, srcLine] of tainted) {
+        const used = new RegExp('[${(,\\s\\[`+.]\\$?' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b');
+        if (used.test(rhs)) { carried = srcLine; break; }
+      }
+      if (carried !== null && !TAINT_SANITIZED.test(rhs)) { tainted.set(name, carried); continue; }
+      // Reassigned from something else — no longer tainted.
+      if (tainted.has(name)) tainted.delete(name);
+    }
+
+    if (tainted.size === 0) continue;
+
+    for (const sink of TAINT_SINKS) {
+      if (!sink.re.test(line)) continue;
+      if (TAINT_SANITIZED.test(line)) continue;
+      for (const [name, srcLine] of tainted) {
+        // The variable must actually appear as an argument on this line.
+        const used = new RegExp('[(,\\s\\[`+.]\\$?' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b');
+        if (!used.test(line)) continue;
+        found.push({ sink, line: i + 1, snippet: line.trim(), varName: name, srcLine });
+        break;
+      }
+    }
+  }
+  return found;
+}
+
 function matchContent(content, filenameOrExt, patterns) {
   const fileLines = content.split(/\r?\n/);
   const ext = (path.extname(filenameOrExt || '').slice(1) || filenameOrExt || '').toLowerCase();
@@ -255,6 +337,26 @@ function matchContent(content, filenameOrExt, patterns) {
           if (hits.filter(h => h.id === 'secret-entropy').length >= MAX_OCCURRENCES) break;
         }
       }
+    }
+  }
+
+  // Multi-line taint: source assigned to a variable, then used in a sink.
+  if (!cfg || cfg.taintTracking !== false) {
+    for (const flow of findTaintFlows(fileLines)) {
+      if (seen.has(flow.sink.id)) continue;
+      if (isSuppressed(fileLines[flow.line - 1], flow.sink.id)) continue;
+      // Skip only when a pattern already reported this same vulnerability on
+      // this line; an unrelated finding on the line must not hide the taint.
+      if (hits.some(h => h.line === flow.line && h.section === flow.sink.section)) continue;
+      seen.add(flow.sink.id);
+      hits.push({
+        id: flow.sink.id,
+        section: flow.sink.section,
+        hint: `${flow.sink.hint} (tainted \`${flow.varName}\` from line ${flow.srcLine})`,
+        severity: flow.sink.severity,
+        line: flow.line,
+        snippet: maskSecret(flow.snippet, flow.sink.id),
+      });
     }
   }
 

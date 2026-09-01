@@ -526,6 +526,44 @@ bad('sbd_legacy_tls', 'py', 'ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_0)', 'sbd-l
 good('sbd_modern_tls', 'py', 'ctx = ssl.create_default_context()');
 bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
 
+// --- multi-line taint tracking ---
+// Regex patterns only fire when the source sits inside the sink call. These
+// cover the same bug split across lines, and — just as important — that
+// sanitized or out-of-scope code stays clean.
+(function taintTests() {
+  const { loadPatterns, matchContent } = require('./scan.js');
+  const pats = loadPatterns();
+  const ids = (code, ext) => matchContent(code, 'taint.' + ext, pats).map(h => h.id);
+
+  const flags = (name, code, ext, wanted) => {
+    uniq('taint-' + name);
+    const got = ids(code, ext);
+    if (got.includes(wanted)) pass++;
+    else { fail++; console.log(`MISS  taint-${name}: got [${got}] want ${wanted}`); }
+  };
+  const clean = (name, code, ext) => {
+    uniq('taint-clean-' + name);
+    const got = ids(code, ext).filter(i => i.startsWith('taint-'));
+    if (got.length === 0) pass++;
+    else { fail++; console.log(`FALSE+ taint-${name}: ${got}`); }
+  };
+
+  flags('phpPath', '$f = $_GET["f"];\nreadfile($f);', 'php', 'taint-path-traversal');
+  flags('pySsrf', 'u = request.args["url"]\nrequests.get(u)', 'py', 'taint-ssrf');
+  flags('jsSsrf', 'const t = req.query.url;\nawait fetch(t);', 'js', 'taint-ssrf');
+  flags('jsCmd', 'const c = req.body.cmd;\nexec(c);', 'js', 'taint-command');
+  // One hop through interpolation: req.params -> template -> sink.
+  flags('twoHop', 'const p = req.params.name;\nconst full = `/data/${p}`;\nfs.readFileSync(full);', 'js', 'taint-path-traversal');
+
+  clean('sanitized', 'const r = req.query.f;\nconst n = path.basename(r);\nfs.readFileSync(n);', 'js');
+  clean('parameterized', 'const id = req.params.id;\ndb.query("SELECT * FROM u WHERE id = ?", [id]);', 'js');
+  clean('parsedInt', 'const p = parseInt(req.query.page, 10);\ndb.query("SELECT * LIMIT ?", [p]);', 'js');
+  clean('reassigned', 'let t = req.query.url;\nt = DEFAULT;\nawait fetch(t);', 'js');
+  // Taint must not cross a function boundary.
+  clean('scoped', 'function a(req) {\n  const u = req.query.url;\n}\nfunction b() {\n  fetch(u);\n}', 'js');
+  clean('notAssignment', 'const eq = req.query.x == other;\nfetch(other);', 'js');
+})();
+
 // --- pattern file hygiene ---
 // The exclusion column takes ONE !regex. Writing `!a|!b|!c` makes only `a`
 // exclude; `b` and `c` then require a literal `!` in the code and never fire,

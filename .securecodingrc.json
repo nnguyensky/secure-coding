@@ -1,6 +1,7 @@
 {
   "failOn": "high",
   "entropyDetection": true,
+  "taintTracking": true,
   "generateMarkdownPR": true,
   "modules": {
     "llm": true,

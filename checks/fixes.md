@@ -702,6 +702,34 @@ Wrong: pickle.loads, yaml.load, unserialize, readObject on anything from outside
 Right: JSON to plain values. yaml.safe_load. Validate the shape after parsing.
 Watch: "it's our own service" is not trust — the transport can be tampered with.
 
+## taint-path-traversal
+OWASP: 180,190,191
+Request data reaches a filesystem call after passing through a variable. Same bug as path-traversal; the pattern scanner misses it because the source and the sink are on different lines.
+Wrong: const p = req.params.name; fs.readFileSync(`/data/${p}`)
+Right: resolve the path, then confirm it stays inside the allowed directory. Or pass a key that selects a file from an allowlist.
+Watch: basename() alone still allows picking any file in that directory.
+
+## taint-ssrf
+OWASP: 137,138
+Request data reaches an outbound HTTP call after passing through a variable. The server will fetch whatever the caller names, including internal addresses.
+Wrong: const t = req.query.url; await fetch(t)
+Right: allowlist the destination host, and block private ranges (10.0.0.0/8, 127.0.0.1, 169.254.169.254).
+Watch: check the URL after resolution — redirects and DNS rebinding move the target.
+
+## taint-command
+OWASP: 22,203
+Request data reaches a process call after passing through a variable. Anything the caller sends can add its own command.
+Wrong: const c = req.body.cmd; exec(c)
+Right: pass an argument array with no shell — execFile(bin, [arg]), subprocess.run([bin, arg]).
+Watch: quoting the input is not a fix; the shell has too many ways in.
+
+## taint-sql
+OWASP: 167,21
+Request data reaches a query call after passing through a variable, so escaping was never applied.
+Wrong: const id = req.params.id; db.query("SELECT * FROM u WHERE id = " + id)
+Right: parameterized queries — db.query(sql, [id]). Or the ORM's normal query API.
+Watch: table and column names cannot be parameterized — allowlist them instead.
+
 ## llm-prompt-injection
 OWASP: LLM Applications Security
 Concatenating unescaped user input directly into LLM prompt strings enables direct prompt injection attacks.
