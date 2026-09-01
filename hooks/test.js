@@ -526,6 +526,43 @@ bad('sbd_legacy_tls', 'py', 'ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_0)', 'sbd-l
 good('sbd_modern_tls', 'py', 'ctx = ssl.create_default_context()');
 bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
 
+// --- CLI argument handling ---
+// An unknown flag used to fall through to hook mode and block forever on a
+// stdin read. It must fail loudly instead, without breaking real hook input.
+(function cliArgs() {
+  const runArgs = (args, input) => spawnSync('node', [SCAN, ...args], {
+    input: input === undefined ? '' : input,
+    env: { ...process.env, SECURE_CODING_STATE: path.join(TMP, 'cli.jsonl'), SECURE_CODING_REPORT: 'off' },
+    encoding: 'utf8',
+    timeout: 10000,
+  });
+
+  const expect = (name, args, input, wantStatus) => {
+    uniq('cli-' + name);
+    const r = runArgs(args, input);
+    if (r.status === wantStatus && !r.error) pass++;
+    else { fail++; console.log(`MISS  cli-${name}: status=${r.status} want=${wantStatus}${r.error ? ' err=' + r.error.code : ''}`); }
+  };
+
+  expect('help', ['--help'], '', 0);
+  expect('unknownFlag', ['--path', '/tmp'], '', 64);
+  expect('bogusFlag', ['--bogus'], '', 64);
+
+  // Usage text must actually reach the user, on stderr for the error case.
+  uniq('cli-usage-text');
+  const u = runArgs(['--nope'], '');
+  if (/unknown option/.test(u.stderr) && /Usage:/.test(u.stderr)) pass++;
+  else { fail++; console.log('MISS  cli-usage-text'); }
+
+  // Real hook mode (piped JSON) must keep working.
+  uniq('cli-hook-mode');
+  const hookFile = path.join(TMP, 'cli-hook.js');
+  fs.writeFileSync(hookFile, 'eval(x);\n');
+  const h = runArgs([], JSON.stringify({ tool_input: { file_path: hookFile } }));
+  if (h.status === 2 && /eval/.test(h.stdout)) pass++;
+  else { fail++; console.log(`MISS  cli-hook-mode: status=${h.status}`); }
+})();
+
 // --- filename-scoped patterns (Dockerfile) ---
 // exts are lowercased at load, so a `Dockerfile`-scoped rule only matched a
 // lowercase basename — all 19 container rules were unreachable.

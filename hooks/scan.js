@@ -280,6 +280,23 @@ function scanSingleFile(file, patterns) {
   return hits;
 }
 
+const USAGE = `secure-coding scanner
+
+Usage:
+  node hooks/scan.js --staged              scan git staged files
+  node hooks/scan.js --diff                scan modified working-tree files
+  node hooks/scan.js --file <path>         scan one file
+  node hooks/scan.js --files <p> [p...]    scan specific files
+  node hooks/scan.js --find <id> <file>    record a manual finding
+  node hooks/scan.js                       hook mode (PostToolUse JSON on stdin)
+
+Options:
+  --json                                   machine-readable output
+  --help                                   show this message
+
+Exit codes: 0 clean, 2 findings found.
+`;
+
 function main() {
   const args = process.argv.slice(2);
   const patterns = loadPatterns();
@@ -363,7 +380,25 @@ function main() {
     process.exit(2);
   }
 
-  // Hook Mode: PostToolUse payload on stdin
+  if (args[0] === '--help' || args[0] === '-h') {
+    process.stdout.write(USAGE);
+    return;
+  }
+
+  // Anything else flag-shaped is a typo, not hook input — fail loudly instead
+  // of falling through and blocking forever on a stdin read.
+  if (args[0] && args[0].startsWith('-')) {
+    process.stderr.write(`scan.js: unknown option '${args[0]}'\n\n${USAGE}`);
+    process.exit(64); // EX_USAGE
+  }
+
+  // Hook Mode: PostToolUse payload on stdin. Only valid when stdin is piped;
+  // on a terminal there is nothing to read and we would hang waiting.
+  if (process.stdin.isTTY) {
+    process.stderr.write(`scan.js: no input — stdin is a terminal.\n\n${USAGE}`);
+    process.exit(64);
+  }
+
   let payload = '';
   try { payload = fs.readFileSync(0, 'utf8'); } catch (e) { return; }
   const m = payload.match(/"file_path"\s*:\s*"([^"]*)"/);

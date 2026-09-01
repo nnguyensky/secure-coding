@@ -422,7 +422,7 @@ Refer to SKILL.md, templates/, and checks/secure-by-design.md for secure pattern
       const content = `When writing code that handles user input, auth, secrets, databases, files, or LLM pipelines:
 - Read SKILL.md and apply matching templates from templates/.
 - When designing architecture, refer to checks/secure-by-design.md and checks/memory-safety.md.
-- After writing, verify using: node hooks/scan.js
+- After writing, verify using: node hooks/scan.js --staged
 `;
       fs.writeFileSync(windsurfRules, content);
       console.log(`${GREEN}✅ Configured Windsurf rules:${NC} ${windsurfRules}`);
@@ -436,7 +436,7 @@ Refer to SKILL.md, templates/, and checks/secure-by-design.md for secure pattern
 Always write secure code from the start. Never defer security fixes.
 - Before coding, read SKILL.md and templates/<language>.md.
 - When handling LLM tools or RAG, review checks/llm-top10.md.
-- After writing code, run \`node hooks/scan.js\` and fix any reported findings immediately.
+- After writing code, run \`node hooks/scan.js --staged\` and fix any reported findings immediately.
 `;
       fs.writeFileSync(clineRules, content);
       console.log(`${GREEN}✅ Configured Cline rules:${NC} ${clineRules}`);
