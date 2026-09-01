@@ -9,7 +9,7 @@
 
 - id: secure-coding-clean
   name: Clean Code Quality Linter
-  description: Lints code against 22 universal Clean Code quality standards (magic numbers, multi-responsibility functions).
+  description: Lints code against 14 universal Clean Code quality standards (magic numbers, multi-responsibility functions).
   entry: node hooks/clean.js
   language: node
   types: [text]

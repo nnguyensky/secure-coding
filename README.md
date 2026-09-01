@@ -10,7 +10,7 @@
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-385%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-388%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -192,7 +192,7 @@ Applied during system design and boundary definition:
 ### 🔬 Layer 3: Verification & Auditing
 - **Semantic OWASP Checklist** ([`checks/review.md`](checks/review.md)): 213 verifiable controls.
 - **Multi-Ecosystem Package Audit** ([`hooks/audit.js`](hooks/audit.js)): Scans lockfiles across 9 ecosystems (`npm`, `pnpm`, `yarn`, `pip`, `poetry`, `cargo`, `go`, `dotnet`, `composer`, `bundler`). Exits with code `2` on high/critical advisories.
-- **Clean Code Linter** ([`hooks/clean.js`](hooks/clean.js)): Flags magic numbers, multi-responsibility functions, and unneeded context.
+- **Clean Code Linter** ([`hooks/clean.js`](hooks/clean.js)): Flags magic numbers, multi-responsibility functions, and unneeded context. Standards documented in [`checks/clean-code.md`](checks/clean-code.md).
 - **OWASP Top 10:2025 → CWE Map** ([`checks/owasp-top10-2025.md`](checks/owasp-top10-2025.md)): Every category mapped to its key CWEs and the pattern ids that cover it — including the two new 2025 categories (**A03 Software Supply Chain Failures**, **A10 Mishandling of Exceptional Conditions**) and an explicit note on which categories patterns *cannot* cover.
 - **NIST SSDF (SP 800-218) Coverage Map** ([`checks/ssdf-mapping.md`](checks/ssdf-mapping.md)): All 4 practice groups and 20 practices mapped to the skill's tooling, with the gaps stated plainly for attestation purposes.
 
@@ -203,7 +203,7 @@ Applied during system design and boundary definition:
 - **Git Pre-commit & Pre-push Hooks** (`install.sh` / `hooks/install.js`): Automates staged and repository-wide protection.
 
 ### 🔧 Layer 5: Automated In-Place Remediation & MCP Server
-- **Interactive Guidance**: `node hooks/fix.js --suggest <id>` provides instant remediation advice.
+- **Interactive Guidance**: `node hooks/fix.js --suggest <id>` prints the `When / Wrong / Right / Watch` block for a finding, sourced from [`checks/fixes.md`](checks/fixes.md) — 135 blocks, every one tagged with its CWE and OWASP 2025 category.
 - **Autofix Engine**: `node hooks/fix.js --apply` safely refactors deterministic vulnerabilities in-place.
 - **Native MCP Server** ([`mcp/server.js`](mcp/server.js)): Exposes tools directly over JSON-RPC 2.0 stdio for IDEs and AI agents.
 
@@ -211,41 +211,81 @@ Applied during system design and boundary definition:
 
 ## ⚡ Quick Start
 
-Get started in under 60 seconds. Choose the method that best matches your environment:
+**Requirements:** Node.js 18+ and nothing else. No dependencies are installed — every tool uses the Node standard library only.
 
-### 1. Direct NPX (Fastest — No Manual Clone)
+### 1. Get the files
+
 ```bash
-npx secure-coding
-```
-*Runs an interactive terminal wizard to configure Git hooks, VS Code tasks, MCP server, and AI agent rules automatically.*
-
-### 2. Local Setup Wizard (Node.js)
-```bash
-# Interactive setup in current project:
-node install.js
-
-# Or install globally for Google Antigravity & Claude Code:
-node install.js --global --agent all --mcp --yes
+git clone <your-fork-or-mirror> secure-coding && cd secure-coding
 ```
 
-### 3. Pre-Commit Framework Integration
-Add to your project's `.pre-commit-config.yaml`:
+> **Note:** this package is not published to npm and has no public repository yet, so `npx secure-coding` and remote `pre-commit` URLs will not resolve. Clone or vendor the directory, then use the local commands below.
+
+### 2. Verify it works
+
+```bash
+node hooks/test.js
+```
+
+Expect `pass=388 fail=0`. Also run `node hooks/sync.js` — it validates that every pattern, template and remediation block is internally consistent, and should report `0 errors, 0 warnings`.
+
+### 3. Install into a project
+
+```bash
+node install.js --target ../my-app --agent all --mcp
+```
+
+Run without arguments for an interactive wizard. Useful flags:
+
+| Flag | Effect |
+|---|---|
+| `--target <dir>` | Project to configure (default: current directory) |
+| `--agent <name>` | `antigravity` \| `claude` \| `cursor` \| `windsurf` \| `cline` \| `all` |
+| `--mcp` | Register the MCP server for IDEs and agents |
+| `--global` | Install to `~/.secure-coding` and link Antigravity + Claude Code |
+| `--yes` | Non-interactive; accept defaults |
+| `--no-hooks` / `--no-vscode` / `--no-config` | Skip that step |
+| `--wizard` | Open the browser policy UI when finished |
+
+`node install.js --help` lists them all.
+
+> **Heads up:** `--mcp` writes outside `--target` — it registers the server in
+> your Claude Desktop config (`~/Library/Application Support/Claude/`) and links
+> a global Antigravity plugin under `~/.gemini/`. Omit `--mcp` to keep every
+> change inside the project directory.
+
+### 4. Wire it into your workflow
+
+**Git hooks** are installed by step 3 unless you pass `--no-hooks`. To use the [pre-commit](https://pre-commit.com) framework instead, reference this directory locally:
+
 ```yaml
 repos:
-  - repo: https://github.com/owasp/secure-coding
-    rev: v2.1.0
+  - repo: local
     hooks:
       - id: secure-coding-scan
-      - id: secure-coding-clean
-      - id: secure-coding-audit
+        name: Secure Coding Staged Scan
+        entry: node /path/to/secure-coding/hooks/scan.js --staged
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
 ```
 
-### 4. Interactive Browser UI Policy Wizard
+**CI**: copy [`.github/workflows/security-scan.yml`](.github/workflows/security-scan.yml). It runs `sync.js`, `test.js`, `audit.js`, scans changed files, and uploads SARIF to GitHub code scanning with CWE tags. Actions are pinned to commit SHAs and tracked by [`.github/dependabot.yml`](.github/dependabot.yml).
+
+**npm scripts** are shortcuts for the same commands:
+
 ```bash
-node hooks/config.js --ui
-# or with npm:
-npm run wizard
+npm test              # sync.js + test.js
+npm run staged        # scan staged files
+npm run audit         # dependency advisories
+npm run sbom          # CycloneDX AI-SBOM + VEX
+npm run wizard        # browser policy UI
+npm run mcp           # start the MCP server on stdio
 ```
+
+### 5. Confirm the agent picked it up
+
+Ask your agent to read `SKILL.md`, then have it write something insecure — a query built by string concatenation is the quickest check. It should refuse and produce a parameterized version. If nothing happens, confirm the rules file for your agent exists (`.cursor/rules/`, `.clinerules`, `.windsurfrules`, `AGENTS.md`) and that `node hooks/scan.js --staged` runs from the project root.
 
 ---
 
@@ -488,7 +528,7 @@ echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"secure_cod
 
 ## 🧪 Validation & Test Suite
 
-Verify all 385 test assertions, pattern compilation, secret masking, and MCP tools:
+Verify all 388 test assertions, pattern compilation, secret masking, and MCP tools:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js
