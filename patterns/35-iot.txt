@@ -1,9 +1,9 @@
 # IoT & Embedded Systems Security Patterns (AS ETSI EN 303 645 / ACSC)
-# id	exts	regex	!exclude	hint	severity
+# id	exts	regex	!exclude	hint	severity  (ONE regex: !a|b|c, never !a|!b|!c)
 # POSIX ERE only - BSD grep has no -P and fails silently on it.
 
-iot-unencrypted-mqtt	py,js,ts,c,cpp,rs	(mqtt:\/\/|port\s*[:=]\s*1883)	!mqtts:\/\/|!ssl|!tls|!8883	unencrypted MQTT connection; use mqtts:// on port 8883 with TLS and client certificates	high
+iot-unencrypted-mqtt	py,js,ts,c,cpp,rs	(mqtt:\/\/|port\s*[:=]\s*1883)	!mqtts:\/\/|ssl|tls|8883	unencrypted MQTT connection; use mqtts:// on port 8883 with TLS and client certificates	high
 iot-unencrypted-coap	py,js,ts,c,cpp,rs,go	coap:\/\/	!coaps:\/\/	unencrypted CoAP protocol; mandate coaps:// with DTLS for embedded communications	high
 iot-debug-interface	c,cpp,h,rs,py	(DEBUG_UART|ENABLE_JTAG|CONFIG_BOOT_SWD)(\s*[:=]\s*|\s+)(1|true|TRUE|enabled)		hardware debug interface enabled; disable JTAG/UART/SWD in production builds	high
-iot-ota-no-verify	c,cpp,rs,py,go	(flash_write|apply_ota_update|esp_ota_write)\s*\([^)]*\)	!verify|!signature|!crypto|!pubkey	firmware update flashed without cryptographic signature verification	critical
+iot-ota-no-verify	c,cpp,rs,py,go	(flash_write|apply_ota_update|esp_ota_write)\s*\([^)]*\)	!verify|signature|crypto|pubkey	firmware update flashed without cryptographic signature verification	critical
 iot-hardcoded-flash-key	c,cpp,h,rs	(#define|const\s+char\*?)\s+[A-Z0-9_]*(DEVICE_KEY|MASTER_KEY|FIRMWARE_KEY|AES_KEY)\s*=?\s*"[0-9a-fA-F]{16,}"		hardcoded cryptographic key in firmware; use hardware root of trust (Secure Element / TPM)	critical

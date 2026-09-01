@@ -3,7 +3,7 @@
 # Note: API-1 covers the API-specific case. ssrf covers general SSRF.
 # Section 21 in the skill's group numbering.
 #
-# id	exts	regex	!exclude	hint
+# id	exts	regex	!exclude	hint  (ONE regex: !a|b|c, never !a|!b|!c)
 ssrf	py	requests\.(get|post|put|delete|head|patch|options)\s*\(\s*(request\.(args|form|json|params|GET)\.get|req\.args\.get|req\.form\.get|req\.json\.get)\s*\(\s*["']\w+["']\s*\)	ssrf: user-supplied URL passed to HTTP client — validate against allowlist		critical
 ssrf	py	httpx\.(get|post|put|delete|head|patch|options)\s*\(\s*(request\.(args|form|json|params|GET)\.get|req\.args\.get|req\.form\.get|req\.json\.get)\s*\(\s*["']\w+["']\s*\)			critical
 ssrf	py	urllib\.request\.urlopen\s*\(\s*(request\.(args|form|json|params|GET)\.get|req\.args\.get|req\.form\.get|req\.json\.get)\s*\(\s*["']\w+["']\s*\)			critical

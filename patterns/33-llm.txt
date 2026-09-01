@@ -1,8 +1,8 @@
 # OWASP Top 10 for LLM Applications Patterns
-# id	exts	regex	!exclude	hint	severity
+# id	exts	regex	!exclude	hint	severity  (ONE regex: !a|b|c, never !a|!b|!c)
 # POSIX ERE only - BSD grep has no -P and fails silently on it.
 
 llm-output-html	js,ts	(innerHTML|dangerouslySetInnerHTML)\s*[:=]\s*[^;]*(completion|response|message)\.(content|text)	sanitize or escape LLM output before injecting into DOM		critical
 llm-rag-no-filter	py,js,ts	\.(similarity_search|similaritySearch|as_retriever|asRetriever|max_marginal_relevance_search)\s*\(	!(filter|where|metadata|tenant|namespace)	enforce tenant and user access control metadata filter on vector search	high
 llm-excessive-agency	py,js,ts	(run_tool|execute_tool|call_tool|execute)\s*\([^)]*(auto_approve\s*=\s*True|approval\s*=\s*False|bypass_approval\s*:\s*true)	require human confirmation for state-changing or destructive LLM tool calls		high
-llm-unbounded-tokens	py,js,ts	(openai|anthropic|client|chat)\.(chat|completions|messages)\.create\s*\([^)]*\)	!max_tokens|!max_completion_tokens|!maxOutputTokens	specify explicit max_tokens limit on LLM API calls to prevent resource exhaustion		medium
+llm-unbounded-tokens	py,js,ts	(openai|anthropic|client|chat)\.(chat|completions|messages)\.create\s*\([^)]*\)	!max_tokens|max_completion_tokens|maxOutputTokens	specify explicit max_tokens limit on LLM API calls to prevent resource exhaustion		medium

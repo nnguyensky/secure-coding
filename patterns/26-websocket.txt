@@ -2,9 +2,9 @@
 # New IDs: ws-origin, ws-auth
 # Section 26 in the skill's group numbering.
 #
-# id	exts	regex	!exclude	hint
+# id	exts	regex	!exclude	hint  (ONE regex: !a|b|c, never !a|!b|!c)
 ws-origin	*	new\s+WebSocket\s*\(|ws:\/\/|wss:\/\/	websocket: verify Origin header against trusted origins before accepting connection		high
-ws-origin	*	WebSocketServer\s*\(\s*\{|\.on\s*\(\s*["']connection["']	!origin|!verifyOrigin	websocket: validate Origin header to prevent cross-site WebSocket hijacking	high
+ws-origin	*	WebSocketServer\s*\(\s*\{|\.on\s*\(\s*["']connection["']	!origin|verifyOrigin	websocket: validate Origin header to prevent cross-site WebSocket hijacking	high
 ws-origin	py	WebSocket\s*\(\s*request|asyncio\.websockets\.serve|ws\s*=\s*await\s*websockets	websocket: verify Origin header against trusted origins		high
 ws-origin	go	gorilla/websocket|nhooyr\.io/websocket|Upgrader\s*\{|CheckOrigin\s*[:=]	websocket: set CheckOrigin to validate against trusted origins		high
 ws-origin	java,kt	WebSocketServlet|@ServerEndpoint|TextWebSocketHandler|WebSocketHandler	websocket: validate Origin header before accepting WebSocket upgrade		high

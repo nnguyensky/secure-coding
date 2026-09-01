@@ -1,5 +1,5 @@
 # OWASP SCP - Cryptographic Practices [101-106]
-# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
 # POSIX ERE only - BSD grep has no -P and fails silently on it.
 
 weak-rng	*	(token|key|secret|nonce|salt|otp|reset|iv)[^;]*Math\.random\s*\(\)	use crypto.randomBytes or secrets.token_urlsafe	use crypto.randomBytes or secrets.token_urlsafe	medium

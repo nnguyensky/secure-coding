@@ -76,10 +76,33 @@ Run verification to confirm zero open issues:
 6. **Done Gate:** Run `node hooks/summary.js && node hooks/audit.js`.
 
 #### Done Gate Criteria:
+
+**Tool checks — necessary, not sufficient:**
 - [ ] `summary.js` reports `0 open` findings.
 - [ ] `audit.js` reports `0 critical/high` vulnerabilities.
 - [ ] Every finding is fixed in code (never marked as accepted or deferred).
 - [ ] Tests pass cleanly (`node hooks/test.js`).
+
+**Manual review — required, because the scanner cannot check these.**
+A green scan is not a pass on its own. For every route, handler, or data
+access you added or changed, answer these in writing. "N/A" is a valid
+answer; silence is not:
+
+- [ ] **Ownership:** For each record fetched by an ID from the request, what
+      scopes it to the caller? Name the check. `findById(req.params.id)` with
+      no owner predicate is BOLA/IDOR — the single most common API breach, and
+      no pattern can see it. (Smell 1, 4)
+- [ ] **Authorization:** For each new route, which guard denies an
+      unauthenticated or under-privileged caller? Deny-by-default, or a named
+      middleware. An admin route with no guard scans clean. (Smell 2, 4)
+- [ ] **Untrusted input reaching a sink:** Trace each request value to where
+      it lands — query, file path, shell, outbound URL, template. The scanner
+      catches these only when the input sits *inside* the sink call; assign it
+      to a variable first and it is invisible. (Smell 1)
+- [ ] **Failure direction:** If the auth or permission check throws, does the
+      request end up denied? (Smell 4)
+
+If you cannot name the check, it does not exist — go add it.
 
 ---
 
@@ -157,6 +180,27 @@ Run verification to confirm zero open issues:
 - **Privileged Containers:** Remove `privileged: true` and drop all unnecessary Linux capabilities (`drop: ["ALL"]`).
 - **Network Isolation:** Apply Kubernetes `NetworkPolicy` to restrict traffic between namespaces and pods.
 - **Host Sharing:** Disable host namespace sharing (`hostNetwork`, `hostPID`, `hostIPC`).
+
+---
+
+## ⚠️ What the Scanner Cannot See
+
+The scanner matches regexes line by line. That makes it fast and precise on
+what it covers, and structurally blind to everything below. **A clean scan
+means "no known bad patterns matched" — never "this code is secure."**
+
+| Blind spot | Why | Who catches it |
+|---|---|---|
+| **Missing checks** (IDOR/BOLA, absent authz, no rate limit) | A regex sees what is *present*. There is no pattern for a guard that was never written. | Done Gate manual review |
+| **Multi-line taint** | Patterns require untrusted input *inside* the sink call. `readfile($_GET["f"])` is caught; `$f = $_GET["f"]; readfile($f);` is not. | Done Gate manual review |
+| **Cross-file / cross-function flow** | Each file is matched in isolation, with no call graph. | Design review, threat model |
+| **Logic and business rules** | Price manipulation, workflow bypass, race conditions in app logic. | `checks/threat-model.md` |
+| **Runtime and config state** | What is actually deployed, which env vars are set, real TLS termination. | Deployment review |
+| **Novel or obfuscated code** | Only known shapes match; renamed or dynamically built calls slip past. | Human review |
+
+Corollary: **never treat a finding count of zero as evidence of security.**
+It is evidence that the mechanical layer found nothing — which is exactly
+why Rule 1 puts the security in the first draft rather than the scan.
 
 ---
 

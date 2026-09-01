@@ -2,7 +2,7 @@
 # New IDs: oauth2-state, oauth2-token, oauth2-redirect
 # Section 24 in the skill's group numbering.
 #
-# id	exts	regex	!exclude	hint
+# id	exts	regex	!exclude	hint  (ONE regex: !a|b|c, never !a|!b|!c)
 oauth2-state	*	oauth.*callback.*state\s*[:=]\s*(null|false|""|'')	oauth2: state parameter must be a cryptographically random, non-guessable value		high
 oauth2-state	*	(state\s*[:=]\s*(req\.|request\.|params\.|query\.))	oauth2: never trust client-supplied state — generate and validate server-side		high
 oauth2-state	py	state\s*=\s*(request\.(args|form|query)\.get|req\.args\.get)\s*\(\s*["']state["']\s*\)	oauth2: validate state parameter against server-stored value		high

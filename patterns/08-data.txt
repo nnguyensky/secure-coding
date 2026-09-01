@@ -1,5 +1,5 @@
 # OWASP SCP - Data Protection [131-142]
-# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
 # POSIX ERE only - BSD grep has no -P and fails silently on it.
 
 world-writable	*	(chmod|chown)\s*\([^)]*0?777|0o777|0777	use 0600 or 0644, never 0777		low

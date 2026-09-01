@@ -1,5 +1,5 @@
 # OWASP SCP - Authentication & Password Management [23-57]
-# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
 # POSIX ERE only - BSD grep has no -P and fails silently on it.
 
 weak-hash	*	\b(md5|sha1)\s*\(	never use MD5/SHA-1 for security — use sha256+ for checksums, argon2id for passwords		high

@@ -526,6 +526,28 @@ bad('sbd_legacy_tls', 'py', 'ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_0)', 'sbd-l
 good('sbd_modern_tls', 'py', 'ctx = ssl.create_default_context()');
 bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
 
+// --- pattern file hygiene ---
+// The exclusion column takes ONE !regex. Writing `!a|!b|!c` makes only `a`
+// exclude; `b` and `c` then require a literal `!` in the code and never fire,
+// so safe code keeps getting flagged.
+(function exclusionSyntax() {
+  uniq('pattern-exclusion-syntax');
+  const dir = path.join(DIR, 'patterns');
+  const offenders = [];
+  for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.txt'))) {
+    const lines = fs.readFileSync(path.join(dir, f), 'utf8').split(/\r?\n/);
+    lines.forEach((line, i) => {
+      if (!line || line.startsWith('#')) return;
+      const cols = line.split('\t');
+      if (cols.length > 3 && cols[3].startsWith('!') && cols[3].slice(1).includes('!')) {
+        offenders.push(`${f}:${i + 1} ${cols[0]} -> ${cols[3]}`);
+      }
+    });
+  }
+  if (offenders.length === 0) pass++;
+  else { fail++; console.log('EXCL malformed exclusion columns:\n  ' + offenders.join('\n  ')); }
+})();
+
 // --- CLI argument handling ---
 // An unknown flag used to fall through to hook mode and block forever on a
 // stdin read. It must fail loudly instead, without breaking real hook input.

@@ -1,5 +1,5 @@
 # OWASP SCP - System Configuration [151-166]
-# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
 # POSIX ERE only - BSD grep has no -P and fails silently on it.
 # Targets config, container, and CI files - not application source.
 

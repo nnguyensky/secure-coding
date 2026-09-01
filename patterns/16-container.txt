@@ -2,7 +2,7 @@
 # IDs use C- prefix to distinguish from OWASP SCP items (1-213).
 # Section 16 in the skill's group numbering.
 #
-# id	exts	regex	!exclude	hint
+# id	exts	regex	!exclude	hint  (ONE regex: !a|b|c, never !a|!b|!c)
 C-1	Dockerfile,yml,yaml	USER\s+root|user:\s*root|user:\s*"root"|user:\s*'root'		C-1 Container root: container runs as root — create unprivileged user and USER it	high
 C-2	yml,yaml	privileged:\s*true|securityContext:.*privileged:\s*true		C-2 Privileged container: effectively no isolation — remove privileged flag	high
 C-3	yml,yaml	hostNetwork:\s*true|hostPID:\s*true|hostIPC:\s*true		C-3 Host namespace: container shares host network/pid/ipc — use container-scoped namespaces	high

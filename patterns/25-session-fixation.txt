@@ -2,7 +2,7 @@
 # New ID: session-fixation
 # Section 25 in the skill's group numbering.
 #
-# id	exts	regex	!exclude	hint
+# id	exts	regex	!exclude	hint  (ONE regex: !a|b|c, never !a|!b|!c)
 session-fixation	*	(req|request)\.session\.id\s*[:=]|session\.session_id\s*[:=]	session fixation: never accept session ID from client — regenerate after login		high
 session-fixation	py	session\[.id.\]\s*=\s*(request|req)\.(form|args|cookies)\.get	session fixation: do not set session ID from client input		high
 session-fixation	js,ts	req\.session\.id\s*=\s*(req\.|params\.|query\.)	session fixation: do not set session ID from client input		high

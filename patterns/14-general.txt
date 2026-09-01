@@ -1,5 +1,5 @@
 # OWASP SCP - General Coding Practices [202-213]
-# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
 # POSIX ERE only - BSD grep has no -P and fails silently on it.
 
 insecure-deserialization	*	pickle\.loads?\s*\(	use JSON or a safe format; validate shape after parsing		critical
@@ -36,7 +36,7 @@ redos-input	py	re\.(compile|search|match|findall)\s*\(\s*(request\.|req\.)	escap
 
 # XML External Entity (XXE)
 xxe	py	lxml\.etree\.fromstring\s*\(|xml\.etree\.ElementTree\.parse\s*\(	!defusedxml	disable external entity resolution or use defusedxml	high
-xxe	java,kt	DocumentBuilderFactory\.newInstance\(\)\.newDocumentBuilder|XMLInputFactory\.newInstance	!FEATURE_SECURE_PROCESSING|!disallow-doctype-decl	disable external DTDs and entities in XML parsers	high
+xxe	java,kt	DocumentBuilderFactory\.newInstance\(\)\.newDocumentBuilder|XMLInputFactory\.newInstance	!FEATURE_SECURE_PROCESSING|disallow-doctype-decl	disable external DTDs and entities in XML parsers	high
 xxe	php	libxml_disable_entity_loader\s*\(\s*false\s*\)|simplexml_load_string\s*\([^)]*\$_	disable external entity loading in XML parsers		high
 
 # LLM & AI Security (OWASP Top 10 for LLMs)
@@ -46,4 +46,4 @@ llm-unsafe-exec	py	(eval|exec)\s*\(\s*(response|completion|message|output)\.(con
 llm-unsafe-exec	js,ts	(eval|new\s+Function)\s*\(\s*(response|completion|result|output)\.(content|text)	never evaluate raw LLM-generated code strings directly		critical
 
 # React Server Components & Server Actions Security
-rsc-unvalidated-action	js,ts	['"]use\s+server['"][\s\S]*?(export\s+)?(async\s+)?function\s+\w+\s*\([^)]*\)	!z\.|!parse|!validate|!safeParse	validate all Server Action arguments using a schema parser (e.g. Zod) before processing	high
+rsc-unvalidated-action	js,ts	['"]use\s+server['"][\s\S]*?(export\s+)?(async\s+)?function\s+\w+\s*\([^)]*\)	!z\.|parse|validate|safeParse	validate all Server Action arguments using a schema parser (e.g. Zod) before processing	high

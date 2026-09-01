@@ -2,20 +2,20 @@
 # IDs use API- prefix to distinguish from OWASP SCP items (1-213).
 # Section 15 in the skill's group numbering.
 #
-# id	exts	regex	!exclude	hint
+# id	exts	regex	!exclude	hint  (ONE regex: !a|b|c, never !a|!b|!c)
 API-1	py	\.get\([^)]*request\.(args|form|json|params)\.get\(		API-1 SSRF: user-supplied URL passed to HTTP client — validate and allowlist target URLs	high
 API-1	js,ts	axios\.(get|post|put|delete|patch)\([^)]*req\.(query|body|params)\.		API-1 SSRF: user-supplied URL passed to HTTP client — validate and allowlist target URLs	high
 API-1	go	http\.Get\([^)]*r\.URL\.Query|http\.Get\([^)]*r\.FormValue		API-1 SSRF: user-supplied URL passed to HTTP client — validate and allowlist target URLs	high
 API-1	java,kt	httpClient\.execute\([^)]*request\.getParameter|httpGet\([^)]*request\.getParameter		API-1 SSRF: user-supplied URL passed to HTTP client — validate and allowlist target URLs	high
-API-2	py,js,ts,go,java,kt	@app\.(route|get|post|put|delete|patch)\(.*\)\ndef |router\.(get|post|put|delete|patch)\(.*\).*=>|app\.(get|post|put|delete|patch)\(.*function	!login|!signin|!auth	API-2 Auth: endpoint handles sensitive action without rate limiting — add rate limit middleware	high
+API-2	py,js,ts,go,java,kt	@app\.(route|get|post|put|delete|patch)\(.*\)\ndef |router\.(get|post|put|delete|patch)\(.*\).*=>|app\.(get|post|put|delete|patch)\(.*function	!login|signin|auth	API-2 Auth: endpoint handles sensitive action without rate limiting — add rate limit middleware	high
 API-3	py	__init__\(self, .*kwargs\)|setattr\(self, key, value\)|\.update\(request\.(json|data|form)\)|\w+\(\*{2}request\.(json|data|form)\)		API-3 Mass assignment: user input directly binds to model — allowlist accepted fields	high
 API-3	js,ts	Object\.assign\(.*, req\.(body|data)\)|\.\.\.req\.(body|data)|body: req\.body|data: req\.body		API-3 Mass assignment: user input directly binds to model — allowlist accepted fields	high
 API-4	py	@app\.route.*methods.*GET.*POST|@app\.route.*methods.*POST.*GET		API-4 Overfetch: GET endpoint returns full model — select only needed fields	medium
-API-4	js,ts	router\.(get|post)\(.*res\.json\(.*\)|\.findMany\(\)|\.findAll\(\)	!select|!fields	API-4 Overfetch: endpoint returns full model — select only needed fields	medium
-API-5	py	@app\.route.*methods.*DELETE|@app\.route.*methods.*PUT|@app\.route.*methods.*PATCH	!auth|!permission|!login	API-5 BFLA: state-changing endpoint without explicit auth check — verify caller has admin role	high
-API-5	js,ts	router\.(delete|put|patch)\(.*\)|app\.(delete|put|patch)\(.*\)	!auth|!permission|!login	API-5 BFLA: state-changing endpoint without explicit auth check — verify caller has admin role	high
-API-6	py	@app\.route.*POST.*json|@app\.route.*PUT.*json	!limit|!throttle|!rate	API-6 Unbounded consumption: no request size limit — set max content length	medium
-API-6	js,ts	app\.use\(express\.json\(\)\)|bodyParser\.json\(\)|app\.post\(.*req\.body	!limit|!size	API-6 Unbounded consumption: no request size limit — set max content length	medium
+API-4	js,ts	router\.(get|post)\(.*res\.json\(.*\)|\.findMany\(\)|\.findAll\(\)	!select|fields	API-4 Overfetch: endpoint returns full model — select only needed fields	medium
+API-5	py	@app\.route.*methods.*DELETE|@app\.route.*methods.*PUT|@app\.route.*methods.*PATCH	!auth|permission|login	API-5 BFLA: state-changing endpoint without explicit auth check — verify caller has admin role	high
+API-5	js,ts	router\.(delete|put|patch)\(.*\)|app\.(delete|put|patch)\(.*\)	!auth|permission|login	API-5 BFLA: state-changing endpoint without explicit auth check — verify caller has admin role	high
+API-6	py	@app\.route.*POST.*json|@app\.route.*PUT.*json	!limit|throttle|rate	API-6 Unbounded consumption: no request size limit — set max content length	medium
+API-6	js,ts	app\.use\(express\.json\(\)\)|bodyParser\.json\(\)|app\.post\(.*req\.body	!limit|size	API-6 Unbounded consumption: no request size limit — set max content length	medium
 API-7	py	pagination.*=.*None|per_page.*=.*-1|page_size.*=.*-1|no.*limit.*query		API-7 Unbounded pagination: no max page size — enforce a default and maximum	medium
 API-7	js,ts	limit:\s*-1|noLimit|pagination:\s*false|perPage:\s*-1		API-7 Unbounded pagination: no max page size — enforce a default and maximum	medium
 API-8	py	raise.*\(.*str\(e\)\)|raise.*\(.*traceback|except.*as.*e:.*return.*str|return.*str\(e\)|return.*str\(ex\)		API-8 Verbose errors: exception details leak to API response — return generic error message	medium
@@ -23,5 +23,5 @@ API-8	js,ts	catch.*err.*res\.(send|json)\(err\)|catch.*error.*res\.(send|json)\(
 API-8	java,kt	catch.*Exception.*e.*response.*e\.getMessage\(\)|catch.*Exception.*e.*res\.send\(e\.toString|catch.*Exception.*e.*return.*e\.getMessage		API-8 Verbose errors: exception details leak to API response — return generic error message	medium
 API-9	py	@app\.route.*v1|@app\.route.*version.*1|api/v1/		API-9 Deprecated version: old API version still exposed — remove or redirect to current version	medium
 API-9	js,ts	/api/v1/|router\.use.*v1|app\.use.*v1		API-9 Deprecated version: old API version still exposed — remove or redirect to current version	medium
-API-10	py	requests\.(get|post|put)\([^)]*\)\.json\(\)|httpx\.(get|post|put)\([^)]*\)\.json\(\)	!validate|!check|!schema	API-10 Unsafe API consumption: third-party API response used without validation — validate response schema	medium
-API-10	js,ts	fetch\(.*\)\.then\(.*=>.*\.json\(\)|axios\.(get|post)\(.*\)\.then\(.*=>.*\.data	!validate|!check|!schema	API-10 Unsafe API consumption: third-party API response used without validation — validate response schema	medium
+API-10	py	requests\.(get|post|put)\([^)]*\)\.json\(\)|httpx\.(get|post|put)\([^)]*\)\.json\(\)	!validate|check|schema	API-10 Unsafe API consumption: third-party API response used without validation — validate response schema	medium
+API-10	js,ts	fetch\(.*\)\.then\(.*=>.*\.json\(\)|axios\.(get|post)\(.*\)\.then\(.*=>.*\.data	!validate|check|schema	API-10 Unsafe API consumption: third-party API response used without validation — validate response schema	medium

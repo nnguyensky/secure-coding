@@ -1,5 +1,5 @@
 # OWASP SCP - Communication Security [143-150]
-# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
 # POSIX ERE only - BSD grep has no -P and fails silently on it.
 
 tls-off	*	verify\s*=\s*False	leave TLS verification on; for self-signed dev certs, add CA to trust store		critical

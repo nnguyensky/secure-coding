@@ -2,8 +2,8 @@
 # New ID distinct from existing: nosql-inject
 # Section 23 in the skill's group numbering.
 #
-# id	exts	regex	!exclude	hint
-nosql-inject	js,ts	\.find\s*\(\s*\{[^}]*req\.(body|query|params)\.|\.(findOne|findOneAndUpdate|findOneAndDelete|updateOne|deleteOne)\s*\(\s*\{[^}]*req\.(body|query|params)	!String\(|!Number\(|!parseInt\(|!parseFloat\(|!Boolean\(	nosql injection: sanitize and validate user input before using in MongoDB queries	critical
+# id	exts	regex	!exclude	hint  (ONE regex: !a|b|c, never !a|!b|!c)
+nosql-inject	js,ts	\.find\s*\(\s*\{[^}]*req\.(body|query|params)\.|\.(findOne|findOneAndUpdate|findOneAndDelete|updateOne|deleteOne)\s*\(\s*\{[^}]*req\.(body|query|params)	!String\(|Number\(|parseInt\(|parseFloat\(|Boolean\(	nosql injection: sanitize and validate user input before using in MongoDB queries	critical
 nosql-inject	js,ts	\$where\s*:|\$regex\s*:|\$gt\s*:|\$ne\s*:|\$nin\s*:|\$exists\s*:	nosql injection: user input may inject MongoDB operators — validate input type		critical
 nosql-inject	js,ts	\.aggregate\s*\(\s*\[[^]]*req\.(body|query|params)	nosql injection: user input in aggregation pipeline — validate input		critical
 nosql-inject	py	\.find\s*\(\s*\{.*request\.(form|json|args|data)\.get|\.find_one\s*\(\s*\{.*request\.(form|json|args|data)\.get	nosql injection: user input in MongoDB query — validate input type and value		critical
