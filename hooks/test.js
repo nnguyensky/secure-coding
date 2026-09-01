@@ -606,6 +606,42 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   clean('notAssignment', 'const eq = req.query.x == other;\nfetch(other);', 'js');
 })();
 
+// --- CWE taxonomy reaches SARIF ---
+// GitHub code scanning keys on external/cwe/cwe-N tags; a finding without one
+// lands as an untyped alert.
+(function cweSarif() {
+  const cweFile = path.join(TMP, 'cwe.jsonl');
+  const src = path.join(TMP, 'cwe-src.js');
+  fs.writeFileSync(src, 'db.query("SELECT * FROM t WHERE a=\'" + a + "\'");\n');
+  spawnSync('node', [SCAN, '--files', src], {
+    env: { ...process.env, SECURE_CODING_STATE: cweFile, SECURE_CODING_REPORT: 'off' },
+    encoding: 'utf8',
+  });
+  const out = spawnSync('node', [path.join(DIR, 'hooks', 'report.js'), '--sarif'], {
+    env: { ...process.env, SECURE_CODING_STATE: cweFile, SECURE_CODING_REPORT: 'off' },
+    encoding: 'utf8',
+  });
+  uniq('cwe-sarif');
+  try {
+    const rules = JSON.parse(out.stdout).runs[0].tool.driver.rules;
+    const rule = rules.find(r => r.id === 'sql-concat');
+    const tags = (rule && rule.properties && rule.properties.tags) || [];
+    if (tags.includes('external/cwe/cwe-89') && /cwe.mitre.org/.test(rule.helpUri)) pass++;
+    else { fail++; console.log(`MISS  cwe-sarif: tags=${JSON.stringify(tags)}`); }
+  } catch (e) { fail++; console.log(`MISS  cwe-sarif: ${e.message}`); }
+
+  // fixes.md must carry the CWE for the ids the map claims.
+  uniq('cwe-fixes-annotated');
+  const fixes = fs.readFileSync(path.join(DIR, 'checks', 'fixes.md'), 'utf8');
+  const need = ['sql-concat', 'shell', 'xss-sink', 'weak-hash', 'taint-ssrf'];
+  const bad = need.filter(id => {
+    const m = fixes.match(new RegExp('^## ' + id + '\\n(OWASP:[^\\n]*)', 'm'));
+    return !m || !/CWE-\d+/.test(m[1]);
+  });
+  if (bad.length === 0) pass++;
+  else { fail++; console.log(`MISS  cwe-fixes-annotated: ${bad.join(', ')}`); }
+})();
+
 // --- BSI AI-SBOM: all 7 clusters present ---
 (function aiSbomClusters() {
   const { generateAiClusters, countAiTodos } = require('./sbom.js');

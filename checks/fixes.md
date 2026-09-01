@@ -2,14 +2,14 @@
 # One block per check id. scan.js prints only the blocks it matched.
 
 ## weak-hash
-OWASP: 30,105
+OWASP: 30,105 | CWE-328 | A04:2025
 MD5 and SHA-1 are broken. Do not use them for anything security-related.
 Wrong: md5(x), sha1(x)
 Right: sha256 for checksums and signatures. argon2id for passwords.
 Watch: fine only for a non-security checksum (cache key, dedupe) — say so in a comment if that is the case.
 
 ## pw-fast-hash
-OWASP: 30,31
+OWASP: 30,31 | CWE-916 | A04:2025
 A password needs a slow hash. Fast hashes are guessed in bulk.
 Wrong: sha256(password), md5(password), any single-pass hash
 Right: argon2id with default params. Else scrypt, or bcrypt at cost 12+.
@@ -17,56 +17,56 @@ Watch: never log the hash, never return it, compare in constant time.
 
 
 ## tls-off
-OWASP: 143,144,145,146
+OWASP: 143,144,145,146 | CWE-319 | A04:2025
 Turning off certificate checks makes TLS decorative. Anyone on the path can read and change traffic.
 Wrong: verify=False, rejectUnauthorized:false, InsecureSkipVerify:true
 Right: leave verification on. For a self-signed dev cert, add that CA to the trust store.
 Watch: this must not differ between dev and prod — it always ships.
 
 ## xss-sink
-OWASP: 19,20
+OWASP: 19,20 | CWE-79 | A05:2025
 Putting user data into HTML as markup runs it as script.
 Wrong: innerHTML =, dangerouslySetInnerHTML, document.write, v-html, |safe
 Right: textContent, or the framework's normal binding, which escapes.
 Watch: must render user HTML? Sanitize with a maintained library (DOMPurify), never a regex.
 
 ## eval
-OWASP: 210,203
+OWASP: 210,203 | CWE-95 | A05:2025
 eval on anything touched by input is code execution.
 Wrong: eval(x), new Function(x), setTimeout("string"), exec(f"...")
 Right: a lookup table, JSON.parse, or a real parser.
 Watch: string-as-code in setTimeout/setInterval is eval wearing a hat.
 
 ## sql-concat
-OWASP: 167,21
+OWASP: 167,21 | CWE-89 | A05:2025
 SQL built by joining strings is SQL injection. Escaping by hand does not fix it.
 Wrong: execute(f"SELECT ... {id}"), "SELECT ..." + x, ${x} in a query
 Right: parameterized queries — execute(sql, [id]). Or the ORM's normal query API.
 Watch: table and column names cannot be parameterized — allowlist them instead.
 
 ## shell
-OWASP: 22,203
+OWASP: 22,203 | CWE-78 | A05:2025
 Passing a built string to a shell lets input add its own commands.
 Wrong: shell=True, os.system(x), popen(x), child_process.exec(x)
 Right: pass an argument list, no shell — subprocess.run([cmd, arg]), execFile.
 Watch: quoting the input is not a fix; the shell has too many ways in.
 
 ## weak-rng
-OWASP: 60,104
+OWASP: 60,104 | CWE-338 | A04:2025
 Regular random is predictable. An attacker can compute the next value.
 Wrong: Math.random(), random.randint(), new Random() for tokens, keys, salts, OTPs, resets
 Right: crypto RNG — secrets.token_urlsafe, crypto.randomBytes, SecureRandom.
 Watch: fine for tests, shuffles, jitter. Not for anything anyone could guess to gain access.
 
 ## secret
-OWASP: 35,102,135,172
+OWASP: 35,102,135,172 | CWE-798 | A04:2025
 A secret in source is public. It stays in git history after you delete it.
 Wrong: hard-coded key, token, password, or private key
 Right: read from the environment or a secret manager. Commit an example file with blanks.
 Watch: if it was ever committed, rotate it — removing the line is not enough.
 
 ## weak-crypto
-OWASP: 133,105
+OWASP: 133,105 | CWE-327 | A04:2025
 Broken ciphers and modes. ECB leaks the shape of your data.
 Wrong: DES, RC4, Blowfish, AES-ECB
 Right: AES-GCM or ChaCha20-Poly1305 — authenticated encryption.
@@ -80,14 +80,14 @@ Right: httpOnly, secure, sameSite together.
 Watch: httpOnly:false only if JS genuinely must read it — a session id never must.
 
 ## jwt
-OWASP: 28,79
+OWASP: 28,79 | CWE-347 | A07:2025
 Skipping signature checks means anyone can write their own token.
 Wrong: alg "none", verify:false, verify_signature:False
 Right: verify the signature, pin the expected algorithm, check exp and aud.
 Watch: never let the token's own header pick the algorithm.
 
 ## mem
-OWASP: 195,196,197,201
+OWASP: 195,196,197,201 | CWE-787 | A06:2025
 Unbounded copies overflow the buffer.
 Wrong: strcpy, strcat, sprintf, gets, alloca
 Right: strncpy/snprintf with a real size, or the platform's safe variants.
@@ -101,7 +101,7 @@ Right: an explicit allowlist of origins.
 Watch: never reflect the request's Origin header back unchecked.
 
 ## csrf-exempt
-OWASP: 73,74
+OWASP: 73,74 | CWE-352 | A01:2025
 Disabling CSRF protection leaves state-changing requests open to forgery.
 Wrong: @csrf_exempt, csrf: false, csrf_exempt()
 Right: keep CSRF protection on; send a per-session or per-request token with every state change.
@@ -115,42 +115,42 @@ Right: SameSite=None with Secure, or SameSite=Lax/Strict for session cookies.
 Watch: SameSite=None requires Secure to work at all.
 
 ## world-writable
-OWASP: 142,192
+OWASP: 142,192 | CWE-732 | A02:2025
 World-writable permissions let any local user read or change the file.
 Wrong: chmod 777, 0777, 0o777
 Right: the narrowest permission the file needs; 600 for secrets, 644 for read-only public files.
 Watch: never 777 on config, keys, or anything security-relevant.
 
 ## mktemp
-OWASP: 132,141
+OWASP: 132,141 | CWE-377 | A06:2025
 mktemp/tmpnam create predictable temp files — a race lets an attacker pre-create them.
 Wrong: mktemp(), tmpnam()
 Right: the platform's secure temp API (tempfile, mkstemp, tmpfile).
 Watch: always use the secure variant; never guess a temp name.
 
 ## exec-py
-OWASP: 210,203
+OWASP: 210,203 | CWE-78 | A05:2025
 exec() runs a string as code. On anything touched by input, that is code execution.
 Wrong: exec(x), exec(compile(x, ...))
 Right: a lookup table, JSON.parse, or a real parser.
 Watch: exec is eval wearing a hat — same risk, same fix.
 
 ## debug-on
-OWASP: 157,162,109
+OWASP: 157,162,109 | CWE-489 | A02:2025
 Debug mode leaks stack traces, config, and sometimes a live console.
 Wrong: DEBUG=True, FLASK_ENV=development, app.run(debug=True) in anything deployable
 Right: debug off by default; enable only from a local-only env file.
 Watch: this is the single most common way internals reach production.
 
 ## dir-listing
-OWASP: 153,158
+OWASP: 153,158 | CWE-548 | A02:2025
 Directory listing hands an attacker your file layout.
 Wrong: autoindex on, Options +Indexes, directory_listing: true
 Right: turn it off; serve an explicit index or 404.
 Watch: check the static-file and upload locations specifically.
 
 ## server-banner
-OWASP: 162
+OWASP: 162 | CWE-200 | A02:2025
 Version banners tell an attacker which exploits to try.
 Wrong: server_tokens on, expose_php = On
 Right: server_tokens off; strip version headers at the proxy.
@@ -164,7 +164,7 @@ Right: allow only the methods the app uses, usually GET and POST.
 Watch: TRACE enables cross-site tracing; disable it explicitly.
 
 ## default-cred
-OWASP: 54,175,178
+OWASP: 54,175,178 | CWE-1392 | A07:2025
 Default accounts and passwords are the first thing tried.
 Wrong: root/admin/sa/postgres with admin, password, changeme, 123456
 Right: unique credentials from a secret manager; disable unused default accounts.
@@ -199,28 +199,28 @@ Right: least privilege per trust level; separate credentials for read and write.
 Watch: the app account should not be able to DROP or GRANT.
 
 ## dynamic-include
-OWASP: 180,190
+OWASP: 180,190 | CWE-98 | A05:2025
 A user-controlled include path executes a file the attacker chooses.
 Wrong: include($_GET['page']), require($_REQUEST[...])
 Right: map an index value to a fixed allowlist of paths.
 Watch: never pass a path through; pass a key that selects one.
 
 ## open-redirect
-OWASP: 189
+OWASP: 189 | CWE-601 | A01:2025
 An open redirect lends your domain to a phishing page.
 Wrong: redirect(req.query.next) straight through
 Right: allowlist targets, or accept only validated relative paths.
 Watch: check the whole URL - //evil.com and \/\/evil.com both escape a naive check.
 
 ## upload-exec
-OWASP: 185,186
+OWASP: 185,186 | CWE-434 | A06:2025
 An upload directory the server executes is a shell.
 Wrong: a location block mapping uploads to php/cgi/fastcgi
 Right: serve uploads from a separate non-executing location or a content server.
 Watch: turn off execute permission on the directory as well.
 
 ## path-traversal
-OWASP: 180,190,191
+OWASP: 180,190,191 | CWE-22 | A01:2025
 A user-supplied path lets an attacker read or write files outside the intended directory.
 Wrong: File.read(params[:file]), os.Open(r.URL.Query().Get("path")), new File(req.getParameter("p"))
 Right: resolve the path, then confirm it stays inside the allowed directory before opening.
@@ -381,7 +381,7 @@ Right: Use structured logging with parameterized fields. Sanitize input by strip
 Watch: log injection can lead to log forging, log rotation attacks, or XSS in log viewers.
 
 ## log-leak
-OWASP: Logging CS, OWASP SCP [119]
+OWASP: Logging CS, OWASP SCP [119] | CWE-532 | A09:2025
 Logging passwords, tokens, secrets, or PII exposes sensitive data in log files and monitoring systems.
 Wrong: console.log("Password:", password), logger.info("Token: " + token)
 Right: Remove or mask sensitive fields before logging. Use redaction middleware for sensitive data.
@@ -395,21 +395,21 @@ Right: hash with argon2id (preferred), scrypt, or bcrypt at cost 12+. Always use
 Watch: never log the hash, never return it to the client, compare in constant time.
 
 ## ssrf
-OWASP: SSRF Prevention CS, OWASP API Top 10 API-1
+OWASP: SSRF Prevention CS, OWASP API Top 10 API-1 | CWE-918 | A06:2025
 User-supplied URLs passed to server-side HTTP clients let attackers reach internal services.
 Wrong: requests.get(user_url), fetch(req.query.url), http.Get(req.URL.Query().Get("url"))
 Right: validate URL against an allowlist of permitted hosts/schemes. Block internal IPs (127.0.0.0/8, 10.0.0.0/8, 169.254.0.0/16, ::1).
 Watch: DNS rebinding can bypass IP checks — resolve first, then check the resolved address.
 
 ## file-upload
-OWASP: File Upload CS, OWASP SCP [183]
+OWASP: File Upload CS, OWASP SCP [183] | CWE-434 | A06:2025
 Unvalidated file uploads allow malicious files, executable code, or resource exhaustion.
 Wrong: saving upload directly to disk without type or size check
 Right: validate MIME type server-side (not just Content-Type header), check magic bytes, enforce max file size, store outside web root.
 Watch: client-provided Content-Type headers are trivially forged — always verify server-side.
 
 ## nosql-inject
-OWASP: NoSQL Security CS
+OWASP: NoSQL Security CS | CWE-943 | A05:2025
 User input injected into NoSQL queries can manipulate query operators, bypassing authentication or extracting data.
 Wrong: db.collection.find({username: req.body.username, password: req.body.password})
 Right: validate input type and value before use in queries. Reject objects/arrays where primitives are expected. Use schema validation.
@@ -437,7 +437,7 @@ Right: validate redirect_uri against pre-registered URIs. Reject if not in allow
 Watch: even partial matching (startsWith) can be bypassed — use exact match.
 
 ## session-fixation
-OWASP: Session Management CS [66,67]
+OWASP: Session Management CS [66,67] | CWE-384 | A07:2025
 Not regenerating the session ID after login lets an attacker pre-set a session ID and hijack the authenticated session.
 Wrong: using the same session ID before and after login, accepting session ID from client
 Right: call session.regenerate() (Express), request.session.regenerate() (Kotlin), session.regenerate! (Rails) after successful authentication.
@@ -493,7 +493,7 @@ Right: use build secrets (DOCKER_BUILDKIT=1, --mount=type=secret) or runtime env
 Watch: even with multi-stage builds, ENV in any stage persists in the final image.
 
 ## unpinned-action
-OWASP: Software Supply Chain CS
+OWASP: Software Supply Chain CS | CWE-1357 | A03:2025
 GitHub Actions pinned to mutable tags (v1, main) can be silently modified by the action author.
 Wrong: uses: actions/checkout@v4, uses: actions/setup-node@main
 Right: pin to full commit SHA: uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
@@ -507,7 +507,7 @@ Right: run npm install / yarn / cargo generate-lockfile. Commit the lockfile. Us
 Watch: CI should always use lockfile-only install (npm ci, not npm install) to prevent lockfile modification.
 
 ## docker-digest
-OWASP: Docker Security CS
+OWASP: Docker Security CS | CWE-1104 | A03:2025
 Base image pinned to tag only (node:20-slim) — tags can be moved, builds are not immutable.
 Wrong: FROM node:20-slim, FROM python:3.12-alpine
 Right: pin to digest: FROM node@sha256:abc123... for immutable builds.
@@ -528,7 +528,7 @@ Right: download to a file, verify checksum, then execute. Or install from the pa
 Watch: the script can change between builds — pin the URL or use a package manager.
 
 ## eval-input
-OWASP: Shell Injection CS
+OWASP: Shell Injection CS | CWE-95 | A05:2025
 eval on user-controlled variables executes arbitrary code via shell expansion.
 Wrong: eval $user_input, eval "$config"
 Right: use a case statement, a lookup table, or safe parsing without eval.
@@ -598,14 +598,14 @@ Right: use SSH key authentication. If password is required, reference a secret m
 Watch: Terraform state stores connection attributes in plaintext — even var references are resolved.
 
 ## temp-race
-OWASP: Temporary File CS
+OWASP: Temporary File CS | CWE-367 | A06:2025
 tmpnam creates predictable temp file names — an attacker can pre-create the file (symlink attack).
 Wrong: tmpnam(), tempnam()
 Right: use mktemp (creates and opens atomically) or Python's tempfile.mkdtemp.
 Watch: always use the secure variant; never guess a temp name.
 
 ## set-hide-error
-OWASP: Error Handling CS
+OWASP: Error Handling CS | CWE-209 | A10:2025
 set +e hides command failures — security controls that fail silently may go unnoticed.
 Wrong: set +e before a security-relevant command
 Right: let errexit propagate; handle errors with explicit if/trap.
@@ -626,49 +626,49 @@ Right: quote variables: rm "$file", cp "$src" "$dst".
 Watch: glob expansion on unquoted * can delete unexpected files.
 
 ## ssti
-OWASP: Injection CS
+OWASP: Injection CS | CWE-1336 | A05:2025
 Server-Side Template Injection evaluates untrusted user input within a template engine, leading to remote code execution.
 Wrong: render_template_string(user_input), jinja2.Template(user_input), ejs.render(user_input)
 Right: render static template files and pass user input as contextual data variables.
 Watch: never concatenate user input into template source strings.
 
 ## prototype-pollution
-OWASP: JavaScript Security CS
+OWASP: JavaScript Security CS | CWE-1321 | A05:2025
 Recursive assignment or merge of untrusted objects can overwrite Object.prototype, affecting all application objects.
 Wrong: Object.assign({}, req.body), lodash.merge(target, req.body)
 Right: validate keys, disallow __proto__ and constructor, or use Map / Object.create(null).
 Watch: JSON.parse does not prevent prototype pollution if recursive merge follows.
 
 ## redos-input
-OWASP: Denial of Service CS
+OWASP: Denial of Service CS | CWE-1333 | A05:2025
 Passing unescaped user input directly into regular expression constructors allows ReDoS attacks.
 Wrong: new RegExp(req.query.search), re.compile(request.args.get("q"))
 Right: escape regex special characters or use plain string search methods (indexOf, includes).
 Watch: validate regex input length and enforce timeouts.
 
 ## xxe
-OWASP: XML Security CS
+OWASP: XML Security CS | CWE-611 | A02:2025
 XML External Entity (XXE) injection allows attackers to read server files or trigger SSRF via custom DOCTYPE entities.
 Wrong: standard XML parsing with external entity resolution enabled.
 Right: disable DTDs/external entities (FEATURE_SECURE_PROCESSING, defusedxml) or use JSON.
 Watch: SOAP and SAML parsers often have external entity resolution enabled by default.
 
 ## zip-slip
-OWASP: File Management CS
+OWASP: File Management CS | CWE-22 | A01:2025
 Archive extraction without destination boundary checks allows writing files outside the target directory via path traversal.
 Wrong: tarfile.extractall(), zipfile.extractall(), unzipper.Extract()
 Right: verify resolved destination path starts with the extraction directory before writing.
 Watch: check both zip/tar entry names and symbolic link targets.
 
 ## jwt-none-alg
-OWASP: Authentication CS
+OWASP: Authentication CS | CWE-347 | A07:2025
 Accepting the 'none' algorithm in JWT tokens allows attackers to forge tokens with empty signatures and arbitrary claims.
 Wrong: jwt.verify(token, key, { algorithms: ['none'] }), pyjwt.decode(token, options={"verify_signature": False})
 Right: restrict accepted algorithms to explicit strong algorithms (e.g. ['RS256', 'ES256', 'HS256']).
 Watch: never trust alg header from unverified token payload.
 
 ## jwt-hardcoded-secret
-OWASP: Cryptographic Practices CS
+OWASP: Cryptographic Practices CS | CWE-798 | A07:2025
 Hardcoded symmetric secrets in JWT signing or verification can be extracted from source code or compiled binaries.
 Wrong: jwt.sign(payload, "secret123"), Jwts.builder().setSigningKey("default")
 Right: load symmetric or asymmetric keys from environment variables or a secret manager.
@@ -682,7 +682,7 @@ Right: verify signature with public key or shared secret, and validate exp, aud,
 Watch: decode() should only be used for debugging, never in request authentication flows.
 
 ## cors-wildcard-credentials
-OWASP: Communication Security CS
+OWASP: Communication Security CS | CWE-942 | A02:2025
 Combining Access-Control-Allow-Origin: * with Access-Control-Allow-Credentials: true is insecure and rejected by modern browsers.
 Wrong: cors({ origin: '*', credentials: true })
 Right: specify an exact trusted origin allowlist when credentials (cookies/auth headers) are permitted.
@@ -696,35 +696,35 @@ Right: validate the request Origin against a strict allowlist array before echoi
 Watch: check exact hostname matches, not weak substrings (e.g. attacker-site.com containing target.com).
 
 ## insecure-deserialization
-OWASP: 194,210
+OWASP: 194,210 | CWE-502 | A08:2025
 Deserializing untrusted data runs code. This is remote code execution.
 Wrong: pickle.loads, yaml.load, unserialize, readObject on anything from outside
 Right: JSON to plain values. yaml.safe_load. Validate the shape after parsing.
 Watch: "it's our own service" is not trust — the transport can be tampered with.
 
 ## taint-path-traversal
-OWASP: 180,190,191
+OWASP: 180,190,191 | CWE-22 | A01:2025
 Request data reaches a filesystem call after passing through a variable. Same bug as path-traversal; the pattern scanner misses it because the source and the sink are on different lines.
 Wrong: const p = req.params.name; fs.readFileSync(`/data/${p}`)
 Right: resolve the path, then confirm it stays inside the allowed directory. Or pass a key that selects a file from an allowlist.
 Watch: basename() alone still allows picking any file in that directory.
 
 ## taint-ssrf
-OWASP: 137,138
+OWASP: 137,138 | CWE-918 | A06:2025
 Request data reaches an outbound HTTP call after passing through a variable. The server will fetch whatever the caller names, including internal addresses.
 Wrong: const t = req.query.url; await fetch(t)
 Right: allowlist the destination host, and block private ranges (10.0.0.0/8, 127.0.0.1, 169.254.169.254).
 Watch: check the URL after resolution — redirects and DNS rebinding move the target.
 
 ## taint-command
-OWASP: 22,203
+OWASP: 22,203 | CWE-78 | A05:2025
 Request data reaches a process call after passing through a variable. Anything the caller sends can add its own command.
 Wrong: const c = req.body.cmd; exec(c)
 Right: pass an argument array with no shell — execFile(bin, [arg]), subprocess.run([bin, arg]).
 Watch: quoting the input is not a fix; the shell has too many ways in.
 
 ## taint-sql
-OWASP: 167,21
+OWASP: 167,21 | CWE-89 | A05:2025
 Request data reaches a query call after passing through a variable, so escaping was never applied.
 Wrong: const id = req.params.id; db.query("SELECT * FROM u WHERE id = " + id)
 Right: parameterized queries — db.query(sql, [id]). Or the ORM's normal query API.
@@ -752,7 +752,7 @@ Right: validate action arguments using a schema validator (such as Zod) before e
 Watch: Server Actions are callable via HTTP POST endpoints independent of client UI components.
 
 ## secret-aws-key
-OWASP: Sensitive Data Exposure CS
+OWASP: Sensitive Data Exposure CS | CWE-798 | A04:2025
 Hardcoded AWS access keys in source code risk immediate credential leakage when pushed to version control.
 Wrong: AWS_ACCESS_KEY_ID = "AKIA1234567890ABCDEF"
 Right: load credentials from AWS IAM roles, environment variables, or AWS Secrets Manager.
@@ -780,7 +780,7 @@ Right: apply application restrictions (HTTP referrers / package names) and API r
 Watch: even public Firebase API keys should have granular security rules and Firestore constraints.
 
 ## secret-private-key
-OWASP: Cryptographic Practices CS
+OWASP: Cryptographic Practices CS | CWE-798 | A04:2025
 Private RSA/EC/SSH keys committed to source code compromise the entire Public Key Infrastructure (PKI).
 Wrong: -----BEGIN RSA PRIVATE KEY----- ... -----END RSA PRIVATE KEY-----
 Right: store private keys in KMS, Hardware Security Modules (HSM), or secure environment secrets.

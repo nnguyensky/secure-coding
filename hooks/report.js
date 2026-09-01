@@ -49,6 +49,18 @@ function sectionName(sec) {
   return SECTION_NAMES[String(sec).replace(/^0+/, '')] || 'Other';
 }
 
+// Read "OWASP: ... | CWE-89 | A05:2025" off a fixes.md block. SARIF consumers
+// (GitHub code scanning included) key on CWE, so surface it as a real taxonomy.
+function cweFor(id) {
+  if (!fs.existsSync(FIXES)) return null;
+  const text = fs.readFileSync(FIXES, 'utf8');
+  const m = text.match(new RegExp('^## ' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\n(OWASP:[^\\n]*)', 'm'));
+  if (!m) return null;
+  const cwe = m[1].match(/CWE-(\d+)/);
+  const cat = m[1].match(/(A\d\d):2025/);
+  return cwe ? { cwe: cwe[1], category: cat ? cat[1] + ':2025' : null } : null;
+}
+
 function fixText(id) {
   if (!fs.existsSync(FIXES)) return '';
   const text = fs.readFileSync(FIXES, 'utf8');
@@ -116,14 +128,22 @@ function generateSarif(rows) {
   const ruleMap = new Map();
   for (const r of openRows) {
     if (!ruleMap.has(r.id)) {
-      ruleMap.set(r.id, {
+      const meta = cweFor(r.id);
+      const rule = {
         id: r.id,
         name: r.id,
         shortDescription: { text: `OWASP rule violation: ${r.id}` },
         fullDescription: { text: r.fix || `Remediation for ${r.id}` },
         defaultConfiguration: { level: levelMap[r.severity] || 'warning' },
-        helpUri: 'https://owasp.org',
-      });
+        helpUri: meta ? `https://cwe.mitre.org/data/definitions/${meta.cwe}.html` : 'https://owasp.org',
+      };
+      if (meta) {
+        rule.properties = {
+          tags: ['security', `external/cwe/cwe-${meta.cwe}`].concat(meta.category ? [`OWASP-${meta.category}`] : []),
+          'security-severity': ({ critical: '9.0', high: '7.0', medium: '5.0', low: '3.0' })[r.severity] || '5.0',
+        };
+      }
+      ruleMap.set(r.id, rule);
     }
   }
 
