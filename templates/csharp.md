@@ -222,8 +222,12 @@ if (allowedOrigins.Contains(origin)) {
 ## Log injection prevention — sanitize user input before logging
 ```csharp
 string SanitizeLog(string value) {
-    return Regex.Replace(value, @"[\x00-\x1f\x7f]", "")
-               .Replace("\n", "\\n").Replace("\r", "\\r");
+    // Escape first: stripping control chars first would delete the CR/LF
+    // before Replace() could see them, silently merging tokens.
+    var escaped = value.Replace("\\", "\\\\")
+                       .Replace("\n", "\\n")
+                       .Replace("\r", "\\r");
+    return Regex.Replace(escaped, @"[\x00-\x1f\x7f]", "");
 }
 
 Logger.LogInformation("user_action user={User} input={Input}", user, SanitizeLog(userInput));

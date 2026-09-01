@@ -34,7 +34,13 @@ token = secrets.token_urlsafe(32)
 ## Constant-time compare
 ```python
 import hmac
-if not hmac.compare_digest(a, b):  # deny
+
+def token_matches(provided: str, expected: str) -> bool:
+    # == leaks the position of the first difference through timing.
+    return hmac.compare_digest(provided.encode(), expected.encode())
+
+if not token_matches(provided, expected):
+    raise PermissionError("invalid token")
 ```
 
 ## Safe temp file
@@ -244,8 +250,10 @@ def set_cors(response):
 import re, logging
 
 def sanitize_log(value: str) -> str:
-    # strip CR, LF, and control characters
-    return re.sub(r'[\x00-\x1f\x7f]', '', value).replace('\n', '\\n').replace('\r', '\\r')
+    # Escape first: stripping control chars first would delete the CR/LF
+    # before .replace() could see them, silently merging tokens.
+    escaped = value.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r')
+    return re.sub(r'[\x00-\x1f\x7f]', '', escaped)
 
 logging.info("user_action user=%s input=%s", user, sanitize_log(user_input))
 # never: logging unsanitized user input — CR/LF can forge log entries

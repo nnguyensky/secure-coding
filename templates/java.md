@@ -226,8 +226,12 @@ if (allowedOrigins.contains(origin)) {
 ## Log injection prevention — sanitize user input before logging
 ```java
 String sanitizeLog(String value) {
-    return value.replaceAll("[\\x00-\\x1f\\x7f]", "")
-                .replace("\n", "\\n").replace("\r", "\\r");
+    // Escape first: stripping control chars first would delete the CR/LF
+    // before the replace() calls could ever see them, silently merging tokens.
+    return value.replace("\\", "\\\\")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replaceAll("[\\x00-\\x1f\\x7f]", "");
 }
 
 logger.info("user_action user={} input={}", user, sanitizeLog(userInput));

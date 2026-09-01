@@ -38,9 +38,14 @@ token = SecureRandom.urlsafe_base64(32)
 
 ## Constant-time compare
 ```ruby
-require "securerandom"
-if !SecureRandom.hex(32) # placeholder
-# use: ActiveSupport::SecurityUtils.secure_compare(a, b)
+require "openssl"
+
+def token_matches?(provided, expected)
+  # == returns early on the first differing byte, which leaks length and content.
+  OpenSSL.secure_compare(provided, expected)
+end
+
+raise "invalid token" unless token_matches?(provided, expected)
 ```
 
 ## Safe temp file
@@ -236,7 +241,10 @@ end
 ## Log injection prevention — sanitize user input before logging
 ```ruby
 def sanitize_log(value)
-  value.gsub(/[\x00-\x1f\x7f]/, "").gsub("\n", "\\n").gsub("\r", "\\r")
+  # Escape first: stripping control chars first would delete the CR/LF
+  # before the gsub calls could see them, silently merging tokens.
+  value.gsub("\\", "\\\\").gsub("\n", "\\n").gsub("\r", "\\r")
+       .gsub(/[\x00-\x1f\x7f]/, "")
 end
 
 Rails.logger.info("user_action user=#{user} input=#{sanitize_log(user_input)}")
