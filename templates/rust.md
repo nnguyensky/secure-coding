@@ -155,6 +155,77 @@ let hash = Sha256::digest(std::fs::read(path)?);
 // never: deploying without verifying integrity of interpreted code, libraries, or config
 ```
 
+## Secure cookie — HttpOnly, Secure, SameSite
+```rust
+use axum_extra::extract::cookie::{Cookie, SameSite};
+use time::Duration;
+
+fn session_cookie(token: String) -> Cookie<'static> {
+    Cookie::build(("session", token))
+        .http_only(true)                 // unreachable from JavaScript
+        .secure(true)                    // HTTPS only
+        .same_site(SameSite::Strict)     // not sent on cross-site requests
+        .path("/")
+        .max_age(Duration::hours(8))
+        .build()
+}
+```
+
+## File upload — validate content, never trust the name
+```rust
+use std::path::{Path, PathBuf};
+use uuid::Uuid;
+
+const MAX_UPLOAD: usize = 10 * 1024 * 1024;
+
+fn handle_upload(data: &[u8], upload_dir: &Path) -> Result<PathBuf, Error> {
+    if data.len() > MAX_UPLOAD {
+        return Err(Error::TooLarge);
+    }
+    // Sniff the real type from the bytes; the supplied filename is untrusted.
+    let ext = match infer::get(data).map(|t| t.mime_type()) {
+        Some("image/jpeg") => "jpg",
+        Some("image/png") => "png",
+        Some("application/pdf") => "pdf",
+        _ => return Err(Error::InvalidType),
+    };
+    let dest = upload_dir.join(format!("{}.{ext}", Uuid::new_v4()));
+
+    // Confirm the path is still inside upload_dir before writing.
+    let root = upload_dir.canonicalize()?;
+    if !dest.parent().map_or(false, |p| p.canonicalize().map_or(false, |c| c.starts_with(&root))) {
+        return Err(Error::PathEscape);
+    }
+    std::fs::write(&dest, data)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o600))?;
+    }
+    Ok(dest)
+}
+```
+
+## Safe redirect — allowlist the destination
+```rust
+use url::Url;
+
+const ALLOWED_HOSTS: &[&str] = &["app.example.com", "www.example.com"];
+
+fn safe_redirect(target: &str) -> String {
+    // A relative path with no host is safe; anything else must be allowlisted.
+    match Url::parse(target) {
+        Ok(u) => {
+            let host_ok = u.host_str().map_or(false, |h| ALLOWED_HOSTS.contains(&h));
+            if u.scheme() == "https" && host_ok { u.to_string() } else { "/".to_string() }
+        }
+        // Parse failure means it is relative — accept only a rooted path.
+        Err(_) if target.starts_with('/') && !target.starts_with("//") => target.to_string(),
+        Err(_) => "/".to_string(), // fail closed
+    }
+}
+```
+
 ## Cache-Control — no-store for sensitive responses
 ```rust
 // axum / actix-web:

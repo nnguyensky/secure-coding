@@ -34,7 +34,7 @@ Use it when asked for an **SSDF attestation** (`technology-selection.md` asks ve
 |---|---|
 | PW.1.1 Design to meet security requirements | `secure-by-design.md` (OWASP SbD 36 controls), `threat-model.md` (STRIDE/DREAD) |
 | PW.1.2 Threat modeling | `threat-model.md`; Done Gate manual review |
-| PW.1.3 Reuse standard security services | `templates/<language>.md` (12 languages), `cryptography.md` |
+| PW.1.3 Reuse standard security services | `templates/<language>.md` (13 languages), `cryptography.md` |
 | PW.2.1 Verify design meets requirements | Done Gate manual review; `secure-by-design.md` ADR template |
 | PW.3.1–3.2 Verify third-party software | `audit.js` (9 ecosystems), `sbom.md`, `technology-selection.md` |
 | PW.4.1–4.5 Reuse well-secured software | `templates/`, `memory-safety.md` §3 MSL matrix |

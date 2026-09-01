@@ -33,7 +33,7 @@ No finding is marked as accepted, deferred, or ignored without an explicit revie
 2. **Identify which of the 9 code groups apply:**
    - (1) Data in/out • (2) Identity & Auth • (3) Secrets & Crypto • (4) Errors & Logs • (5) Storage & Transport • (6) Files & System • (7) Deployment & Config • (8) API Security • (9) Containers & Cloud
 
-3. **Need a copy-paste secure pattern?** Load `templates/<language>.md` (12 languages supported).
+3. **Need a copy-paste secure pattern?** Load `templates/<language>.md` (13 languages supported).
 
 ---
 

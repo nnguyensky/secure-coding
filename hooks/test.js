@@ -741,6 +741,44 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log(`MISS  ai-sbom-no-fake-metrics: ${metrics.length} invented metrics`); }
 })();
 
+// --- template roster & README matrix ---
+// sync.js validates the templates that exist; it could not see that shell.md
+// was absent while the README's matrix claimed a Sh column.
+(function templateRoster() {
+  const dir = path.join(DIR, 'templates');
+  const LANGS = ['c', 'csharp', 'go', 'java', 'javascript', 'kotlin', 'php',
+                 'python', 'ruby', 'rust', 'shell', 'swift', 'typescript'];
+
+  uniq('template-roster');
+  const absent = LANGS.filter(l => !fs.existsSync(path.join(dir, `${l}.md`)));
+  const extra = fs.readdirSync(dir).filter(f => f.endsWith('.md'))
+    .map(f => f.replace('.md', '')).filter(l => !LANGS.includes(l));
+  if (absent.length === 0 && extra.length === 0) pass++;
+  else { fail++; console.log(`MISS  template-roster: absent=[${absent}] undocumented=[${extra}]`); }
+
+  // Every language the README's matrix names must have a template.
+  uniq('template-readme-matrix');
+  const readme = fs.readFileSync(path.join(DIR, 'README.md'), 'utf8');
+  const header = (readme.match(/^\| # \| Security Control \|([^\n]*)\|$/m) || [])[1] || '';
+  const cols = header.split('|').map(c => c.trim()).filter(Boolean);
+  if (cols.length === LANGS.length) pass++;
+  else { fail++; console.log(`MISS  template-readme-matrix: ${cols.length} columns for ${LANGS.length} templates (${cols})`); }
+
+  // Sections a language genuinely cannot have are declared; everything else
+  // must be present, so a stripped template fails loudly.
+  uniq('template-core-sections');
+  const CORE = ['password hashing', 'secure random', 'constant-time', 'input validation',
+                'secrets', 'error handling', 'logging', 'file permission'];
+  const short = [];
+  for (const l of LANGS) {
+    const text = fs.readFileSync(path.join(dir, `${l}.md`), 'utf8').toLowerCase();
+    const miss = CORE.filter(c => !text.includes(c));
+    if (miss.length) short.push(`${l}:${miss.join('/')}`);
+  }
+  if (short.length === 0) pass++;
+  else { fail++; console.log(`MISS  template-core-sections: ${short.join(' ')}`); }
+})();
+
 // --- SKILL.md references resolve ---
 // A renamed or missing checks/ file would silently send the agent nowhere.
 (function skillLinks() {

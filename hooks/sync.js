@@ -170,14 +170,31 @@ function main() {
     'Password complexity', 'File permissions', 'Encryption at rest',
     'Integrity verification', 'SSRF prevention', 'CORS', 'Log injection',
   ];
-  // C is a systems language — web-only sections don't apply
-  const webOnlySections = ['Parameterized query', 'Secure cookie', 'Output encoding', 'TLS', 'Cache-Control', 'Session', 'File upload', 'Safe redirect', 'Shell', 'SSRF prevention', 'CORS', 'Log injection'];
+  // Sections that genuinely do not apply to a language, so their absence is not
+  // a gap. Keep these tight: anything listed here is invisible to the check.
+  const NOT_APPLICABLE = {
+    // C is a systems language: no HTTP tier. It does query databases, exec
+    // processes and write logs, so those stay required.
+    c: ['Secure cookie', 'Output encoding', 'TLS', 'Cache-Control', 'Session', 'File upload', 'Safe redirect', 'SSRF prevention', 'CORS'],
+    // Shell scripts are not an HTTP server either.
+    shell: ['Secure cookie', 'Output encoding', 'TLS', 'Cache-Control', 'Session', 'File upload', 'Safe redirect', 'CORS'],
+  };
+
+  // A template that does not exist cannot be reported as missing sections, so
+  // check the roster explicitly — this is how the absent shell template hid.
+  const EXPECTED_LANGS = ['c', 'csharp', 'go', 'java', 'javascript', 'kotlin', 'php',
+                          'python', 'ruby', 'rust', 'shell', 'swift', 'typescript'];
+  for (const lang of EXPECTED_LANGS) {
+    if (!fs.existsSync(path.join(TEMPLATES_DIR, `${lang}.md`))) {
+      err(`template missing entirely: templates/${lang}.md`);
+    }
+  }
 
   const langFiles = fs.readdirSync(TEMPLATES_DIR).filter(f => f.endsWith('.md'));
   for (const f of langFiles) {
     const lang = f.replace('.md', '');
     const sections = templateSections[lang] || [];
-    const skipSections = lang === 'c' ? webOnlySections : [];
+    const skipSections = NOT_APPLICABLE[lang] || [];
     const missing = expectedSections.filter(exp => {
       if (skipSections.includes(exp)) return false;
       return !sections.some(s => s.toLowerCase().includes(exp.toLowerCase().split(' ')[0]));

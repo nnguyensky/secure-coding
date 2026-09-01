@@ -33,6 +33,51 @@ p = NULL;   // prevents double-free and use-after-free
 fgets(buf, sizeof buf, stdin);
 ```
 
+## Parameterized query (SQLite / libpq)
+```c
+/* Bind values; never build SQL with sprintf. */
+sqlite3_stmt *stmt;
+if (sqlite3_prepare_v2(db, "SELECT id FROM users WHERE email = ?", -1, &stmt, NULL) != SQLITE_OK) {
+    return -1;
+}
+sqlite3_bind_text(stmt, 1, email, -1, SQLITE_TRANSIENT);
+while (sqlite3_step(stmt) == SQLITE_ROW) { /* ... */ }
+sqlite3_finalize(stmt);
+
+/* libpq: $1 placeholders, values passed separately */
+const char *params[1] = { email };
+PGresult *res = PQexecParams(conn, "SELECT id FROM users WHERE email = $1",
+                             1, NULL, params, NULL, NULL, 0);
+```
+
+## Shell — argument list, never a shell string
+```c
+/* system() and popen() hand the string to /bin/sh: input can add commands. */
+pid_t pid = fork();
+if (pid == 0) {
+    char *const argv[] = { "/usr/bin/convert", (char *)input_path, (char *)output_path, NULL };
+    execv(argv[0], argv);   /* no shell involved, so no metacharacters to escape */
+    _exit(127);
+}
+int status;
+waitpid(pid, &status, 0);
+```
+
+## Log injection prevention — sanitize before logging
+```c
+/* CR/LF in user input lets an attacker forge whole log lines. */
+static void log_safe(const char *label, const char *untrusted) {
+    char clean[256];
+    size_t j = 0;
+    for (size_t i = 0; untrusted[i] != '\0' && j + 1 < sizeof clean; i++) {
+        unsigned char c = (unsigned char)untrusted[i];
+        clean[j++] = (c == '\n' || c == '\r' || c < 0x20) ? '_' : (char)c;
+    }
+    clean[j] = '\0';
+    syslog(LOG_INFO, "%s=%s", label, clean);   /* never syslog(LOG_INFO, untrusted) */
+}
+```
+
 ## Password hashing (libsodium)
 ```c
 // argon2id via libsodium:

@@ -167,6 +167,51 @@ h := sha256.Sum256(data)
 // never: deploying without verifying integrity of interpreted code, libraries, or config
 ```
 
+## File upload — validate content, never trust the name
+```go
+var allowedMIME = map[string]string{"image/jpeg": "jpg", "image/png": "png", "application/pdf": "pdf"}
+
+func handleUpload(data []byte, uploadDir string) (string, error) {
+    if len(data) > 10<<20 { // cap before doing any work
+        return "", errors.New("file too large")
+    }
+    // Sniff the real type from the bytes; the client-supplied name and
+    // Content-Type are attacker-controlled.
+    ext, ok := allowedMIME[http.DetectContentType(data)]
+    if !ok {
+        return "", errors.New("invalid file type")
+    }
+    name := uuid.NewString() + "." + ext // never reuse the uploaded filename
+    dest := filepath.Join(uploadDir, name)
+
+    // Confirm the result is still inside uploadDir.
+    root, err := filepath.Abs(uploadDir)
+    if err != nil {
+        return "", err
+    }
+    abs, err := filepath.Abs(dest)
+    if err != nil || !strings.HasPrefix(abs, root+string(os.PathSeparator)) {
+        return "", errors.New("path escapes upload directory")
+    }
+    return dest, os.WriteFile(dest, data, 0o600)
+}
+```
+
+## Safe redirect — allowlist the destination
+```go
+var allowedHosts = map[string]bool{"app.example.com": true, "www.example.com": true}
+
+func safeRedirect(w http.ResponseWriter, r *http.Request, target string) {
+    u, err := url.Parse(target)
+    // Relative path with no host is safe; anything else must be on the allowlist.
+    if err != nil || (u.Host != "" && !allowedHosts[u.Host]) || (u.Scheme != "" && u.Scheme != "https") {
+        http.Redirect(w, r, "/", http.StatusFound) // fail closed to a known page
+        return
+    }
+    http.Redirect(w, r, u.String(), http.StatusFound)
+}
+```
+
 ## Cache-Control — no-store for sensitive responses
 ```go
 w.Header().Set("Cache-Control", "no-store")
