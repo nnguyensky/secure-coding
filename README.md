@@ -8,8 +8,9 @@
 [![Secure by Design](https://img.shields.io/badge/ACSC%20%2F%20CISA-Secure%20by%20Design-orange?style=for-the-badge&logo=shield&logoColor=white)](checks/secure-by-design.md)
 [![AI-SBOM & VEX](https://img.shields.io/badge/BSI%20%2F%20CISA-AI--SBOM%20%26%20VEX-darkblue?style=for-the-badge&logo=probot&logoColor=white)](checks/sbom.md)
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
+[![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-301%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-366%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -42,10 +43,10 @@
 │  • 9 Focused Trigger Groups  • 12 Drop-In Templates (25 Standards Each)     │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  LAYER 2: MECHANICAL SCANNER & SHANNON ENTROPY (0 Tokens Clean, <20ms)      │
-│  • 31 Pattern Files (356+ Regexes)  • Shannon Entropy H ≥ 3.5 Bits/Byte     │
+│  • 31 Pattern Files (359 Regexes)  • Shannon Entropy H ≥ 3.5 Bits/Byte      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  LAYER 3: VERIFICATION & MULTI-ECOSYSTEM AUDITING                           │
-│  • 213 Verifiable Controls  • 9 Package Managers  • 22 Clean Code Standards │
+│  • 213 Verifiable Controls  • 9 Package Managers  • 14 Clean Code Standards │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  LAYER 4: POLICY GOVERNANCE, SBOM & SARIF CI/CD                             │
 │  • Browser GUI Wizard  • CycloneDX v1.5 / SPDX v2.3  • OASIS SARIF v2.1.0   │
@@ -55,7 +56,7 @@
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- ⚡ **Zero-Token Idle Cost**: Local hooks execute in $<20\text{ms}$. If code is clean, it consumes **0 LLM tokens**.
+- ⚡ **Zero-Token Idle Cost**: Local hooks execute in ~1ms for a typical file (~20ms for 2,000 lines). If code is clean, it consumes **0 LLM tokens**.
 - 🎯 **Progressive Disclosure**: Specialized architecture guides load on-demand **only** when touching relevant systems.
 - 🛠️ **Deterministic Fixes**: Violations return exact line snippets with copy-pasteable `When / Wrong / Right / Watch` blocks.
 
@@ -67,7 +68,7 @@
 flowchart TD
     subgraph L0["Layer 0: Planning, Threat Modeling & Architecture"]
         TM["checks/threat-model.md<br/>• STRIDE Architecture &amp; DREAD Risk"]
-        SBD["checks/secure-by-design.md<br/>• OWASP 40-Item Review Checklist<br/>• ACSC Modern Defensible Architecture<br/>• Zero Trust &amp; CDS Ingress Normalization"]
+        SBD["checks/secure-by-design.md<br/>• OWASP SbD 36-Control Checklist<br/>• ACSC Modern Defensible Architecture<br/>• Zero Trust &amp; CDS Ingress Normalization"]
         MEM["checks/memory-safety.md<br/>• Memory Safe Language (MSL) Selection<br/>• Safe C/C++ Intermediary Wrappers"]
         CRYPTO["checks/cryptography.md<br/>• FIPS 140-3 KMS Envelope Encryption<br/>• Post-Quantum Cryptography (ML-KEM, ML-DSA)"]
         IOT["checks/iot-security.md<br/>• AS ETSI EN 303 645 (13 IoT Principles)<br/>• Secure Boot, OTA Signing &amp; JTAG Lockout"]
@@ -76,22 +77,22 @@ flowchart TD
     end
 
     subgraph L1["Layer 1: Proactive Design (Progressive Disclosure)"]
-        SKILL["SKILL.md (~1000 tokens)<br/>• 9 Modular Trigger Groups"]
+        SKILL["SKILL.md (~3.6k tokens)<br/>• 9 Modular Trigger Groups"]
         TEMPLATES["templates/*.md (12 Languages)<br/>• 25 Secure Standards Each"]
-        LLM["checks/llm-top10.md (~350 tokens)<br/>• OWASP Top 10 for LLMs (2025)"]
+        LLM["checks/llm-top10.md (~1.1k tokens)<br/>• OWASP Top 10 for LLMs (2025)"]
     end
 
     subgraph L2["Layer 2: Fast Mechanical Scanner (0 Tokens Clean)"]
         SCAN["hooks/scan.js (&lt;20ms)<br/>• Line Numbers &amp; Code Snippets"]
         ENTROPY["Shannon Entropy Engine<br/>• Un-prefixed Secret Detection ($H \\ge 3.5$)"]
-        PATTERNS["patterns/*.txt (31 Files, 356+ Regexes)<br/>• JWT, CORS, Deser, Cloud Keys, SbD, IoT"]
+        PATTERNS["patterns/*.txt (31 Files, 359 Regexes)<br/>• JWT, CORS, Deser, Cloud Keys, SbD, IoT"]
         SUPPRESS["Inline Comment Suppression<br/>• // secure-coding-ignore: id"]
     end
 
     subgraph L3["Layer 3: Verification & Auditing"]
         REVIEW["checks/review.md<br/>• 213 Verifiable Controls"]
         AUDIT["hooks/audit.js<br/>• 9 Ecosystems (npm, pnpm, yarn, pip, cargo, go...)"]
-        CLEAN["hooks/clean.js<br/>• 22 Clean Code Quality Rules"]
+        CLEAN["hooks/clean.js<br/>• 14 Clean Code Quality Rules"]
     end
 
     subgraph L4["Layer 4: Policy, Governance & CI/CD"]
@@ -161,21 +162,24 @@ sequenceDiagram
 ### 🏛️ Layer 0: Planning, Architecture & Secure by Design
 Applied during system design and boundary definition:
 - **STRIDE & DREAD Threat Modeling** ([`checks/threat-model.md`](checks/threat-model.md)): Structured threat categorization and quantitative risk scoring.
-- **OWASP 40-Item SbD Review & ACSC Defensible Architecture** ([`checks/secure-by-design.md`](checks/secure-by-design.md)): Edge Gateway, mTLS service meshes, Postgres Row-Level Security (RLS), Fail-Closed authorization, and Cross-Domain Solutions (CDS) ingress normalization.
+- **OWASP SbD 36-Control Review & ACSC Defensible Architecture** ([`checks/secure-by-design.md`](checks/secure-by-design.md)): Edge Gateway, mTLS service meshes, Postgres Row-Level Security (RLS), Fail-Closed authorization, and Cross-Domain Solutions (CDS) ingress normalization.
 - **Memory Safety Roadmaps & C/C++ Hardening** ([`checks/memory-safety.md`](checks/memory-safety.md)): Memory-Safe Language decision matrix, Safe Intermediary Wrappers, and compiler hardening (`-fstack-protector-strong`, ASan/UBSan, PIE, CFI).
 - **FIPS 140-3 Cryptographic Key Management & PQC** ([`checks/cryptography.md`](checks/cryptography.md)): Hardware Root of Trust, Envelope Encryption (DEK/KEK), OIDC Workload Identity, and Post-Quantum transition (**ML-KEM / FIPS 203**, **ML-DSA / FIPS 204**).
 - **AS ETSI EN 303 645 Consumer IoT Security** ([`checks/iot-security.md`](checks/iot-security.md)): 13 IoT principles, Multi-stage Secure Boot, cryptographically signed OTA updates, JTAG/UART lockout, and MQTTS/CoAPS.
 - **Supply Chain, AI-SBOM & VEX** ([`checks/sbom.md`](checks/sbom.md)): BSI 7 AI Information Clusters, ACSC/CISA VEX exploitability states, and Sigstore/Cosign signing.
 - **Safe Software Deployment** ([`checks/deployment-safety.md`](checks/deployment-safety.md)): Pre-mortem failure analysis, canary rollout pipeline (1–5%), and automated rollback circuit breakers.
+- **Choosing Secure & Verifiable Technologies** ([`checks/technology-selection.md`](checks/technology-selection.md)): ACSC procurement questions for adopting a dependency, SaaS, or vendor — Secure by Default, supply chain due diligence, data jurisdiction, and the accept/transfer/avoid/mitigate decision.
 
 ### 📐 Layer 1: Proactive Design Rules & Language Templates
-- **Trigger-Based Loading**: [`SKILL.md`](SKILL.md) categorizes security into 9 functional trigger groups. The agent reads only the group matching its immediate task.
+- **Trigger-Based Loading**: [`SKILL.md`](SKILL.md) categorizes security into 9 functional trigger groups. The agent reads only the group matching its immediate task. Full per-group requirements live in [`checks/code-groups.md`](checks/code-groups.md), keeping the always-loaded `SKILL.md` at ~3,650 tokens.
 - **12 Drop-In Secure Templates** ([`templates/`](templates/)): Battle-tested implementations for all 25 OWASP standards across *TypeScript, Python, Go, Rust, Java, Kotlin, Swift, C#, C/C++, PHP, Ruby, Shell*.
-- **Progressive Disclosure for AI/LLMs** ([`checks/llm-top10.md`](checks/llm-top10.md)): High-density guidance (~350 tokens) covering all 10 OWASP LLM 2025 risks.
+- **Progressive Disclosure for AI/LLMs** ([`checks/llm-top10.md`](checks/llm-top10.md)): High-density guidance (~1.1k tokens) covering all 10 OWASP LLM 2025 risks.
 
 ### ⚡ Layer 2: Reactive Mechanical Scanner (`hooks/scan.js`)
-- **Fast Execution**: Pure Node.js standard library; runs in $<20\text{ms}$.
+- **Fast Execution**: Pure Node.js standard library, zero dependencies. ~1ms for a typical file; ~20ms for a 2,000-line one, since multi-line taint tracking adds a per-line pass.
 - **Precise Extraction**: Pinpoints exact line numbers and code snippets (`Line 42: const key = ...`).
+- **Multi-Line Taint Tracking**: Regex alone only matches when untrusted input sits *inside* the sink call. The scanner also follows `var = req.query.x` into a later file, HTTP, process, or query call — reported as `taint-*` — within one function and one hop through interpolation. Sanitizers (`basename`, `validate`, `parseInt`, allowlist checks, parameterized queries) clear the taint. Disable with `"taintTracking": false`.
+- **Per-Occurrence Findings**: Three SQL injections in one file are three findings, tracked by `(file, id, line)`. Fixing one closes only that one, so a partial fix can never silently clear a live vulnerability.
 - **Shannon Entropy Secret Detection**:
   $$H(S) = -\sum_{i=1}^n p(x_i) \log_2 p(x_i)$$
   Calculates string randomness to distinguish true cryptographic keys ($H \ge 3.5\text{ bits/byte}$) from repetitive test strings (`"aaaaaaaaaaaaaaaa"`).
@@ -189,10 +193,12 @@ Applied during system design and boundary definition:
 - **Semantic OWASP Checklist** ([`checks/review.md`](checks/review.md)): 213 verifiable controls.
 - **Multi-Ecosystem Package Audit** ([`hooks/audit.js`](hooks/audit.js)): Scans lockfiles across 9 ecosystems (`npm`, `pnpm`, `yarn`, `pip`, `poetry`, `cargo`, `go`, `dotnet`, `composer`, `bundler`). Exits with code `2` on high/critical advisories.
 - **Clean Code Linter** ([`hooks/clean.js`](hooks/clean.js)): Flags magic numbers, multi-responsibility functions, and unneeded context.
+- **OWASP Top 10:2025 → CWE Map** ([`checks/owasp-top10-2025.md`](checks/owasp-top10-2025.md)): Every category mapped to its key CWEs and the pattern ids that cover it — including the two new 2025 categories (**A03 Software Supply Chain Failures**, **A10 Mishandling of Exceptional Conditions**) and an explicit note on which categories patterns *cannot* cover.
+- **NIST SSDF (SP 800-218) Coverage Map** ([`checks/ssdf-mapping.md`](checks/ssdf-mapping.md)): All 4 practice groups and 20 practices mapped to the skill's tooling, with the gaps stated plainly for attestation purposes.
 
 ### 📜 Layer 4: Policy, Governance & CI/CD Integration
 - **Interactive UI Configuration Wizard** ([`reports/config-wizard.html`](reports/config-wizard.html)): Modern browser wizard to customize failure thresholds, excluded paths, and monitored ecosystems into `.securecodingrc.json`.
-- **SARIF v2.1.0 Export** (`hooks/report.js --sarif`): Emits OASIS standard SARIF reports for GitHub Code Scanning alerts and PR annotations.
+- **SARIF v2.1.0 Export** (`hooks/report.js --sarif`): Emits OASIS standard SARIF for GitHub Code Scanning, tagged with `external/cwe/cwe-N`, `OWASP-Annn:2025`, and `security-severity` so alerts land correctly classified rather than untyped.
 - **Software Bill of Materials (SBOM & AI-SBOM)** ([`hooks/sbom.js`](hooks/sbom.js)): Generates CycloneDX v1.5 and SPDX v2.3 manifests with BSI AI-SBOM 7 clusters and ACSC/CISA VEX data.
 - **Git Pre-commit & Pre-push Hooks** (`install.sh` / `hooks/install.js`): Automates staged and repository-wide protection.
 
@@ -248,7 +254,7 @@ npm run wizard
 | Category | Command | Description |
 |---|---|---|
 | **🔍 Scanning** | `node hooks/scan.js` | Scans post-write payload on stdin. |
-| | `node hooks/scan.js --staged` | Scans only Git staged files ($<20\text{ms}$). |
+| | `node hooks/scan.js --staged` | Scans only Git staged files (~1ms each). |
 | | `node hooks/scan.js --diff` | Scans modified working tree files. |
 | | `node hooks/scan.js --files <paths...>` | Scans an explicit list of files. |
 | | `node hooks/scan.js --file <f> --json` | Outputs findings as structured JSON. |
@@ -397,7 +403,7 @@ Always write secure code from the start. Never defer security fixes.
 
 | MCP Tool | Purpose | Example AI Prompt |
 |---|---|---|
-| `secure_code_scan` | Scans in-memory code snippets or staged files for 356+ OWASP & SbD bugs. | *"Scan this authentication function for vulnerabilities."* |
+| `secure_code_scan` | Scans in-memory code snippets or staged files for 359 OWASP & SbD patterns. | *"Scan this authentication function for vulnerabilities."* |
 | `secure_code_autofix` | Returns exact remediation diffs or refactors code in-place. | *"Fix the weak random number generator in auth.ts."* |
 | `security_dependency_audit` | Scans lockfiles across 9 package ecosystems for CVEs. | *"Check package.json and requirements.txt for vulnerabilities."* |
 | `clean_code_lint` | Lints source code against 14 universal Clean Code quality standards. | *"Lint my recent changes for clean code issues."* |
@@ -482,7 +488,7 @@ echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"secure_cod
 
 ## 🧪 Validation & Test Suite
 
-Verify all 301 test fixtures, pattern compilation, secret masking, and MCP tools:
+Verify all 366 test assertions, pattern compilation, secret masking, and MCP tools:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js
