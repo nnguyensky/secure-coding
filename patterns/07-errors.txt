@@ -1,0 +1,14 @@
+# OWASP SCP - Error Handling [107-130] / OWASP Top 10:2025 A10 Mishandling of Exceptional Conditions
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+swallowed-exception	py	except[^:\n]*:[ \t]*(\n[ \t]+)?(pass|\.\.\.)[ \t]*(\n|$)		never swallow an exception — log it and fail closed, or let it propagate	high
+swallowed-exception	js,ts,java,kt,cs,php	catch\s*\([^)]*\)\s*\{\s*\}		empty catch block hides the failure — log and re-throw, or handle explicitly	high
+swallowed-exception	rb	rescue[^\n]*\n\s*end		empty rescue hides the failure — log and re-raise, or handle explicitly	high
+broad-except	py	except\s*(Exception|BaseException)?\s*:	!(as |raise|log|logger|logging)	catch the specific exception; a bare except also swallows KeyboardInterrupt and SystemExit	medium
+unchecked-error	go	\w+\s*,\s*_\s*:?=\s*\w*\.?(Authorize|Verify|Validate|Check|Authenticate|Decrypt|Sign|Parse)\w*\s*\(		discarding an error from a security check means the failure is invisible — check err	high
+error-detail-exposed	*	\b(res|response|resp)\b[^;\n]*\.(send|json|write|end)\s*\([^;\n]*(err\.stack|error\.stack|e\.stack|exception\.getMessage|traceback\.format_exc|\$e->getMessage|printStackTrace)		never return a stack trace or exception message to the caller — log it, return a generic error	high
+error-detail-exposed	py	(return|render|abort|jsonify)\b[^\n]*(traceback\.format_exc|str\(e\)|repr\(e\))		never return exception text to the caller — log it, return a generic message	high
+fail-open-catch	*	catch\s*\([^)]*\)\s*\{[^}]*return\s+(true|True|1)\s*;?\s*\}		returning success from a catch block fails open — deny on error	critical
+fail-open-catch	py	except[^:\n]*:[ \t]*\n[ \t]+(return[ \t]+True|(authorized|is_valid|allowed|ok)[ \t]*=[ \t]*True)		granting access in an exception handler fails open — deny on error	critical
+uncaught-handler-empty	js,ts	(process\.on\s*\(\s*['"]uncaught(Exception|Rejection)['"]|window\.onerror\s*=)[^{\n]*\{\s*\}		an empty global error handler hides crashes — log, alert, then exit or recover deliberately	medium
+recover-empty	go	recover\s*\(\s*\)\s*(\}|$)	!(if |err|log|panic)	recover() without inspecting the value silently continues after a panic	medium

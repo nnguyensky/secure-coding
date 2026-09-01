@@ -19,7 +19,7 @@ Use this to translate a scanner finding into the language auditors, SARIF consum
 | **A07** | Authentication Failures | 258, 259, 287, 288, 290, 294, 295, 297, 304, 306, 307, 308, 384, 521, 613, 620, 640, 798, 940, 1216 | `default-cred` `jwt-*` `session-fixation` `oauth2-state` `oauth2-redirect` `pw-*-hash` `secret-*` `API-2` `ws-auth` `sbd-unauthenticated-route` |
 | **A08** | Software or Data Integrity Failures | 345, 353, 426, 427, 494, 502, 506, 509, 565, 784, 829, 830, 915, 926 | `insecure-deserialization` `unpinned-action` `docker-digest` `dockerfile-curl-bash` `rsc-unvalidated-action` `prototype-pollution`; signing/attestation in `sbom.md` §5 |
 | **A09** | Security Logging & Alerting Failures | 117, 221, 223, 532, 778 | `log-inject` `log-leak` `set-hide-error` — **thin. Absence of logging cannot be pattern-matched**; see Done Gate and `secure-by-design.md` MT-01…07 |
-| **A10** | **Mishandling of Exceptional Conditions** *(new)* | 209, 215, 248, 252, 274, 280, 369, 390, 391, 394, 396, 397, 460, 476, 544, 584, 600, 636, 703, 754, 755 | `set-hide-error` `cc-swallowed-error` `cc-empty-throw` (via `clean.js`) — **weak coverage.** Fail-open on exception is a design smell: see Done Gate "failure direction" and `secure-by-design.md` Fail-Closed |
+| **A10** | **Mishandling of Exceptional Conditions** *(new)* | 209, 215, 248, 252, 274, 280, 369, 390, 391, 394, 396, 397, 460, 476, 544, 584, 600, 636, 703, 754, 755 | `fail-open-catch` `swallowed-exception` `broad-except` `unchecked-error` `error-detail-exposed` `uncaught-handler-empty` `recover-empty` (`patterns/07-errors.txt`) + `set-hide-error`, `cc-swallowed-error`/`cc-empty-throw` via `clean.js`. Structural fail-open across a call boundary still needs the Done Gate "failure direction" check and `secure-by-design.md` Fail-Closed |
 
 ---
 
@@ -28,9 +28,9 @@ Three categories cannot be substantially pattern-matched, because they are about
 
 - **A01** — missing ownership/authorization checks (IDOR/BOLA).
 - **A09** — absent or unmonitored logging.
-- **A10** — swallowed exceptions and fail-open error paths.
+- **A10** — *partially covered now* (`patterns/07-errors.txt`): swallowed handlers, fail-open catches, discarded security errors and leaked stack traces are detected. What remains is structural — an exception that propagates to a caller which then treats the failure as success.
 
-All three are covered by the **Done Gate manual review** in `SKILL.md`. A clean scan is not evidence for any of them — see *What the Scanner Cannot See*.
+These are covered by the **Done Gate manual review** in `SKILL.md`. A clean scan is not evidence for any of them — see *What the Scanner Cannot See*.
 
 ## Citing a finding
 When reporting or writing a `fixes.md` entry, give the CWE alongside the pattern id: SARIF consumers, GitHub code scanning, and CVE records are all keyed on CWE. Example: `sql-concat` → **A05:2025 Injection** → **CWE-89**.

@@ -526,6 +526,49 @@ bad('sbd_legacy_tls', 'py', 'ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_0)', 'sbd-l
 good('sbd_modern_tls', 'py', 'ctx = ssl.create_default_context()');
 bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
 
+// --- A10 Mishandling of Exceptional Conditions ---
+// The scanner previously found nothing on any of these; A10 had 3 rules for
+// 24 CWEs. Negative cases matter most here — `pass` and `return True` appear
+// constantly in correct code.
+(function a10Rules() {
+  const { loadPatterns, matchContent } = require('./scan.js');
+  const pats = loadPatterns();
+  const hit = (code, ext, id) => matchContent(code, 'a10.' + ext, pats).some(h => h.id === id);
+
+  const yes = (name, code, ext, id) => {
+    uniq('a10-' + name);
+    if (hit(code, ext, id)) pass++;
+    else { fail++; console.log(`MISS  a10-${name} (want ${id})`); }
+  };
+  const no = (name, code, ext, id) => {
+    uniq('a10-' + name);
+    if (!hit(code, ext, id)) pass++;
+    else { fail++; console.log(`FALSE+ a10-${name} (${id}): ${code.slice(0, 46)}`); }
+  };
+
+  yes('pyPass', 'try:\n    x()\nexcept Exception:\n    pass\n', 'py', 'swallowed-exception');
+  yes('jsEmptyCatch', 'try { await verify(t); } catch (e) { }', 'js', 'swallowed-exception');
+  yes('failOpenJs', 'try { auth(); } catch (e) { return true; }', 'js', 'fail-open-catch');
+  yes('failOpenPy', 'try:\n    verify(t)\nexcept:\n    authorized = True\n', 'py', 'fail-open-catch');
+  yes('bareExcept', 'except:', 'py', 'broad-except');
+  yes('goDiscard', 'result, _ := Authorize(user)', 'go', 'unchecked-error');
+  yes('stackToClient', 'res.status(500).send(err.stack);', 'js', 'error-detail-exposed');
+  yes('pyTraceback', 'return traceback.format_exc()', 'py', 'error-detail-exposed');
+  yes('emptyUncaught', "process.on('uncaughtException', () => {});", 'js', 'uncaught-handler-empty');
+  yes('goRecover', 'defer func() { recover() }()', 'go', 'recover-empty');
+
+  // `pass` is ordinary Python: abstract methods, exception subclasses, Protocols.
+  no('abstractPass', '@abstractmethod\ndef run(self):\n    pass\n', 'py', 'swallowed-exception');
+  no('exceptionSubclass', 'class MyError(Exception):\n    pass\n', 'py', 'swallowed-exception');
+  no('handledExcept', 'except ValueError as e:\n    logger.exception("failed")\n    raise\n', 'py', 'swallowed-exception');
+  no('plainReturnTrue', 'def check(u):\n    if u.is_admin:\n        return True\n', 'py', 'fail-open-catch');
+  no('genericError', 'res.status(500).send("Internal error");', 'js', 'error-detail-exposed');
+  no('loggedTrace', 'logger.error(traceback.format_exc())', 'py', 'error-detail-exposed');
+  no('errChecked', 'result, err := Authorize(user)', 'go', 'unchecked-error');
+  no('idiomaticDiscard', 'v, _ := strconv.Atoi(s)', 'go', 'unchecked-error');
+  no('handlerLogs', "process.on('uncaughtException', (e) => { log(e); process.exit(1); });", 'js', 'uncaught-handler-empty');
+})();
+
 // --- context-sensitive rules ---
 // Validated against a real Tauri/Rust app that produced 24 findings, all false
 // positives: every `unsafe {}` (mandatory for FFI), every `0o777` literal (a

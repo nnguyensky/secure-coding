@@ -289,7 +289,7 @@ function installMcpConfig(targetDir) {
         claudeCfg.mcpServers['secure-coding'] = mcpEntry;
         fs.writeFileSync(claudeDesktopCfg, JSON.stringify(claudeCfg, null, 2) + '\n');
         console.log(`${GREEN}✅ Configured Claude Desktop MCP:${NC} ${claudeDesktopCfg}`);
-      } catch (e) {}
+      } catch (e) {} // secure-coding-ignore: swallowed-exception -- optional step, must not abort
     }
   }
 }
@@ -318,7 +318,7 @@ function installGlobal() {
       fs.symlinkSync(DIR, claudeLink, 'dir');
       console.log(`${GREEN}✅ Linked to Claude Code at:${NC} ${claudeLink}`);
     }
-  } catch (e) {}
+  } catch (e) {} // secure-coding-ignore: swallowed-exception -- optional step, must not abort
 
   // 3. Link for OpenCode (~/.opencode/skills/secure-coding)
   try {
@@ -331,7 +331,7 @@ function installGlobal() {
       fs.symlinkSync(DIR, opencodeLink, 'dir');
       console.log(`${GREEN}✅ Linked to OpenCode at:${NC} ${opencodeLink}`);
     }
-  } catch (e) {}
+  } catch (e) {} // secure-coding-ignore: swallowed-exception -- optional step, must not abort
 
   // 4. Link for Google Antigravity (~/.gemini/config/plugins/secure-coding)
   try {
@@ -353,7 +353,7 @@ function installGlobal() {
       }, null, 2) + '\n');
       console.log(`${GREEN}✅ Registered global Antigravity plugin:${NC} ${pluginDir}`);
     }
-  } catch (e) {}
+  } catch (e) {} // secure-coding-ignore: swallowed-exception -- optional step, must not abort
 }
 
 function configureAgent(targetDir, agentName) {

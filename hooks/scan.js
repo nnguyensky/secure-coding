@@ -289,8 +289,10 @@ function matchContent(content, filenameOrExt, patterns) {
             }
           }
           if (!matchedLineNum) {
-            matchedLineNum = 1;
-            matchedSnippet = fileLines[0]?.trim() || '';
+            const at = content.search(p.re);
+            const line = at >= 0 ? content.slice(0, at).split(/\r?\n/).length : 1;
+            matchedLineNum = line;
+            matchedSnippet = (fileLines[line - 1] || fileLines[0] || '').trim();
           }
         }
       }
@@ -456,7 +458,7 @@ function main() {
     }
 
     if (REPORT) {
-      try { require(path.join(DIR, 'hooks', 'report.js')); } catch (e) {}
+      try { require(path.join(DIR, 'hooks', 'report.js')); } catch (e) {} // secure-coding-ignore: swallowed-exception -- optional step, must not abort
     }
 
     if (args.includes('--json')) {

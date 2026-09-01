@@ -730,6 +730,55 @@ Wrong: const id = req.params.id; db.query("SELECT * FROM u WHERE id = " + id)
 Right: parameterized queries — db.query(sql, [id]). Or the ORM's normal query API.
 Watch: table and column names cannot be parameterized — allowlist them instead.
 
+## fail-open-catch
+OWASP: 107,109 | CWE-755 | A10:2025
+Returning success from an exception handler grants access when the check itself failed. The error path becomes the bypass.
+Wrong: catch (e) { return true }, except: authorized = True
+Right: deny on error. Log the exception, return false or re-raise; the caller must not proceed.
+Watch: an auth check that throws is the case an attacker will aim for — make it the safest path, not the weakest.
+
+## swallowed-exception
+OWASP: 107,110 | CWE-390 | A10:2025
+An empty handler discards the failure. The operation did not happen, nothing recorded it, and the caller continues as if it had.
+Wrong: catch (e) {}, except Exception: pass, rescue; end
+Right: log with context and re-raise, or handle the specific failure deliberately.
+Watch: "it can never throw here" ages badly — if it truly cannot, assert that instead of swallowing.
+
+## broad-except
+OWASP: 107,110 | CWE-396 | A10:2025
+Catching Exception or a bare except also catches bugs you did not anticipate, and in Python a bare except swallows KeyboardInterrupt and SystemExit.
+Wrong: except:, except Exception: (with no re-raise)
+Right: catch the specific exception type you can actually handle. Let the rest propagate.
+Watch: a broad catch at a top-level boundary is fine if it logs and fails closed — the problem is a broad catch that continues.
+
+## unchecked-error
+OWASP: 107,111 | CWE-252 | A10:2025
+Discarding the error from a security operation makes its failure invisible; the zero value then reads as a successful result.
+Wrong: result, _ := Authorize(user), ok, _ := Verify(sig)
+Right: check err and return early. Never assign a security result alongside a discarded error.
+Watch: discarding an error is idiomatic for things like strconv.Atoi — this is about authorize, verify, validate and decrypt.
+
+## error-detail-exposed
+OWASP: 107,108 | CWE-209 | A10:2025
+Stack traces, exception text and driver errors hand an attacker your file paths, library versions and query structure.
+Wrong: res.status(500).send(err.stack), return traceback.format_exc(), echo $e->getMessage()
+Right: log the detail server-side with a correlation id; return a generic message and that id to the caller.
+Watch: this includes debug pages and framework default error handlers — disable them in production.
+
+## uncaught-handler-empty
+OWASP: 107,110 | CWE-248 | A10:2025
+An empty global handler keeps a broken process alive in an unknown state, and hides the crash from monitoring.
+Wrong: process.on('uncaughtException', () => {}), window.onerror = function () {}
+Right: log the error, alert, then exit and let the supervisor restart cleanly. Recover only where you know the state is sound.
+Watch: after an uncaught exception the process may hold half-released locks or partial writes — continuing is a choice, not a default.
+
+## recover-empty
+OWASP: 107,110 | CWE-584 | A10:2025
+recover() without inspecting the value silently resumes after a panic, discarding what failed and why.
+Wrong: defer func() { recover() }()
+Right: defer func() { if r := recover(); r != nil { log.Printf("panic: %v", r); /* fail closed */ } }()
+Watch: recovering in a request handler is reasonable; recovering and then returning a success response is not.
+
 ## llm-prompt-injection
 OWASP: LLM Applications Security | CWE-1427 | A05:2025
 Concatenating unescaped user input directly into LLM prompt strings enables direct prompt injection attacks.

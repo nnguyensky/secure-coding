@@ -10,7 +10,7 @@
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-366%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-385%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -43,7 +43,7 @@
 │  • 9 Focused Trigger Groups  • 12 Drop-In Templates (25 Standards Each)     │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  LAYER 2: MECHANICAL SCANNER & SHANNON ENTROPY (0 Tokens Clean, <20ms)      │
-│  • 31 Pattern Files (359 Regexes)  • Shannon Entropy H ≥ 3.5 Bits/Byte      │
+│  • 32 Pattern Files (370 Regexes)  • Shannon Entropy H ≥ 3.5 Bits/Byte      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  LAYER 3: VERIFICATION & MULTI-ECOSYSTEM AUDITING                           │
 │  • 213 Verifiable Controls  • 9 Package Managers  • 14 Clean Code Standards │
@@ -85,7 +85,7 @@ flowchart TD
     subgraph L2["Layer 2: Fast Mechanical Scanner (0 Tokens Clean)"]
         SCAN["hooks/scan.js (&lt;20ms)<br/>• Line Numbers &amp; Code Snippets"]
         ENTROPY["Shannon Entropy Engine<br/>• Un-prefixed Secret Detection ($H \\ge 3.5$)"]
-        PATTERNS["patterns/*.txt (31 Files, 359 Regexes)<br/>• JWT, CORS, Deser, Cloud Keys, SbD, IoT"]
+        PATTERNS["patterns/*.txt (32 Files, 370 Regexes)<br/>• JWT, CORS, Deser, Cloud Keys, SbD, IoT"]
         SUPPRESS["Inline Comment Suppression<br/>• // secure-coding-ignore: id"]
     end
 
@@ -403,7 +403,7 @@ Always write secure code from the start. Never defer security fixes.
 
 | MCP Tool | Purpose | Example AI Prompt |
 |---|---|---|
-| `secure_code_scan` | Scans in-memory code snippets or staged files for 359 OWASP & SbD patterns. | *"Scan this authentication function for vulnerabilities."* |
+| `secure_code_scan` | Scans in-memory code snippets or staged files for 370 OWASP & SbD patterns. | *"Scan this authentication function for vulnerabilities."* |
 | `secure_code_autofix` | Returns exact remediation diffs or refactors code in-place. | *"Fix the weak random number generator in auth.ts."* |
 | `security_dependency_audit` | Scans lockfiles across 9 package ecosystems for CVEs. | *"Check package.json and requirements.txt for vulnerabilities."* |
 | `clean_code_lint` | Lints source code against 14 universal Clean Code quality standards. | *"Lint my recent changes for clean code issues."* |
@@ -488,7 +488,7 @@ echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"secure_cod
 
 ## 🧪 Validation & Test Suite
 
-Verify all 366 test assertions, pattern compilation, secret masking, and MCP tools:
+Verify all 385 test assertions, pattern compilation, secret masking, and MCP tools:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js
