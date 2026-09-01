@@ -205,7 +205,12 @@ function main() {
       }
     }
   }
-  const dupes = Object.entries(seenPatterns).filter(([, files]) => files.size > 1);
+  // One defect keeps one id even when a generic rule and a language-specific
+  // rule live in different files. Listed ids are deliberately shared; anything
+  // else spanning files is an accidental collision worth warning about.
+  const SHARED_IDS = new Set(['insecure-deserialization']);
+  const dupes = Object.entries(seenPatterns)
+    .filter(([id, files]) => files.size > 1 && !SHARED_IDS.has(id));
   if (dupes.length > 0) {
     for (const [id, files] of dupes) {
       warn(`pattern "${id}" appears in multiple files: ${[...files].join(', ')}`);

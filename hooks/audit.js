@@ -10,7 +10,10 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const DIR = process.argv[2] || process.cwd();
+// argv[2] is a target directory, not a flag — a stray `--help` would otherwise
+// be treated as a path and have the audit file written into it.
+const ARG = process.argv[2];
+const DIR = ARG && !ARG.startsWith('-') ? ARG : process.cwd();
 const OUT = process.env.AUDIT_OUT || 'json';
 const STATE = process.env.SECURE_CODING_AUDIT || path.join(DIR, 'checks', 'audit.json');
 const TIMEOUT = 15000; // 15s per tool

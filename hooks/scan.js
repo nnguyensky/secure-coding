@@ -159,7 +159,16 @@ function matchContent(content, filenameOrExt, patterns) {
   for (const p of patterns) {
     if (seen.has(p.id)) continue;
     if (cfg && Array.isArray(cfg.ignorePatterns) && cfg.ignorePatterns.includes(p.id)) continue;
-    if (p.exts !== '*' && ext && !p.exts.split(',').includes(ext) && !p.exts.split(',').includes(base)) continue;
+    // exts are lowercased at load; match the basename case-insensitively so
+    // `Dockerfile` scoping works. Extensionless files (Dockerfile, Makefile)
+    // must still be filtered — matching on basename only, not skipped.
+    if (p.exts !== '*') {
+      const want = p.exts.split(',');
+      const lowerBase = base.toLowerCase();
+      // Dockerfile.prod / api.Dockerfile are Dockerfiles too.
+      const named = want.some(w => lowerBase === w || lowerBase.startsWith(w + '.') || lowerBase.endsWith('.' + w));
+      if (!want.includes(ext) && !named) continue;
+    }
 
     let matchedLineNum = null;
     let matchedSnippet = '';

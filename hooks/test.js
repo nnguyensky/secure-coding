@@ -526,6 +526,42 @@ bad('sbd_legacy_tls', 'py', 'ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_0)', 'sbd-l
 good('sbd_modern_tls', 'py', 'ctx = ssl.create_default_context()');
 bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
 
+// --- filename-scoped patterns (Dockerfile) ---
+// exts are lowercased at load, so a `Dockerfile`-scoped rule only matched a
+// lowercase basename — all 19 container rules were unreachable.
+(function dockerfileScope() {
+  const { loadPatterns, matchContent } = require('./scan.js');
+  const pats = loadPatterns();
+  const ids = (name) => matchContent('USER root', '/x/' + name, pats).map(h => h.id);
+
+  for (const name of ['Dockerfile', 'dockerfile', 'Dockerfile.prod', 'api.Dockerfile']) {
+    uniq('dockerfile-' + name);
+    if (ids(name).includes('container-root')) pass++;
+    else { fail++; console.log(`MISS  dockerfile-${name} (want container-root, got [${ids(name)}])`); }
+  }
+
+  // Extensionless files must still be filtered, not exempted from scoping.
+  // Extensionless files must be filtered by basename, not exempted from
+  // scoping. Asserted on the scoping rule itself: id-level dedupe hides this
+  // in matchContent output when a `*` rule shares the id.
+  uniq('dockerfile-no-leak');
+  const scoped = pats.filter(x => x.exts !== '*' && !x.exts.split(',').includes('dockerfile'));
+  const leaks = scoped.filter(x => {
+    const want = x.exts.split(','), lb = 'makefile';
+    const named = want.some(w => lb === w || lb.startsWith(w + '.') || lb.endsWith('.' + w));
+    return want.includes('') || named;
+  });
+  if (leaks.length === 0) pass++;
+  else { fail++; console.log(`MISS  dockerfile-no-leak: ${leaks.length} scoped rules would run on Makefile`); }
+
+  // A scoped rule must not bleed across languages.
+  uniq('dockerfile-lang-scope');
+  const goOnJs = matchContent('db.Query("SELECT * FROM t WHERE i=" + id)', 'x.js', pats)
+    .map(h => h.id).includes('sql-concat');
+  if (!goOnJs) pass++;
+  else { fail++; console.log('MISS  dockerfile-lang-scope: go rule fired on .js'); }
+})();
+
 // --- per-occurrence reporting ---
 // The same id on several lines is several findings, so fixing one does not
 // silently close the others.
