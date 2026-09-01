@@ -14,11 +14,6 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    # One PR for all four actions instead of four near-identical ones.
-    groups:
-      github-actions:
-        patterns:
-          - "*"
     labels:
       - "dependencies"
       - "security"
