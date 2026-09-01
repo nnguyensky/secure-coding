@@ -24,23 +24,61 @@ An enterprise-ready SBOM provides machine-readable inventory of software compone
 
 ---
 
-## 2. BSI & G7 "SBOM for AI" — The 7 Information Clusters
+## 2. Generating & Using SBOMs (Joint Guidance)
 
-AI and Machine Learning systems require specialized tracking across 7 distinct clusters:
+**Where the SBOM comes from**, best first:
+1. **Build-time tooling** — generated as part of the build, so it reflects what was actually shipped. Preferred.
+2. **Source repository** analysis, when build integration is not available.
+3. **Binary analysis**, for software that already exists — heuristic, so treat completeness as best-effort.
 
-| Cluster | Key Elements | Machine-Readable Field (CycloneDX / JSON) |
-|---|---|---|
-| **1. Metadata** | Author, tool, timestamp, format spec, serial URN | `metadata.tools`, `metadata.timestamp` |
-| **2. System-Level Properties (SLP)** | AI System name, primary intended use, deployment target (edge/cloud), input/output modalities | `component.properties["ai:system:use_case"]` |
-| **3. Models** | Foundation model name, model architecture (Transformer/CNN), weight provenance, quantization (FP16/INT8/GGUF), license, hashes | `component[type="machine-learning-model"]`, `modelCard.modelParameters` |
-| **4. Dataset Properties (DP)** | Dataset identifier, purpose (training/eval/fine-tuning/RAG), token count, cutoff date, provenance | `data.provenance`, `data.properties["ai:dataset:tokens"]` |
-| **5. Key Performance Indicators (KPI)** | Benchmark scores (MMLU, GSM8k, BLEU, latency, perplexity), evaluation dates | `modelCard.quantitativeAnalysis.performanceMetrics` |
-| **6. Security Properties (SP)** | Model guardrails, prompt injection sanitizers, weight encryption at rest, secure enclave / TEE | `component.properties["ai:security:guardrails"]` |
-| **7. Infrastructure** | PyTorch / vLLM / ONNX versions, CUDA / ROCm version, GPU/TPU hardware requirements | `component.dependencies`, `properties["ai:runtime"]` |
+**An SBOM is only useful if it is machine-processable.** Emit a widely used format (CycloneDX/SPDX) with enough component detail to correlate against vulnerability databases automatically. A PDF or a wiki page is not an SBOM. Automate generation, management, *and* consumption — a file nobody ingests provides no security value.
+
+**Three roles, three different uses** — an organisation is usually more than one:
+
+| Role | What the SBOM is for |
+|---|---|
+| **Producer** | Track upstream components, respond to vulnerability disclosures, manage licence obligations, reduce code bloat, spot support/quality risk early. |
+| **Chooser** | Make risk-informed acquisition decisions. *Whether a supplier can produce an SBOM at all is itself a procurement signal* (see `technology-selection.md`). |
+| **Operator** | Understand exposure when a new CVE lands; triage which systems and missions are affected; apply compensating controls or isolation when no patch exists. |
+
+**Lifecycle obligations**
+- **Version and retain** SBOMs — you need the SBOM for the release that is actually deployed, not just the latest.
+- **Request SBOMs from suppliers** and **provide them downstream**. Transparency only compounds if it propagates.
+- **Continuously monitor** — an SBOM is a snapshot; new vulnerabilities appear in unchanged components. Log4Shell is the canonical case: the value was in answering "do we run this?" in minutes rather than weeks.
+- Pair SBOM data with machine-readable advisories — **CSAF** for security advisories, **VEX** for exploitability status (§4).
+- **Licence tracking** is a first-class use, not a side effect. A licence violation can force a recall or sale suspension.
+
+> SBOM is how the Secure by Design principle of **radical transparency and accountability** is made concrete: build one per product, ask suppliers for theirs, and publish yours to customers.
 
 ---
 
-## 3. ACSC & CISA VEX (Vulnerability Exploitability eXchange)
+## 3. BSI & G7 "SBOM for AI" — The 7 Information Clusters
+
+AI and Machine Learning systems require specialized tracking across 7 distinct clusters:
+
+*Cluster order and element names follow the BSI/G7 document. These are **additional** to the general SBOM minimum elements in §1 — an AI-SBOM does not replace them.*
+
+| Cluster | BSI Minimum Elements | Machine-Readable Field (CycloneDX / JSON) |
+|---|---|---|
+| **1. Metadata** | SBOM author (the entity running the tool — distinct from the component's *producer*), SBOM version, data format name + version, **author signature**, tool name + version, **generation context**, timestamp, dependency relationship | `metadata.tools`, `metadata.timestamp`, `metadata.authors`, `signature` |
+| **2. System-Level Properties (SLP)** | System name, components, producer, version, timestamp, **data flow**, **data usage**, input/output properties, intended application area | `component.properties["ai:system:*"]` |
+| **3. Models** | Model name, identifier, version, timestamp, producer, description, **hash value + hash algorithm**, properties, input-output properties, **training properties**, license, external references | `component[type="machine-learning-model"]`, `modelCard.modelParameters` |
+| **4. Datasets Properties (DP)** | Dataset name, description, content, identifier, hash, **provenance**, **statistical properties**, **sensitivity**, dependency relationship, license | `data.provenance`, `data.properties["ai:dataset:*"]` |
+| **5. Infrastructure** | Infrastructure software (firmware, package managers, third-party libraries, frameworks, runtime environments, tools) and hardware | `component.dependencies`, `properties["ai:runtime"]` |
+| **6. Security Properties (SP)** | Security controls (encryption, data minimization, differential privacy, access controls, API authentication, I/O anomaly detection, adversarial robustness, prompt-injection controls, input/output filters), **security compliance**, cybersecurity policy information, **vulnerability referencing** | `component.properties["ai:security:*"]` |
+| **7. Key Performance Indicators (KPI)** | Security metrics, operational performance KPIs | `modelCard.quantitativeAnalysis.performanceMetrics` |
+
+Elements in **bold** are the ones most often missing from a hand-rolled AI-SBOM.
+
+> `node hooks/sbom.js --ai` emits a **scaffold** — a `machine-learning-model` component with
+> `bsi:cluster:*` properties and example metrics. It is a starting point, not a conformant
+> AI-SBOM: the values are placeholders and the Models, Dataset, and KPI clusters must be filled
+> in from your actual model and training data. Treat a generated file as unfinished until each
+> element above is either populated or explicitly marked not-applicable.
+
+---
+
+## 4. ACSC & CISA VEX (Vulnerability Exploitability eXchange)
 
 VEX communicates the **actionable status** of a vulnerability in a component within the specific application context, eliminating vulnerability scanner noise:
 
@@ -75,7 +113,7 @@ VEX communicates the **actionable status** of a vulnerability in a component wit
 
 ---
 
-## 4. Supply Chain Attestation & Signing
+## 5. Supply Chain Attestation & Signing
 
 1. **In-Toto / Sigstore Signing**:
    ```bash

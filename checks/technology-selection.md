@@ -28,6 +28,8 @@ You will not get answers to all of these. The goal is enough information to make
 - [ ] Has the manufacturer done **due diligence on its own suppliers**' Secure by Design practices?
 - [ ] Any **single-supplier reliance** identified upstream, and mitigated?
 - [ ] Does the **SBOM include inherited/transitive components**, in a spec that supports automated monitoring (CycloneDX/SPDX — see `sbom.md`)?
+- [ ] Can the supplier **produce an SBOM at all**? Inability to is itself a risk signal.
+- [ ] Are security advisories published in a machine-readable format (**CSAF**), with **VEX** exploitability status?
 - [ ] Are releases **signed**, with anti-tampering verification available to you?
 
 ## 4. Open Source Posture
