@@ -49,8 +49,8 @@ f, err := os.CreateTemp("", "prefix-*")
 ## Secure cookie
 ```go
 http.SetCookie(w, &http.Cookie{
-    Name: "sid", Value: token,
-    HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode,
+	Name: "sid", Value: token,
+	HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode,
 })
 ```
 
@@ -95,8 +95,8 @@ dbPassword := os.Getenv("DB_PASSWORD")   // or a secret manager
 ## Safe error handling — no internals to the user
 ```go
 if err := doThing(); err != nil {
-    log.Printf("operation failed: %v", err)   // full detail to logs only
-    http.Error(w, "Something went wrong", http.StatusInternalServerError)
+	log.Printf("operation failed: %v", err)   // full detail to logs only
+	http.Error(w, "Something went wrong", http.StatusInternalServerError)
 }
 // never: returning err.Error(), a stack trace, SQL, or file paths
 ```
@@ -133,9 +133,12 @@ func validatePassword(pw string) error {
 	hasUpper, hasDigit, hasSymbol := false, false, false
 	for _, c := range pw {
 		switch {
-		case c >= 'A' && c <= 'Z': hasUpper = true
-		case c >= '0' && c <= '9': hasDigit = true
-		case c >= 33 && c <= 126:  hasSymbol = true
+		case c >= 'A' && c <= 'Z':
+			hasUpper = true
+		case c >= '0' && c <= '9':
+			hasDigit = true
+		case c >= 33 && c <= 126:
+			hasSymbol = true
 		}
 	}
 	if !hasUpper || !hasDigit || !hasSymbol {
@@ -143,6 +146,7 @@ func validatePassword(pw string) error {
 	}
 	return nil
 }
+
 // never: accepting any password without policy checks
 ```
 
@@ -172,28 +176,28 @@ h := sha256.Sum256(data)
 var allowedMIME = map[string]string{"image/jpeg": "jpg", "image/png": "png", "application/pdf": "pdf"}
 
 func handleUpload(data []byte, uploadDir string) (string, error) {
-    if len(data) > 10<<20 { // cap before doing any work
-        return "", errors.New("file too large")
-    }
-    // Sniff the real type from the bytes; the client-supplied name and
-    // Content-Type are attacker-controlled.
-    ext, ok := allowedMIME[http.DetectContentType(data)]
-    if !ok {
-        return "", errors.New("invalid file type")
-    }
-    name := uuid.NewString() + "." + ext // never reuse the uploaded filename
-    dest := filepath.Join(uploadDir, name)
+	if len(data) > 10<<20 { // cap before doing any work
+		return "", errors.New("file too large")
+	}
+	// Sniff the real type from the bytes; the client-supplied name and
+	// Content-Type are attacker-controlled.
+	ext, ok := allowedMIME[http.DetectContentType(data)]
+	if !ok {
+		return "", errors.New("invalid file type")
+	}
+	name := uuid.NewString() + "." + ext // never reuse the uploaded filename
+	dest := filepath.Join(uploadDir, name)
 
-    // Confirm the result is still inside uploadDir.
-    root, err := filepath.Abs(uploadDir)
-    if err != nil {
-        return "", err
-    }
-    abs, err := filepath.Abs(dest)
-    if err != nil || !strings.HasPrefix(abs, root+string(os.PathSeparator)) {
-        return "", errors.New("path escapes upload directory")
-    }
-    return dest, os.WriteFile(dest, data, 0o600)
+	// Confirm the result is still inside uploadDir.
+	root, err := filepath.Abs(uploadDir)
+	if err != nil {
+		return "", err
+	}
+	abs, err := filepath.Abs(dest)
+	if err != nil || !strings.HasPrefix(abs, root+string(os.PathSeparator)) {
+		return "", errors.New("path escapes upload directory")
+	}
+	return dest, os.WriteFile(dest, data, 0o600)
 }
 ```
 
@@ -202,13 +206,13 @@ func handleUpload(data []byte, uploadDir string) (string, error) {
 var allowedHosts = map[string]bool{"app.example.com": true, "www.example.com": true}
 
 func safeRedirect(w http.ResponseWriter, r *http.Request, target string) {
-    u, err := url.Parse(target)
-    // Relative path with no host is safe; anything else must be on the allowlist.
-    if err != nil || (u.Host != "" && !allowedHosts[u.Host]) || (u.Scheme != "" && u.Scheme != "https") {
-        http.Redirect(w, r, "/", http.StatusFound) // fail closed to a known page
-        return
-    }
-    http.Redirect(w, r, u.String(), http.StatusFound)
+	u, err := url.Parse(target)
+	// Relative path with no host is safe; anything else must be on the allowlist.
+	if err != nil || (u.Host != "" && !allowedHosts[u.Host]) || (u.Scheme != "" && u.Scheme != "https") {
+		http.Redirect(w, r, "/", http.StatusFound) // fail closed to a known page
+		return
+	}
+	http.Redirect(w, r, u.String(), http.StatusFound)
 }
 ```
 
@@ -234,28 +238,28 @@ import "net/url"
 var allowedHosts = map[string]bool{"api.example.com": true, "cdn.example.com": true}
 
 func isSafeURL(rawURL string) bool {
-    u, err := url.Parse(rawURL)
-    if err != nil || u.Scheme != "https" {
-        return false
-    }
-    if !allowedHosts[u.Hostname()] {
-        return false
-    }
-    // block internal IPs
-    ips, err := net.LookupIP(u.Hostname())
-    if err != nil {
-        return false
-    }
-    for _, ip := range ips {
-        if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
-            return false
-        }
-    }
-    return true
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "https" {
+		return false
+	}
+	if !allowedHosts[u.Hostname()] {
+		return false
+	}
+	// block internal IPs
+	ips, err := net.LookupIP(u.Hostname())
+	if err != nil {
+		return false
+	}
+	for _, ip := range ips {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
+			return false
+		}
+	}
+	return true
 }
 
 if !isSafeURL(userURL) {
-    return errors.New("URL not allowed")
+	return errors.New("URL not allowed")
 }
 // never: http.Get(r.URL.Query().Get("url")) without validation
 ```
@@ -265,15 +269,16 @@ if !isSafeURL(userURL) {
 var allowedOrigins = map[string]bool{"https://app.example.com": true}
 
 func corsMiddleware(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        origin := r.Header.Get("Origin")
-        if allowedOrigins[origin] {
-            w.Header().Set("Access-Control-Allow-Origin", origin)
-            w.Header().Set("Access-Control-Allow-Credentials", "true")
-        }
-        next.ServeHTTP(w, r)
-    })
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if allowedOrigins[origin] {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+		next.ServeHTTP(w, r)
+	})
 }
+
 // never: Access-Control-Allow-Origin: * with credentials
 ```
 
@@ -282,9 +287,9 @@ func corsMiddleware(next http.Handler) http.Handler {
 import "strings"
 
 func sanitizeLog(s string) string {
-    s = strings.ReplaceAll(s, "\n", "\\n")
-    s = strings.ReplaceAll(s, "\r", "\\r")
-    return s
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	s = strings.ReplaceAll(s, "\r", "\\r")
+	return s
 }
 
 log.Printf("user_action user=%s input=%s", user, sanitizeLog(userInput))
