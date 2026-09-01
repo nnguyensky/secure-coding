@@ -273,7 +273,14 @@ install(CORS) {
 ## Log injection
 ```kotlin
 fun sanitizeLog(msg: String): String {
-    return msg.replace("[\r\n\t]".toRegex(), " ").take(500)
+    // Escape rather than blank out, so the log still shows what was submitted.
+    // Escape first: stripping control chars first would delete the CR/LF.
+    return msg.replace("\\", "\\\\")
+              .replace("\n", "\\n")
+              .replace("\r", "\\r")
+              .replace("\t", "\\t")
+              .replace(Regex("[\\x00-\\x1f\\x7f]"), "")
+              .take(500)
 }
 logger.info("Lookup: {}", sanitizeLog(userParam))
 ```

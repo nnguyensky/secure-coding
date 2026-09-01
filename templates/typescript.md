@@ -307,7 +307,15 @@ app.use(cors({
 ## Log injection
 ```ts
 function sanitizeLog(input: string): string {
-  return input.replace(/[\r\n\t]/g, " ").slice(0, 500);
+  // Escape rather than blank out, so the log still shows what was submitted.
+  return input
+    .replace(/\\/g, "\\\\")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\t/g, "\\t")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x00-\x1f\x7f]/g, "")
+    .slice(0, 500);
 }
 logger.info(`User lookup: ${sanitizeLog(req.query.search as string)}`);
 ```

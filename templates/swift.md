@@ -288,7 +288,14 @@ app.middleware.use(CORSMiddleware(configuration: corsConfiguration))
 ## Log injection
 ```swift
 func sanitizeForLog(_ str: String) -> String {
-    return String(str.replacingOccurrences(of: "[\r\n\t]", with: " ", options: .regularExpression).prefix(500))
+    // Escape rather than blank out, so the log still shows what was submitted.
+    let escaped = str
+        .replacingOccurrences(of: "\\", with: "\\\\")
+        .replacingOccurrences(of: "\n", with: "\\n")
+        .replacingOccurrences(of: "\r", with: "\\r")
+        .replacingOccurrences(of: "\t", with: "\\t")
+        .replacingOccurrences(of: "[\u{00}-\u{1f}\u{7f}]", with: "", options: .regularExpression)
+    return String(escaped.prefix(500))
 }
 req.logger.info("Search query: \(sanitizeForLog(searchParam))")
 ```
