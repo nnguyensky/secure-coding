@@ -11,7 +11,7 @@ weak-hash	java,kt	DigestUtils\.(md5|sha1)|(MD5|SHA-?1)\.digest\s*\(			high
 weak-hash	rb	Digest::(MD5|SHA1)\b			high
 weak-hash	php	hash\s*\(\s*["'](md5|sha1)["']			high
 weak-hash	cs	(MD5|SHA1)\.Create\s*\(|System\.Security\.Cryptography\.(MD5|SHA1)\b			high
-weak-hash	rs	(Md5|Sha1)::new\s*\(|md5::|sha1::			high
+weak-hash	rs	(Md5|Sha1)::new\s*\(|md5::|sha1::	![Cc]hecksum|[Ii]ntegrity|[Dd]edup|[Ee][Tt]ag|[Cc]ache[_-]?[Kk]ey|non-?security|[Ff]ingerprint	never use MD5/SHA-1 for security — fine for checksums, argon2id for passwords	high
 pw-fast-hash	*	(sha256|sha512|md5|sha1)\s*\(\s*\w*(password|passwd|pwd)\w*	use argon2id; else scrypt or bcrypt at cost 12+	use argon2id; else scrypt or bcrypt at cost 12+	high
 pw-fast-hash	*	hashlib\.\w+\s*\(\s*\w*(password|passwd|pwd)\w*			high
 pw-fast-hash	go	sha256\.Sum256\s*\(\s*\[\]\s*byte\s*\(\s*\w*(password|passwd|pwd)\w*			high

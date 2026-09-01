@@ -4,5 +4,6 @@
 
 mem	c,h,cpp,cc,hpp	\b(strcpy|strcat|sprintf|gets|vsprintf)\s*\(	use bounded copies (snprintf, strlcpy); check allocs; free once+null		medium
 mem	c,h,cpp,cc,hpp	\balloca\s*\(	use malloc with bounds check, or a fixed-size buffer		medium
-mem	rs	unsafe\s*\{	Minimize unsafe blocks; validate all inputs before entering		medium
+mem	rs	unsafe\s*\{[^}]*\b(transmute|from_raw_parts|get_unchecked|set_len|assume_init|copy_nonoverlapping|offset|as_mut|from_utf8_unchecked)(::<[^>]*>)?\s*\(	validate length and lifetime before an unchecked memory operation		medium
+mem	rs	\b(std::mem::transmute|from_raw_parts(_mut)?|get_unchecked(_mut)?|assume_init|copy_nonoverlapping|from_utf8_unchecked)(::<[^>]*>)?\s*\(	validate length and lifetime before an unchecked memory operation		medium
 mem	cs	\bunsafe\s*\{			medium

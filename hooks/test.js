@@ -526,6 +526,48 @@ bad('sbd_legacy_tls', 'py', 'ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_0)', 'sbd-l
 good('sbd_modern_tls', 'py', 'ctx = ssl.create_default_context()');
 bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
 
+// --- context-sensitive rules ---
+// Validated against a real Tauri/Rust app that produced 24 findings, all false
+// positives: every `unsafe {}` (mandatory for FFI), every `0o777` literal (a
+// chmod parser), and MD5 used as a file checksum.
+(function contextRules() {
+  const { loadPatterns, matchContent } = require('./scan.js');
+  const pats = loadPatterns();
+  const hit = (code, ext, id) => matchContent(code, 'ctx.' + ext, pats).some(h => h.id === id);
+
+  const yes = (name, code, ext, id) => {
+    uniq('ctx-' + name);
+    if (hit(code, ext, id)) pass++;
+    else { fail++; console.log(`MISS  ctx-${name} (want ${id}): ${code.slice(0, 50)}`); }
+  };
+  const no = (name, code, ext, id) => {
+    uniq('ctx-' + name);
+    if (!hit(code, ext, id)) pass++;
+    else { fail++; console.log(`FALSE+ ctx-${name} (${id}): ${code.slice(0, 50)}`); }
+  };
+
+  // world-writable: the alternation used to bind at top level, so a bare
+  // 0o777 literal matched with no chmod at all.
+  no('maskLiteral', 'let valid_mask = 0o7777;', 'rs', 'world-writable');
+  no('octalAssert', 'assert_eq!(parse_octal("777").unwrap(), 0o777);', 'rs', 'world-writable');
+  no('bitClear', "'a' => mode &= !0o777,", 'rs', 'world-writable');
+  no('safeMode', 'chmod(path, 0o644)', 'py', 'world-writable');
+  yes('chmod777', 'os.chmod(p, 0o777)', 'py', 'world-writable');
+  yes('chmodSync', 'fs.chmodSync(f, 0o777)', 'js', 'world-writable');
+  yes('chmodShell', 'chmod -R 777 /data', 'sh', 'world-writable');
+
+  // mem: FFI requires unsafe and is not a defect; flag the operation instead.
+  no('ffiUnsafe', 'unsafe { winapi::um::aclapi::GetAceCount(a) }', 'rs', 'mem');
+  no('unsafeOpen', 'let result = unsafe {', 'rs', 'mem');
+  yes('transmute', 'unsafe { std::mem::transmute::<u32,f32>(x) }', 'rs', 'mem');
+  yes('fromRawParts', 'let s = unsafe { std::slice::from_raw_parts(p, len) };', 'rs', 'mem');
+  yes('getUnchecked', 'let v = unsafe { buf.get_unchecked(i) };', 'rs', 'mem');
+
+  // weak-hash: MD5 is legitimate for non-security checksums.
+  no('md5Checksum', 'let mut md5 = md5::Md5::new(); // file integrity checksum', 'rs', 'weak-hash');
+  yes('md5Bare', 'let h = md5::Md5::new();', 'rs', 'weak-hash');
+})();
+
 // --- multi-line taint tracking ---
 // Regex patterns only fire when the source sits inside the sink call. These
 // cover the same bug split across lines, and — just as important — that

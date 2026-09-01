@@ -2,7 +2,7 @@
 # id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
 # POSIX ERE only - BSD grep has no -P and fails silently on it.
 
-world-writable	*	(chmod|chown)\s*\([^)]*0?777|0o777|0777	use 0600 or 0644, never 0777		low
+world-writable	*	((chmod|chown|fchmod|lchown)(Sync)?|set_mode|from_mode)\s*\([^)]*0?o?7[75]{2}\b|chmod\s+(-[A-Za-z]+\s+)*0?7[75]{2}\b	use 0600 or 0644, never 0777		low
 mktemp	*	\b(mktemp|tmpnam)\s*\(	use mkstemp or tempfile.mkdtemp		low
 
 # Insecure Deserialization
