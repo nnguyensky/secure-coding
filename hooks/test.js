@@ -606,6 +606,17 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   clean('notAssignment', 'const eq = req.query.x == other;\nfetch(other);', 'js');
 })();
 
+// --- SKILL.md references resolve ---
+// A renamed or missing checks/ file would silently send the agent nowhere.
+(function skillLinks() {
+  uniq('skill-check-links');
+  const skill = fs.readFileSync(path.join(DIR, 'SKILL.md'), 'utf8');
+  const refs = [...new Set((skill.match(/checks\/[a-z0-9-]+\.md/g) || []))];
+  const missing = refs.filter(r => !fs.existsSync(path.join(DIR, r)));
+  if (refs.length > 0 && missing.length === 0) pass++;
+  else { fail++; console.log(`LINKS unresolved in SKILL.md: ${missing.join(', ') || '(no refs found)'}`); }
+})();
+
 // --- pattern file hygiene ---
 // The exclusion column takes ONE !regex. Writing `!a|!b|!c` makes only `a`
 // exclude; `b` and `c` then require a literal `!` in the code and never fire,

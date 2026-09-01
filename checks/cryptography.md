@@ -43,7 +43,40 @@ flowchart LR
 
 ---
 
-## 4. Post-Quantum Cryptography (PQC) Transition Checklist
+## 4. Certificate Chain of Trust & Revocation
+Every certificate presented must pass all four checks — skipping any one breaks the chain:
+1. **Signature validation**: verify each certificate against the issuing CA's public key; reject on tampering.
+2. **Chain verification**: the issuer sequence must terminate at a CA in the trust store. Keep the root CA offline; issue from intermediates so a compromised intermediate can be revoked without replacing the root.
+3. **Expiry**: reject expired certificates anywhere in the chain — never "warn and continue".
+4. **Revocation**: check CRL or OCSP on use. A certificate can be revoked long before it expires.
+
+- **Trust only verified public certificates.** A malicious intermediate lets an attacker mint end-entity certs at will.
+- Revoking a CA must revoke everything it signed.
+- Monitor expiry dates and renew ahead of time; an unplanned expiry forces an emergency rollover.
+
+---
+
+## 5. Positions of Trust & Separation of Duties
+Roles with access to keys and secrets (crypto custodians, admins, privileged CI) carry extra obligations and are a prime target for both external attack and insider misuse:
+- **Least privilege + separation of duties**: split critical key operations so no single person can generate, export, and destroy. Revalidate privileged access on a schedule; unchecked standing access is how a single compromise becomes an organisational one.
+- **No lone zones**: require secondary verification for changes to high-value keys.
+- **Never store keys or secrets in clear text**, including in backups and config files.
+- **Audit and monitor** key usage, certificate status, and expiry — but never log the key or secret material itself, or the monitoring system becomes the new target.
+- **Escrow and recovery** are additional attack surfaces. Support them only where required, and secure them to the same standard as the primary store.
+
+---
+
+## 6. Compromise Triggers → Rollover
+Rollover is not only a scheduled activity. Trigger an immediate, unscheduled rollover on any of:
+suspected compromise · certificate expiry missed · insufficient key length · a newly discovered weakness in the algorithm or its use · exposure through memory dump, logging, or a handling error · departure of a person in a position of trust.
+
+Practise rollover before you need it — the first unplanned rollover should not be the first time the procedure runs. More frequent rotation is not automatically safer; rollover itself carries operational risk.
+
+> **The worst compromise is one that is not detected.** Sufficient logging and monitoring is what turns a silent breach into an incident you can actually respond to.
+
+---
+
+## 7. Post-Quantum Cryptography (PQC) Transition Checklist
 Design crypto agility into protocols to prepare for quantum decryption threats:
 - **Key Encapsulation (KEM)**: Transition from RSA/ECDH to **ML-KEM (FIPS 203)** (formerly Kyber).
 - **Digital Signatures**: Transition from RSA/ECDSA/Ed25519 to **ML-DSA (FIPS 204)** (formerly Dilithium) and **SLH-DSA (FIPS 205)** (formerly SPHINCS+).

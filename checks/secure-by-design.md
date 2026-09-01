@@ -21,16 +21,18 @@
 
 ---
 
-## 3. OWASP SbD 40-Item Review Checklist (Architectural Categories)
+## 3. OWASP SbD Review Checklist — 36 Controls in 5 Domains
 
-| Domain | Key Architectural Invariants & Requirements |
+*Control ids are the framework's own (AS/DM/RR/AC/MT), so a review can cite them directly.*
+
+| Domain (control ids) | Key Architectural Invariants & Requirements |
 |---|---|
-| **Edge Gateway** | Single ingress point, SSL termination (TLS $\ge 1.3$), JWT token validation, IP/token rate limiting, request payload size limits. |
-| **Inter-Service** | Mutual TLS (mTLS) with short-lived SPIFFE/x509 certs, token forwarding, circuit breakers with retry budgets, bulkheads, explicit request timeouts. |
-| **Data Layer** | Database Row-Level Security (RLS) for multi-tenancy, parameterized queries, field-level encryption, KMS envelope encryption (DEK/KEK). |
-| **Identity & Auth** | Centralized IdP (OIDC/SAML), phishing-resistant MFA (WebAuthn), least-privilege RBAC/ABAC, access tokens $\le 15\text{ mins}$, refresh token rotation. |
-| **Resilience & Faults** | **Fail-Closed Authorization**: Unexpected errors or unreachable auth services must deny access, never permit. Graceful degradation. |
-| **Audit & Telemetry** | ISO 8601 UTC timestamps, structured JSON logging, strict redaction of PII/credentials, tamper-evident write-only SIEM pipelines. |
+| **A. Architecture & Service Design** (AS-01…08) | Trust zones enforced, cross-zone traffic only via a governed gateway/bus. Clear service boundaries, no circular dependencies, each service owns its data. Avoid long synchronous chains. Versioned API/event contracts with consumer notice before breaking changes. Durable messaging with a DLQ strategy. Startup resilience for missing dependencies. Legacy behind an anti-corruption layer. |
+| **B. Data Management & Protection** (DM-01…06) | Data classified with named owners, controls proportional to classification. Encryption in transit (TLS/mTLS) and at rest with managed keys and rotation. Idempotent handlers with duplicate suppression. Sagas/compensations over 2PC. Retention/deletion policy per data class, with minimisation. Documented consistency model. Row-Level Security for multi-tenancy; parameterized queries. |
+| **C. Reliability & Resilience** (RR-01…08) | Retries with exponential backoff + jitter. Circuit breakers and bulkheads; degraded modes for non-critical features. Defined async semantics (ordering, delivery guarantees, ack timeouts, monitored DLQs). HA shared integration layers that contain errors. Idempotency-Key on every mutating endpoint. Timeouts on all calls, health probes, multi-AZ failover. Quotas, autoscaling, edge rate limits. Caching and back-pressure. |
+| **D. Access Control & Secure Comms** (AC-01…07) | TLS/mTLS everywhere with verified service identity (mesh-issued certs). Central IdP (OIDC/OAuth2), MFA on privileged paths, short-lived tokens. RBAC/ABAC over APIs *and* messaging publish/consume. Authorization centralized at gateway/mesh as policy-as-code. Secrets in a secret manager, keys/certs auto-rotating, never in code or logs. Regulatory controls identified with evidence. Least privilege extended to CI/CD, VCS apps, and third-party tooling. |
+| **E. Monitoring, Testing & Incident Readiness** (MT-01…07) | Structured centralized logs with correlation/trace ids; admin access logged. Metrics/SLOs with actionable alerts. ASVS-aligned and negative tests drawn from threat modeling. SbD controls verifiable in test — isolation, mTLS, authZ denials, rate-limit behaviour. Published OpenAPI/AsyncAPI, current ADRs and runbooks. Rehearsed incident response plan. Audit retention $\ge 12$ months, tamper-evident, searchable hot window. |
+| **Fail-Closed** (cross-cutting) | Unexpected errors or an unreachable auth service must deny access, never permit. Graceful degradation without privilege escalation. |
 
 ---
 
