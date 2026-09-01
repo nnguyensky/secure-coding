@@ -73,7 +73,7 @@ Right: AES-GCM or ChaCha20-Poly1305 — authenticated encryption.
 Watch: use the library's high-level API. Never assemble a cipher yourself.
 
 ## cookie
-OWASP: 75,76
+OWASP: 75,76 | CWE-1004 | A02:2025
 A cookie without flags can be stolen by script or read off the wire.
 Wrong: httpOnly:false, secure:false on a session or auth cookie
 Right: httpOnly, secure, sameSite together.
@@ -94,7 +94,7 @@ Right: strncpy/snprintf with a real size, or the platform's safe variants.
 Watch: check every allocation for NULL. Never trust a length that came from input.
 
 ## cors
-OWASP: 81,95
+OWASP: 81,95 | CWE-942 | A02:2025
 A wildcard origin with credentials lets any site call your API as the user.
 Wrong: Allow-Origin "*" with credentials, or origin:true with credentials:true
 Right: an explicit allowlist of origins.
@@ -108,7 +108,7 @@ Right: keep CSRF protection on; send a per-session or per-request token with eve
 Watch: only disable with a compensating control, and never on a state-changing endpoint.
 
 ## samesite
-OWASP: 75,76
+OWASP: 75,76 | CWE-1275 | A01:2025
 SameSite=None without Secure is rejected by modern browsers and is a cookie flag mistake.
 Wrong: SameSite=None alone
 Right: SameSite=None with Secure, or SameSite=Lax/Strict for session cookies.
@@ -157,7 +157,7 @@ Right: server_tokens off; strip version headers at the proxy.
 Watch: also remove X-Powered-By and framework debug headers.
 
 ## http-methods
-OWASP: 159,160
+OWASP: 159,160 | CWE-650 | A02:2025
 Extra HTTP methods widen the attack surface.
 Wrong: WebDAV/PROPFIND/MKCOL enabled, TRACE or TRACK allowed
 Right: allow only the methods the app uses, usually GET and POST.
@@ -171,28 +171,28 @@ Right: unique credentials from a secret manager; disable unused default accounts
 Watch: applies to the database, the message broker, and the admin UI.
 
 ## container-root
-OWASP: 154,208
+OWASP: 154,208 | CWE-250 | A02:2025
 A container running as root turns an app bug into host access.
 Wrong: USER root, or no USER line at all
 Right: create an unprivileged user and USER it before CMD.
 Watch: drop capabilities too; the default set is broader than needed.
 
 ## container-priv
-OWASP: 154
+OWASP: 154 | CWE-250 | A02:2025
 A privileged container has effectively no isolation.
 Wrong: privileged: true
 Right: leave it off; grant only the specific capability required.
 Watch: also check hostNetwork, hostPID, and mounted docker sockets.
 
 ## test-code
-OWASP: 157
+OWASP: 157 | CWE-489 | A02:2025
 Test hooks left in production are a working auth bypass.
 Wrong: if TESTING / BYPASS_AUTH / SKIP_AUTH / DISABLE_AUTH branches
 Right: remove before deploy; keep test seams in test builds only.
 Watch: a flag that disables a security control must not exist in a shipped binary.
 
 ## default-db-account
-OWASP: 170,175,179
+OWASP: 170,175,179 | CWE-1392 | A07:2025
 An app connecting with full rights turns SQL injection into total compromise.
 Wrong: GRANT ALL, WITH GRANT OPTION, CREATE USER ... IDENTIFIED BY 'password'
 Right: least privilege per trust level; separate credentials for read and write.
@@ -227,147 +227,147 @@ Right: resolve the path, then confirm it stays inside the allowed directory befo
 Watch: never pass a path through; pass a key that selects one from an allowlist.
 
 ## autocomplete-on
-OWASP: 40,51
+OWASP: 40,51 | CWE-200 | A02:2025
 Password fields with autocomplete="on" let the browser save credentials. On shared or public machines, the next user inherits the session.
 Wrong: autocomplete="on" on password fields, or missing autocomplete attribute
 Right: autocomplete="new-password" on password fields (or "off"). Sensitive text fields: autocomplete="off".
 Watch: some browsers ignore autocomplete="off" — use "new-password" or "one-time-code" instead.
 
 ## API-1
-OWASP API: API1:2023
+OWASP API: API1:2023 | CWE-918 | A06:2025
 Server-Side Request Forgery (SSRF): user-supplied URL is passed to an HTTP client, letting the attacker reach internal services.
 Wrong: requests.get(user_url), http.Get(userURL), fetch(userInput)
 Right: validate the URL against an allowlist of permitted hosts/schemes. Reject internal IPs (127.0.0.0/8, 10.0.0.0/8, 169.254.0.0/16, ::1).
 Watch: DNS rebinding can bypass IP checks — resolve first, then check the resolved address.
 
 ## API-2
-OWASP API: API2:2023
+OWASP API: API2:2023 | CWE-307 | A07:2025
 Broken Authentication: endpoints lack rate limiting, allowing brute-force or credential stuffing.
 Wrong: no rate limit on /login, /reset-password, /verify
 Right: rate-limit authentication endpoints (e.g., 5 attempts per minute per IP). Return identical responses for valid/invalid users.
 Watch: apply rate limiting at the infrastructure level (reverse proxy, gateway) to avoid bypass.
 
 ## API-3
-OWASP API: API3:2023
+OWASP API: API3:2023 | CWE-915 | A01:2025
 Mass Assignment: user input binds directly to a data model, letting the attacker set fields like role, is_admin, or balance.
 Wrong: User(**request.json), Object.assign(user, req.body), model.update(**request.form)
 Right: allowlist accepted fields. Never spread user input directly into a model.
 Watch: frameworks with auto-binding (Rails, Spring, Django REST) are especially prone.
 
 ## API-4
-OWASP API: API4:2023
+OWASP API: API4:2023 | CWE-770 | A06:2025
 Overfetching: endpoints return the full model when the client needs only a few fields, leaking sensitive data.
 Wrong: res.json(user), return User.objects.all(), SELECT * FROM users
 Right: select only the fields the client needs. Use field filtering or a DTO.
 Watch: GraphQL mitigates this by design; REST endpoints need explicit field selection.
 
 ## API-5
-OWASP API: API5:2023
+OWASP API: API5:2023 | CWE-285 | A01:2025
 Broken Function Level Authorization (BFLA): state-changing endpoints lack role checks, letting regular users perform admin actions.
 Wrong: router.delete('/users/:id') without role check, @app.route('/admin/...') without @admin_required
 Right: check the caller's role/permission before every state-changing operation. Deny by default.
 Watch: horizontal privilege escalation (user A edits user B's data) is the most common form.
 
 ## API-6
-OWASP API: API6:2023
+OWASP API: API6:2023 | CWE-770 | A06:2025
 Unrestricted Resource Consumption: no request size limit allows an attacker to exhaust memory or CPU.
 Wrong: app.use(express.json()) without limit, no max_content_length
 Right: set body size limits (e.g., 1MB for JSON). Add rate limiting per client.
 Watch: file upload endpoints need separate size limits from JSON body limits.
 
 ## API-7
-OWASP API: API7:2023
+OWASP API: API7:2023 | CWE-918 | A06:2025
 Unbounded Pagination: no maximum page size lets the attacker request millions of records in one call.
 Wrong: limit=-1, no default limit, per_page from user input unchecked
 Right: enforce a default page size (e.g., 20) and a maximum (e.g., 100). Ignore user-supplied limit if it exceeds the max.
 Watch: cursor-based pagination avoids this issue entirely for large datasets.
 
 ## API-8
-OWASP API: API8:2023
+OWASP API: API8:2023 | CWE-16 | A02:2025
 Security Misconfiguration — verbose errors: exception details leak to the API response, exposing internals.
 Wrong: except Exception as e: return str(e), catch(err) { res.send(err) }
 Right: return a generic error message (e.g., "Internal server error"). Log the details server-side.
 Watch: HTTP 500 with a stack trace is a reconnaissance gift.
 
 ## API-9
-OWASP API: API9:2023
+OWASP API: API9:2023 | CWE-1059 | A02:2025
 Improper Inventory Management: deprecated API versions remain accessible, exposing unpatched vulnerabilities.
 Wrong: /api/v1/ still serves requests, old endpoints not removed
 Right: remove deprecated versions or return 410 Gone. Maintain an API inventory.
 Watch: clients may depend on old versions — deprecate with a sunset header before removal.
 
 ## API-10
-OWASP API: API10:2023
+OWASP API: API10:2023 | CWE-20 | A05:2025
 Unsafe Consumption of APIs: third-party API responses are used without validation, letting a compromised upstream inject malicious data.
 Wrong: data = requests.get(external_api).json(), data = res.data
 Right: validate the response schema before use. Check status codes. Set timeouts.
 Watch: a compromised CDN or API can return valid-looking but malicious data.
 
 ## C-1
-Container Security
+Container Security | CWE-250 | A02:2025
 Container runs as root, turning an app vulnerability into host access.
 Wrong: USER root, or no USER line in Dockerfile; runAsUser: 0 in K8s
 Right: create a non-root user in Dockerfile and USER it. Set runAsNonRoot: true and runAsUser > 0 in securityContext.
 Watch: some base images default to root — always add an explicit USER.
 
 ## C-2
-Container Security
+Container Security | CWE-250 | A02:2025
 Privileged container has effectively no isolation from the host.
 Wrong: privileged: true in securityContext
 Right: remove privileged flag. Grant only the specific capability needed via capabilities.add.
 Watch: even with capabilities dropped, privileged containers can escape.
 
 ## C-3
-Container Security
+Container Security | CWE-732 | A02:2025
 Container shares host network/pid/ipc namespace, breaking isolation.
 Wrong: hostNetwork: true, hostPID: true, hostIPC: true
 Right: remove host namespace sharing. Use container-scoped namespaces and Services for networking.
 Watch: hostNetwork bypasses Kubernetes network policies entirely.
 
 ## C-4
-Container Security
+Container Security | CWE-923 | A02:2025
 Writable root filesystem lets an attacker modify binaries or configs inside the container.
 Wrong: readOnlyRootFilesystem: false, read_only: false
 Right: set readOnlyRootFilesystem: true. Use emptyDir volumes for directories that need writes.
 Watch: some apps need /tmp or /var/run writable — mount only those as emptyDir.
 
 ## C-5
-Container Security
+Container Security | CWE-653 | A02:2025
 Excessive Linux capabilities give the container host-level privileges.
 Wrong: capabilities.add: ["ALL"], add: ["SYS_ADMIN", "NET_ADMIN"]
 Right: capabilities.drop: ["ALL"], then add only the specific capabilities needed.
 Watch: CAP_SYS_ADMIN alone allows mounting filesystems and many privilege escalations.
 
 ## C-6
-Container Security
+Container Security | CWE-538 | A02:2025
 Docker socket mount lets the container control the Docker daemon — full host compromise.
 Wrong: volumes: /var/run/docker.sock:/var/run/docker.sock
 Right: remove the socket mount. Use a Docker client with a restricted API proxy if Docker access is needed.
 Watch: mounting the socket also exposes the daemon's TLS certs if using remote Docker.
 
 ## C-7
-Container Security
+Container Security | CWE-1104 | A03:2025
 No healthcheck means the orchestrator cannot detect a broken container.
 Wrong: HEALTHCHECK NONE in Dockerfile; no livenessProbe/readinessProbe in K8s
 Right: add a HEALTHCHECK in Dockerfile or liveness/readiness probes in the pod spec.
 Watch: readinessProbe controls traffic routing — without it, broken pods still receive requests.
 
 ## C-8
-Container Security
+Container Security | CWE-16 | A02:2025
 Pod runs as UID 0 (root) despite other restrictions.
 Wrong: runAsUser: 0, securityContext without runAsNonRoot: true
 Right: set runAsNonRoot: true and runAsUser to a non-zero UID (e.g., 1000).
 Watch: the container's USER directive and the pod's securityContext must both be non-root.
 
 ## C-9
-Container Security
+Container Security | CWE-250 | A02:2025
 Service account token auto-mounted into pods that don't need Kubernetes API access.
 Wrong: automountServiceAccountToken: true (or omitted — defaults to true)
 Right: set automountServiceAccountToken: false on pods that don't call the K8s API.
 Watch: a leaked token in a compromised pod can enumerate the entire cluster.
 
 ## C-10
-Container Security
+Container Security | CWE-532 | A09:2025
 No CPU/memory limits allows a single container to starve the node.
 Wrong: resources: {}, no limits section, limits: null
 Right: set requests and limits for both CPU and memory on every container.
@@ -388,7 +388,7 @@ Right: Remove or mask sensitive fields before logging. Use redaction middleware 
 Watch: logs often persist longer than expected and may be accessed by operations teams or attackers.
 
 ## pw-slow-hash
-OWASP: Password Storage CS, OWASP SCP [30,31]
+OWASP: Password Storage CS, OWASP SCP [30,31] | CWE-916 | A04:2025
 Plaintext password storage or weak hashing means a database breach exposes all credentials.
 Wrong: storing password in plaintext, using MD5/SHA1/SHA256 for passwords
 Right: hash with argon2id (preferred), scrypt, or bcrypt at cost 12+. Always use a unique random salt.
@@ -416,21 +416,21 @@ Right: validate input type and value before use in queries. Reject objects/array
 Watch: MongoDB operators like $gt, $ne, $where can bypass authentication if user input is not type-checked.
 
 ## oauth2-state
-OWASP: OAuth2 CS
+OWASP: OAuth2 CS | CWE-352 | A07:2025
 Missing or predictable state parameter in OAuth2 flow enables CSRF attacks that link attacker accounts to victim sessions.
 Wrong: no state parameter, state from client input, static/predictable state value
 Right: generate cryptographically random state, store server-side, validate on callback. Reject if missing or mismatched.
 Watch: state must be bound to the user's session — an attacker cannot forge or predict it.
 
 ## oauth2-token
-OWASP: OAuth2 CS
+OWASP: OAuth2 CS | CWE-522 | A07:2025
 Skipping token verification lets attackers use expired, forged, or replayed tokens.
 Wrong: verify:false, skipIntrospection:true, no exp/aud/iss check
 Right: verify signature, check expiration (exp), validate audience (aud) and issuer (iss). Use library defaults.
 Watch: token introspection adds a network call but catches revoked tokens in real time.
 
 ## oauth2-redirect
-OWASP: OAuth2 CS
+OWASP: OAuth2 CS | CWE-601 | A01:2025
 Accepting redirect_uri from user input lets attackers steal authorization codes via open redirect.
 Wrong: redirect_uri = request.args.get("redirect_uri"), using client-supplied URI
 Right: validate redirect_uri against pre-registered URIs. Reject if not in allowlist.
@@ -444,49 +444,49 @@ Right: call session.regenerate() (Express), request.session.regenerate() (Kotlin
 Watch: regenerate must happen before any response is sent to the client.
 
 ## hsts
-OWASP: HSTS CS, HTTP Headers CS
+OWASP: HSTS CS, HTTP Headers CS | CWE-319 | A04:2025
 Missing HSTS header means the first visit (or any HTTP redirect) is vulnerable to SSL stripping attacks.
 Wrong: no Strict-Transport-Security header, max-age too short (< 6 months)
 Right: Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 Watch: HSTS is only effective over HTTPS — ensure HTTP redirects to HTTPS first.
 
 ## ws-origin
-OWASP: WebSocket Security CS
+OWASP: WebSocket Security CS | CWE-346 | A01:2025
 Missing Origin validation on WebSocket upgrades allows cross-site WebSocket hijacking from any malicious page.
 Wrong: accepting WebSocket connections without checking Origin, CheckOrigin: func(r) { return true }
 Right: validate Origin header against a trusted allowlist. Reject connections from unknown origins.
 Watch: the Origin header is sent by the browser — server-side WS libraries may not check it by default.
 
 ## ws-auth
-OWASP: WebSocket Security CS
+OWASP: WebSocket Security CS | CWE-306 | A07:2025
 Trusting the HTTP upgrade handshake alone is insufficient — WebSocket connections bypass HTTP auth middleware.
 Wrong: no authentication after WS upgrade, relying solely on cookie from upgrade request
 Right: authenticate in the connection handler (onOpen/connect). Validate session/token. Reject unauthenticated sockets.
 Watch: WebSocket connections persist — a logged-out user's open socket may still receive data.
 
 ## docker-copy-secrets
-OWASP: Docker Security CS
+OWASP: Docker Security CS | CWE-538 | A02:2025
 COPY . or ADD . copies everything into the image — including .env, .git, keys, and secrets.
 Wrong: COPY . ., ADD . /app, COPY *.env .
 Right: create a .dockerignore file excluding secrets, .git, node_modules, *.env. Copy only needed files.
 Watch: Docker build context is sent to the daemon — secrets in context can leak via image layers.
 
 ## dockerfile-latest
-OWASP: Docker Security CS
+OWASP: Docker Security CS | CWE-1104 | A03:2025
 Using :latest tag means builds are non-reproducible — the base image changes without notice.
 Wrong: FROM node:latest, FROM python:latest
 Right: pin to specific version: FROM node:20-slim, FROM python:3.12-alpine
 Watch: even pinning to a minor version (3.12) can drift — pin to patch for maximum reproducibility.
 
 ## dockerfile-upgrade
-OWASP: Docker Security CS
+OWASP: Docker Security CS | CWE-1104 | A03:2025
 apt-get upgrade in Dockerfile upgrades packages unpredictably — non-reproducible builds.
 Wrong: RUN apt-get update && apt-get upgrade -y && apt-get install -y package
 Right: pin base image version, install specific package versions, combine into single RUN with cleanup.
 Watch: apt-get upgrade can pull in breaking changes — pin the base image instead.
 
 ## dockerfile-env-secrets
-OWASP: Docker Security CS
+OWASP: Docker Security CS | CWE-538 | A02:2025
 Secrets in ENV are baked into image layers and visible in docker inspect.
 Wrong: ENV DB_PASSWORD=secret123, ENV API_KEY=sk_live_xxx
 Right: use build secrets (DOCKER_BUILDKIT=1, --mount=type=secret) or runtime environment variables.
@@ -500,7 +500,7 @@ Right: pin to full commit SHA: uses: actions/checkout@b4ffde65f46336ab88eb53be80
 Watch: use a tool like Pinact or Dependabot to automate SHA pinning and updates.
 
 ## lockfile-missing
-OWASP: Software Supply Chain CS
+OWASP: Software Supply Chain CS | CWE-1357 | A03:2025
 Missing lockfile means npm install resolves versions at deploy time — non-reproducible and vulnerable to dependency confusion.
 Wrong: no package-lock.json, no yarn.lock, no Cargo.lock, no go.sum
 Right: run npm install / yarn / cargo generate-lockfile. Commit the lockfile. Use npm ci / yarn --frozen-lockfile in CI.
@@ -514,14 +514,14 @@ Right: pin to digest: FROM node@sha256:abc123... for immutable builds.
 Watch: digest pinning means manual updates — use Dependabot or Renovate to automate.
 
 ## dockerfile-add
-OWASP: Docker Security CS
+OWASP: Docker Security CS | CWE-494 | A08:2025
 ADD extracts archives automatically and supports URLs — COPY is safer and more explicit.
 Wrong: ADD app.tar.gz /app, ADD https://example.com/file /app
 Right: use COPY for local files. Extract archives in a separate RUN step if needed.
 Watch: ADD with a URL downloads at build time with no checksum verification.
 
 ## dockerfile-curl-bash
-OWASP: Docker Security CS
+OWASP: Docker Security CS | CWE-494 | A08:2025
 Piping curl to bash executes arbitrary code from the internet at build time.
 Wrong: RUN curl -sSL https://example.com/install.sh | bash
 Right: download to a file, verify checksum, then execute. Or install from the package manager.
@@ -535,63 +535,63 @@ Right: use a case statement, a lookup table, or safe parsing without eval.
 Watch: even eval "$fixed_string" is dangerous if any part came from input.
 
 ## hostpath
-OWASP: Kubernetes Security CS
+OWASP: Kubernetes Security CS | CWE-552 | A02:2025
 hostPath mounts the node's filesystem into the pod — breaks isolation.
 Wrong: hostPath: { path: /var/log }
 Right: use PersistentVolumeClaim, emptyDir, or a mounted ConfigMap/Secret.
 Watch: hostPath can expose sensitive node files (SSH keys, Docker socket).
 
 ## k8s-np
-OWASP: Kubernetes Security CS
+OWASP: Kubernetes Security CS | CWE-923 | A02:2025
 No NetworkPolicy means all pods can talk to each other — no network segmentation.
 Wrong: no NetworkPolicy resource defined
 Right: define NetworkPolicy to restrict pod-to-pod traffic to only what's needed.
 Watch: start with a default-deny policy, then allow specific flows.
 
 ## k8s-psa
-OWASP: Kubernetes Security CS
+OWASP: Kubernetes Security CS | CWE-250 | A02:2025
 No pod security standard enforced — pods can run as root, use privileged mode, or mount host paths.
 Wrong: no PSA labels, pod-security.kubernetes.io/enforce: privileged
 Right: set pod-security.kubernetes.io/enforce: baseline (or restricted) on namespaces.
 Watch: restricted profile breaks some workloads — test before applying.
 
 ## k8s-readonly
-OWASP: Kubernetes Security CS
+OWASP: Kubernetes Security CS | CWE-732 | A02:2025
 Writable root filesystem lets an attacker modify binaries or configs inside the container.
 Wrong: readOnlyRootFilesystem: false (or omitted)
 Right: set readOnlyRootFilesystem: true. Use emptyDir for directories that need writes.
 Watch: some apps need /tmp or /var/run writable — mount only those as emptyDir.
 
 ## k8s-seccomp
-OWASP: Kubernetes Security CS
+OWASP: Kubernetes Security CS | CWE-250 | A02:2025
 No seccomp profile means the container can use any syscall — wider attack surface.
 Wrong: no seccompProfile in securityContext
 Right: set seccompProfile.type: RuntimeDefault or a custom profile.
 Watch: RuntimeDefault is the safe starting point — custom profiles need testing.
 
 ## npm-audit
-OWASP: Software Supply Chain CS
+OWASP: Software Supply Chain CS | CWE-1395 | A03:2025
 Dependencies with known vulnerabilities are shipped to production.
 Wrong: no audit step in CI, ignoring npm audit / pip-audit / cargo audit output
 Right: run audit in CI, fail on critical/high. Use Dependabot or Renovate for automated fixes.
 Watch: some vulnerabilities have no fix yet — document and monitor.
 
 ## provisioner-local
-OWASP: Infrastructure as Code CS
+OWASP: Infrastructure as Code CS | CWE-78 | A05:2025
 provisioner "local-exec" runs arbitrary commands on the machine running Terraform.
 Wrong: provisioner "local-exec" { command = "..." }
 Right: use null_resource with a controlled script, or use cloud-init / Ansible.
 Watch: local-exec runs with the Terraform user's permissions — often root or CI token.
 
 ## provisioner-remote
-OWASP: Infrastructure as Code CS
+OWASP: Infrastructure as Code CS | CWE-78 | A05:2025
 provisioner "remote-exec" opens an SSH connection and runs commands on the target.
 Wrong: provisioner "remote-exec" { inline = ["..."] }
 Right: use Ansible, cloud-init, or a configuration management tool.
 Watch: remote-exec runs as root by default and leaves no audit trail.
 
 ## tf-password
-OWASP: Infrastructure as Code CS
+OWASP: Infrastructure as Code CS | CWE-798 | A04:2025
 Hardcoded password in a connection block leaks credentials in state file and plan output.
 Wrong: connection { password = var.db_password }
 Right: use SSH key authentication. If password is required, reference a secret manager.
@@ -612,14 +612,14 @@ Right: let errexit propagate; handle errors with explicit if/trap.
 Watch: set +e is sometimes needed for conditional logic — document why.
 
 ## unquoted-test
-OWASP: Shell Injection CS
+OWASP: Shell Injection CS | CWE-78 | A05:2025
 Unquoted variables in test expressions undergo word splitting and glob expansion.
 Wrong: [ $var == "yes" ], test $var -eq 0
 Right: quote variables: [ "$var" == "yes" ], test "$var" -eq 0.
 Watch: even quoted variables can be dangerous if they start with - (test interprets flags).
 
 ## unquoted-var
-OWASP: Shell Injection CS
+OWASP: Shell Injection CS | CWE-78 | A05:2025
 Unquoted variables in command arguments undergo word splitting and glob expansion.
 Wrong: rm $file, cp $src $dst, chmod 777 $dir
 Right: quote variables: rm "$file", cp "$src" "$dst".
@@ -675,7 +675,7 @@ Right: load symmetric or asymmetric keys from environment variables or a secret 
 Watch: ensure secret has sufficient entropy (at least 256 bits for HMAC-SHA256).
 
 ## jwt-no-verify
-OWASP: Authentication CS
+OWASP: Authentication CS | CWE-347 | A07:2025
 Decoding JWT tokens without cryptographic signature verification allows authentication bypass.
 Wrong: jwt.decode(token, verify=False), jwt.decode(token, { verifySignature: false })
 Right: verify signature with public key or shared secret, and validate exp, aud, and iss claims.
@@ -689,7 +689,7 @@ Right: specify an exact trusted origin allowlist when credentials (cookies/auth 
 Watch: wildcard origin with credentials exposes authenticated endpoints to cross-origin abuse.
 
 ## cors-origin-reflection
-OWASP: Communication Security CS
+OWASP: Communication Security CS | CWE-346 | A02:2025
 Reflecting the incoming Origin header into Access-Control-Allow-Origin without allowlist validation bypasses same-origin protections.
 Wrong: res.setHeader("Access-Control-Allow-Origin", req.headers.origin)
 Right: validate the request Origin against a strict allowlist array before echoing it.
@@ -731,21 +731,21 @@ Right: parameterized queries — db.query(sql, [id]). Or the ORM's normal query 
 Watch: table and column names cannot be parameterized — allowlist them instead.
 
 ## llm-prompt-injection
-OWASP: LLM Applications Security
+OWASP: LLM Applications Security | CWE-1427 | A05:2025
 Concatenating unescaped user input directly into LLM prompt strings enables direct prompt injection attacks.
 Wrong: client.chat.completions.create(messages=[{"role": "user", "content": f"Translate this: {user_input}"}])
 Right: separate system instructions from user inputs using structured message roles and delimiter tags (e.g. <user_query>).
 Watch: treat all LLM outputs and inputs crossing trust boundaries as untrusted.
 
 ## llm-unsafe-exec
-OWASP: LLM Applications Security
+OWASP: LLM Applications Security | CWE-94 | A05:2025
 Executing code or system commands directly generated by an LLM allows remote code execution.
 Wrong: eval(completion.choices[0].message.content), exec(response.text)
 Right: execute generated code inside an isolated container/sandbox, or require explicit human confirmation.
 Watch: LLM outputs are probabilistic and vulnerable to prompt injection hijacking.
 
 ## rsc-unvalidated-action
-OWASP: API Security CS
+OWASP: API Security CS | CWE-20 | A05:2025
 Next.js Server Actions without argument validation expose internal mutation handlers to arbitrary client payloads.
 Wrong: "use server"; export async function updateProfile(data) { await db.user.update(data); }
 Right: validate action arguments using a schema validator (such as Zod) before executing mutations.
@@ -759,21 +759,21 @@ Right: load credentials from AWS IAM roles, environment variables, or AWS Secret
 Watch: rotate any AWS keys that have ever been committed to a repository.
 
 ## secret-github-token
-OWASP: Sensitive Data Exposure CS
+OWASP: Sensitive Data Exposure CS | CWE-798 | A04:2025
 GitHub Personal Access Tokens in source code allow full access to repositories and organization resources.
 Wrong: const token = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
 Right: use GitHub Actions secrets, fine-grained access tokens stored in environment variables.
 Watch: revoked tokens should be immediately regenerated and checked with GitHub secret scanning.
 
 ## secret-stripe-key
-OWASP: Sensitive Data Exposure CS
+OWASP: Sensitive Data Exposure CS | CWE-798 | A04:2025
 Stripe live secret keys allow unauthorized payment charges and financial data access.
 Wrong: const stripe = new Stripe("sk_live_1234567890abcdefghijklmn");
 Right: load Stripe secret keys from secure environment variables on the backend only.
 Watch: never expose sk_live or rk_live keys in client-side bundles.
 
 ## secret-google-key
-OWASP: Sensitive Data Exposure CS
+OWASP: Sensitive Data Exposure CS | CWE-798 | A04:2025
 Unrestricted Google / Firebase API keys can be abused to rack up cloud billing or access sensitive APIs.
 Wrong: const apiKey = "AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
 Right: apply application restrictions (HTTP referrers / package names) and API restrictions in Google Cloud Console.
@@ -787,112 +787,112 @@ Right: store private keys in KMS, Hardware Security Modules (HSM), or secure env
 Watch: rotate compromised certificates and revoke associated public keys.
 
 ## secret-slack-webhook
-OWASP: Sensitive Data Exposure CS
+OWASP: Sensitive Data Exposure CS | CWE-798 | A04:2025
 Hardcoded Slack Webhook URLs allow unauthorized parties to post arbitrary messages or spam workspace channels.
 Wrong: url = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
 Right: read webhook URLs from environment variables or vault storage.
 Watch: Slack invalidates publicly committed webhooks automatically.
 
 ## secret-db-url
-OWASP: Sensitive Data Exposure CS
+OWASP: Sensitive Data Exposure CS | CWE-798 | A04:2025
 Database connection strings with plaintext passwords in code expose database clusters to takeover.
 Wrong: const uri = "postgres://admin:pass123@db.internal:5432/prod";
 Right: compose connection parameters from separate environment variables or secret managers.
 Watch: logs that print error objects often inadvertently dump the full connection URI.
 
 ## llm-output-html
-OWASP: LLM Applications Security
+OWASP: LLM Applications Security | CWE-79 | A05:2025
 Directly inserting LLM-generated output into DOM without sanitization leads to Cross-Site Scripting (XSS).
 Wrong: document.getElementById("chat").innerHTML = llmResponse.text
 Right: use textContent, or sanitize with DOMPurify before rendering markdown/HTML.
 Watch: indirect prompt injection can force the model to output malicious `<script>` tags.
 
 ## llm-rag-no-filter
-OWASP: LLM Applications Security
+OWASP: LLM Applications Security | CWE-285 | A01:2025
 Querying vector databases without tenant or user authorization filters enables cross-tenant data leakage.
 Wrong: vectorStore.similaritySearch(userQuery, k=5)
 Right: enforce tenant/user metadata filtering: vectorStore.similaritySearch(userQuery, { filter: { tenantId } })
 Watch: always verify document authorization at query time, not just during indexing.
 
 ## llm-excessive-agency
-OWASP: LLM Applications Security
+OWASP: LLM Applications Security | CWE-269 | A06:2025
 Allowing LLM agents to execute destructive or state-changing tools without human approval creates excessive agency risks.
 Wrong: execute_tool(tool_name, params, auto_approve=True)
 Right: require explicit human authorization gates for state changes (purchases, data deletions, external emails).
 Watch: validate tool inputs against strict schemas before execution.
 
 ## llm-unbounded-tokens
-OWASP: LLM Applications Security
+OWASP: LLM Applications Security | CWE-770 | A06:2025
 Invoking LLM APIs without specifying max_tokens can lead to token denial-of-service and runaway cloud bills.
 Wrong: openai.chat.completions.create(model="gpt-4o", messages=messages)
 Right: explicitly set max_tokens / max_completion_tokens based on expected response length.
 Watch: enforce client-level rate limits and cost budgets.
 
 ## secret-entropy
-OWASP: Sensitive Data Exposure CS
+OWASP: Sensitive Data Exposure CS | CWE-798 | A04:2025
 Un-prefixed high-entropy string assigned to a secret/credential variable indicates hardcoded API keys or private tokens.
 Wrong: const api_secret = "8f9a2b1c4e7d0f3a6b5c4d3e2f1a0b9c";
 Right: read credentials and keys from environment variables or a secure key management vault.
 Watch: rotate any exposed keys and never commit high-entropy secret blobs to source repositories.
 
 ## sbd-missing-timeout
-OWASP: Secure by Design Architecture
+OWASP: Secure by Design Architecture | CWE-1088 | A10:2025
 Issuing HTTP client requests without explicit timeouts causes thread starvation and cascading failures during network degradation.
 Wrong: response = requests.get("https://api.internal/data")
 Right: specify explicit connect and read timeouts: requests.get("https://api.internal/data", timeout=(3.05, 10))
 Watch: external API hangs will exhaust worker pools if timeouts are omitted.
 
 ## sbd-legacy-tls
-OWASP: Secure Communication & Cryptography
+OWASP: Secure Communication & Cryptography | CWE-327 | A04:2025
 Using deprecated TLS versions (TLS 1.0, TLS 1.1, SSLv3) exposes traffic to known cryptographic attacks (BEAST, POODLE).
 Wrong: context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_0)
 Right: enforce modern TLS protocol versions: context = ssl.create_default_context() or mandate ssl.PROTOCOL_TLSv1_3
 Watch: ensure client and server cipher suites disable obsolete ciphers (RC4, 3DES).
 
 ## sbd-dynamic-eval-reflection
-OWASP: Injection & Safe Code Execution
+OWASP: Injection & Safe Code Execution | CWE-470 | A05:2025
 Dynamically evaluating code or constructing runtime execution objects from untrusted user requests causes Remote Code Execution (RCE).
 Wrong: eval(req.body.code)
 Right: use static data structures or safe declarative parsers without dynamic code interpretation.
 Watch: dynamic reflection should only match against a strict compile-time allowlist of known safe types.
 
 ## sbd-unauthenticated-route
-OWASP: Access Control & Authorization
+OWASP: Access Control & Authorization | CWE-306 | A01:2025
 Administrative or privileged route handlers exposed without explicit authentication middleware allow unauthorized access.
 Wrong: app.get("/admin/users", handleAdminUsers)
 Right: attach authentication and RBAC middleware: app.get("/admin/users", authenticate, requireRole("admin"), handleAdminUsers)
 Watch: apply authorization guards globally or at router level rather than relying on per-handler checks.
 
 ## iot-unencrypted-mqtt
-OWASP: IoT & Embedded Security (AS ETSI EN 303 645)
+OWASP: IoT & Embedded Security (AS ETSI EN 303 645) | CWE-319 | A04:2025
 Connecting to MQTT message brokers without TLS transmits telemetry, sensor data, and control commands in cleartext.
 Wrong: client.connect("mqtt://broker.hivemq.com:1883")
 Right: connect over secure TLS port 8883 with mutual certificates: client.connect("mqtts://broker.hivemq.com:8883", { cert, key, ca })
 Watch: verify the broker certificate and enforce client certificate authentication (mTLS).
 
 ## iot-unencrypted-coap
-OWASP: IoT & Embedded Security (AS ETSI EN 303 645)
+OWASP: IoT & Embedded Security (AS ETSI EN 303 645) | CWE-319 | A04:2025
 Transmitting sensor metrics or actuations over unencrypted CoAP allows eavesdropping and packet injection on constrained networks.
 Wrong: coap://sensor.local/telemetry
 Right: use CoAPS over DTLS 1.3: coaps://sensor.local/telemetry with pre-shared keys (PSK) or X.509 certs.
 Watch: DTLS handshake replay protection should be enabled on constrained edge nodes.
 
 ## iot-debug-interface
-OWASP: IoT & Embedded Security (AS ETSI EN 303 645)
+OWASP: IoT & Embedded Security (AS ETSI EN 303 645) | CWE-1263 | A02:2025
 Enabling hardware debug interfaces (JTAG, UART, SWD) in production firmware allows physical extraction of firmware and keys.
 Wrong: #define DEBUG_UART 1
 Right: disable all debug logs, JTAG, and SWD interfaces in production builds (#define DEBUG_UART 0 or blow debug eFuses).
 Watch: verify that production build configurations strip debug symbols and disable console serial output.
 
 ## iot-ota-no-verify
-OWASP: IoT & Embedded Security (AS ETSI EN 303 645)
+OWASP: IoT & Embedded Security (AS ETSI EN 303 645) | CWE-494 | A08:2025
 Flashing OTA firmware updates without cryptographic signature verification allows malicious firmware overwrites.
 Wrong: flash_write(OTA_PARTITION, image_buffer, image_len)
 Right: verify the digital signature against a trusted public key baked into the hardware bootloader before flashing.
 Watch: implement anti-rollback version counters to prevent downgrade attacks to vulnerable older firmware.
 
 ## iot-hardcoded-flash-key
-OWASP: IoT & Embedded Security (AS ETSI EN 303 645)
+OWASP: IoT & Embedded Security (AS ETSI EN 303 645) | CWE-798 | A04:2025
 Hardcoding encryption keys or master secrets into firmware sources allows attackers to extract identical keys across all devices.
 Wrong: #define DEVICE_KEY "a1b2c3d4e5f60718293a4b5c6d7e8f90"
 Right: use unique per-device keys provisioned in a Hardware Root of Trust (Secure Element / TPM / ARM TrustZone).

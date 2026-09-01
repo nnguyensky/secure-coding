@@ -54,7 +54,7 @@ function sectionName(sec) {
 function cweFor(id) {
   if (!fs.existsSync(FIXES)) return null;
   const text = fs.readFileSync(FIXES, 'utf8');
-  const m = text.match(new RegExp('^## ' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\n(OWASP:[^\\n]*)', 'm'));
+  const m = text.match(new RegExp('^## ' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\n([^\\n]*)', 'm'));
   if (!m) return null;
   const cwe = m[1].match(/CWE-(\d+)/);
   const cat = m[1].match(/(A\d\d):2025/);

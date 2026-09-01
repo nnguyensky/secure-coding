@@ -633,13 +633,30 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   // fixes.md must carry the CWE for the ids the map claims.
   uniq('cwe-fixes-annotated');
   const fixes = fs.readFileSync(path.join(DIR, 'checks', 'fixes.md'), 'utf8');
-  const need = ['sql-concat', 'shell', 'xss-sink', 'weak-hash', 'taint-ssrf'];
+  const need = ['sql-concat', 'shell', 'xss-sink', 'weak-hash', 'taint-ssrf',
+                'API-1', 'C-1', 'iot-debug-interface', 'llm-prompt-injection'];
   const bad = need.filter(id => {
-    const m = fixes.match(new RegExp('^## ' + id + '\\n(OWASP:[^\\n]*)', 'm'));
+    const m = fixes.match(new RegExp('^## ' + id + '\\n([^\\n]*)', 'm'));
     return !m || !/CWE-\d+/.test(m[1]);
   });
   if (bad.length === 0) pass++;
   else { fail++; console.log(`MISS  cwe-fixes-annotated: ${bad.join(', ')}`); }
+})();
+
+// Every fixes.md block must carry a CWE — a finding without one lands as an
+// untyped alert in code scanning.
+(function cweAllBlocks() {
+  uniq('cwe-all-blocks');
+  const fixes = fs.readFileSync(path.join(DIR, 'checks', 'fixes.md'), 'utf8');
+  const lines = fixes.split('\n');
+  const bad = [];
+  lines.forEach((l, i) => {
+    if (!l.startsWith('## ')) return;
+    const meta = lines[i + 1] || '';
+    if (!/CWE-\d+/.test(meta)) bad.push(l.slice(3));
+  });
+  if (bad.length === 0) pass++;
+  else { fail++; console.log(`MISS  cwe-all-blocks: ${bad.length} without CWE (${bad.slice(0, 4).join(', ')})`); }
 })();
 
 // --- BSI AI-SBOM: all 7 clusters present ---
