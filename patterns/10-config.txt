@@ -1,0 +1,29 @@
+# OWASP SCP - System Configuration [151-166]
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+# Targets config, container, and CI files - not application source.
+
+debug-on	*	(DEBUG|debug)\s*[:=]\s*(True|true|1|on)["']?\s*$	set to false for production		low
+debug-on	*	FLASK_ENV\s*[:=]\s*["']?development			low
+debug-on	*	APP_ENV\s*[:=]\s*["']?(dev|development|debug)			low
+debug-on	*	app\.run\([^)]*debug\s*=\s*True			low
+
+dir-listing	conf,nginx,htaccess,cfg	autoindex\s+on	server_tokens off; disable directory listing		low
+dir-listing	conf,nginx,htaccess,cfg	Options[^#]*\+?Indexes			low
+dir-listing	*	directory[_-]?listing\s*[:=]\s*(true|on|1)			low
+
+server-banner	conf,nginx,cfg	server_tokens\s+on	server_tokens off; strip version banners		low
+server-banner	*	expose_php\s*=\s*On			low
+
+http-methods	conf,nginx,htaccess,cfg	(WebDAV|PROPFIND|MKCOL|dav_methods)	disable WebDAV and TRACE		low
+http-methods	*	allowed_?methods[^#]*["'](TRACE|TRACK|OPTIONS)["']			low
+
+default-cred	*	([Uu][Ss][Ee][Rr]|[Uu][Ss][Ee][Rr][Nn][Aa][Mm][Ee]|[Uu][Ii][Dd])\s*[:=]\s*["']?(root|admin|sa|postgres|guest)["']?\s*$	!example|sample|template	change default credentials	critical
+default-cred	*	([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Pp][Ww][Dd])\s*[:=]\s*["']?(admin|password|root|changeme|123456|secret|test)["']?\s*$			critical
+default-cred	yml,yaml,env,ini,cfg,conf,tf	POSTGRES_PASSWORD\s*[:=]\s*["']?(postgres|password|admin)			critical
+
+container-root	dockerfile,Dockerfile	^\s*USER\s+root	run as non-root user		medium
+container-priv	yml,yaml,tf,json	privileged\s*[:=]\s*true	remove privileged: true		medium
+
+test-code	*	(TODO|FIXME|XXX)[^a-zA-Z]*(remove|delete)[^a-zA-Z]*(before|prior)[^a-zA-Z]*(prod|deploy|release)	remove before deploying		low
+test-code	*	if\s+.*(TESTING|IS_TEST|BYPASS_AUTH|SKIP_AUTH|DISABLE_AUTH)	remove auth bypass flags before deploy		low

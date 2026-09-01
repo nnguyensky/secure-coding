@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "secure-coding": {
+      "command": "node",
+      "args": ["./mcp/server.js"],
+      "description": "OWASP Secure Coding, AI-SBOM, Clean Code & Dependency Audit Engine",
+      "env": {}
+    }
+  }
+}

@@ -1,0 +1,21 @@
+# OWASP SCP - File Management [180-193]
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+
+dynamic-include	*	(include|require)(_once)?\s*\(?\s*\$_(GET|POST|REQUEST|COOKIE)	never pass user input to include/require		medium
+path-traversal	php	(file_get_contents|fopen|include|require|readfile)\s*\(\s*\$_(GET|POST|REQUEST|COOKIE)	resolve path then confirm inside allowed directory		high
+path-traversal	java,kt	new\s+File\s*\(\s*(request\.getParameter|req\.getParameter)|Paths\.get\s*\(\s*(request\.getParameter|req\.getParameter)			high
+path-traversal	go	os\.(Open|ReadFile|Create)\s*\(\s*r\.(URL\.Query|FormValue)|filepath\.Join\s*\([^)]*r\.(URL\.Query|FormValue)			high
+path-traversal	rb	File\.(read|open|new)\s*\(\s*params\[|File\.(read|open|new)\s*\(\s*request\.(query|params)			high
+open-redirect	*	(redirect|Location:)[^;]*(req|request)\.(query|params|body|args|GET)	allowlist redirect targets, never user-supplied URLs		medium
+open-redirect	go	http\.Redirect\s*\([^)]*r\.(URL\.Query|FormValue)|Redirect\s*\([^)]*r\.URL\.Query			medium
+open-redirect	java,kt	(redirect|sendRedirect)\s*\([^)]*(getParameter|getQueryString)			medium
+open-redirect	rb	redirect_to\s+params\[|redirect_to\s+request\.(query|params)			medium
+open-redirect	cs	Redirect\s*\(\s*Request\.(QueryString|Form)|Response\.Redirect\s*\(\s*Request			medium
+upload-exec	conf,nginx,htaccess,cfg	location[^}]*upload[^}]*(php|cgi|fastcgi)	never execute uploads; store outside web root		medium
+
+# Zip Slip / Archive Extraction Path Traversal
+zip-slip	py	\.extractall\s*\(|(tarfile|zipfile|TarFile|ZipFile)\.extract\s*\(	!is_safe|!safe_path	validate target file path is within destination folder before extraction	high
+zip-slip	js,ts	(unzipper|adm-zip|decompress|tar\.extract|tar\.x)\s*\(|Extract\s*\(\s*\{\s*path:	validate extracted entry path is contained in target directory		high
+zip-slip	go	(zip\.Reader|tar\.Reader).*(Copy|Write)	validate file path does not escape destination directory using filepath.Clean		high
+zip-slip	java,kt	ZipInputStream.*\.getNextEntry|ZipFile.*\.getEntry	validate entry.getName() stays within target destination directory		high

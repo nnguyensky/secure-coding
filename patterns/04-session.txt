@@ -1,0 +1,8 @@
+# OWASP SCP - Session Management [58-76]
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+
+cookie	*	httpOnly\s*:\s*false	set httpOnly: true to prevent XSS cookie theft		high
+cookie	*	secure\s*:\s*false	set secure: true to require HTTPS		high
+csrf-exempt	*	@csrf_exempt|csrf\s*:\s*false|["']csrf["']\s*:\s*false|csrf_exempt\s*\(	add per-session or per-request CSRF token		high
+samesite	*	[Ss]ame[Ss]ite\s*[:=]\s*["']?None["']?	set SameSite=Lax or Strict, not None	set SameSite=Lax or Strict, not None	low

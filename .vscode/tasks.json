@@ -1,0 +1,59 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Security: Staged Scan",
+      "type": "shell",
+      "command": "node hooks/scan.js --staged",
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Security: Working Tree Diff Scan",
+      "type": "shell",
+      "command": "node hooks/scan.js --diff",
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Security: Dependency Vulnerability Audit",
+      "type": "shell",
+      "command": "node hooks/audit.js",
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Security: Generate Markdown PR Summary",
+      "type": "shell",
+      "command": "node hooks/report.js --markdown",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Security: Clean Code Linter",
+      "type": "shell",
+      "command": "node hooks/clean.js",
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}

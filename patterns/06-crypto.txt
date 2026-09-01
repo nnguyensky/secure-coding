@@ -1,0 +1,30 @@
+# OWASP SCP - Cryptographic Practices [101-106]
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+
+weak-rng	*	(token|key|secret|nonce|salt|otp|reset|iv)[^;]*Math\.random\s*\(\)	use crypto.randomBytes or secrets.token_urlsafe	use crypto.randomBytes or secrets.token_urlsafe	medium
+weak-rng	*	Math\.random\s*\(\)[^;]*(token|key|secret|nonce|salt|otp|reset)			medium
+weak-rng	*	(token|key|secret|nonce|salt|otp|reset)[^;]*random\.(random|randint|choice|randrange)\s*\(			medium
+weak-rng	*	random\.(random|randint|choice)\s*\([^;]*(token|key|secret|nonce|salt|otp|reset)			medium
+weak-rng	*	new\s+Random\s*\(\s*\)			medium
+weak-rng	go	rand\.(Intn|Int|Float64|Read)\s*\([^)]*(token|key|secret|nonce|salt|otp|reset)|(token|key|secret|nonce|salt|otp|reset)[^;]*rand\.(Intn|Int|Float64)|(token|key|secret|nonce|salt|otp|reset)[^;]*math/rand	use crypto/rand		medium
+weak-rng	java,kt	Math\.random\s*\(\s*\)\s*\*\s*\d+[^;]*(token|key|secret|nonce|salt|otp|reset)|(token|key|secret|nonce|salt|otp|reset)[^;]*new\s+Random\s*\(\)	use SecureRandom		medium
+weak-rng	rb	(token|key|secret|nonce|salt|otp|reset)[^;]*\brand\s*\(|SecureRandom\s*\.\s*random_number	use SecureRandom.urlsafe_base64		medium
+weak-rng	php	(token|key|secret|nonce|salt|otp|reset)[^;]*\b(rand|mt_rand)\s*\(			medium
+weak-rng	cs	(token|key|secret|nonce|salt|otp|reset)[^;]*new\s+Random\s*\(|Random\.Next\s*\([^)]*(token|key|secret|nonce|salt|otp|reset)	use RandomNumberGenerator		medium
+weak-rng	rs	(token|key|secret|nonce|salt|otp|reset)[^;]*rand::(thread_rng|random|Rng)	use rand::rngs::OsRng		medium
+secret	*	(password|passwd|api_?key|secret|token)\s*[:=]\s*["'][A-Za-z0-9/+_-]{12,}["']	move to env or secret manager, never commit	move to env or secret manager, never commit	critical
+secret	*	-----BEGIN\s+(RSA|DSA|EC|OPENSSH|PRIVATE)			critical
+secret	*	AKIA[0-9A-Z]{16}			critical
+secret	*	\bghp_[A-Za-z0-9]{30,}			critical
+secret	*	\bsk-[A-Za-z0-9]{20,}			critical
+secret	*	AIza[0-9A-Za-z_-]{35}			critical
+secret	*	xox[baprs]-[0-9A-Za-z-]{10,}			critical
+secret	*	sk_live_[0-9a-zA-Z]{20,}|pk_live_[0-9a-zA-Z]{20,}			critical
+weak-crypto	*	\bDES\b|\bRC4\b|\bBlowfish\b	use AES-GCM or ChaCha20-Poly1305		medium
+weak-crypto	*	AES/ECB|MODE_ECB|aes-\d+-ecb	never use ECB — use GCM or CTR mode		medium
+weak-crypto	go	crypto/des|crypto/rc4|blowfish\.|des\.NewCipher|rc4\.NewCipher			medium
+weak-crypto	rb	OpenSSL::Cipher[^)]*(DES|RC4|Blowfish)|(DES|RC4|Blowfish)\.new			medium
+weak-crypto	php	mcrypt_|MCRYPT_(DES|RC4|BLOWFISH)|openssl_encrypt\s*\([^,]*,\s*["'](des|rc4|blowfish)			medium
+weak-crypto	cs	(DES|RC2|TripleDES)\.Create\s*\(|DESCryptoServiceProvider|RC2CryptoServiceProvider			medium
+weak-crypto	rs	(des|rc4|blowfish)::|Des::new|Rc4::new|Blowfish::new			medium

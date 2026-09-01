@@ -1,0 +1,19 @@
+# WebSocket Security patterns (OWASP WebSocket Security CS)
+# New IDs: ws-origin, ws-auth
+# Section 26 in the skill's group numbering.
+#
+# id	exts	regex	!exclude	hint
+ws-origin	*	new\s+WebSocket\s*\(|ws:\/\/|wss:\/\/	websocket: verify Origin header against trusted origins before accepting connection		high
+ws-origin	*	WebSocketServer\s*\(\s*\{|\.on\s*\(\s*["']connection["']	!origin|!verifyOrigin	websocket: validate Origin header to prevent cross-site WebSocket hijacking	high
+ws-origin	py	WebSocket\s*\(\s*request|asyncio\.websockets\.serve|ws\s*=\s*await\s*websockets	websocket: verify Origin header against trusted origins		high
+ws-origin	go	gorilla/websocket|nhooyr\.io/websocket|Upgrader\s*\{|CheckOrigin\s*[:=]	websocket: set CheckOrigin to validate against trusted origins		high
+ws-origin	java,kt	WebSocketServlet|@ServerEndpoint|TextWebSocketHandler|WebSocketHandler	websocket: validate Origin header before accepting WebSocket upgrade		high
+ws-origin	rb	ActionCable|WebSocket\s*\(|faye-websocket|websocket-driver	websocket: verify Origin header against trusted origins		high
+ws-origin	cs	WebSocket\s*\(\s*["']wss?|WebSocketHandler|UseWebSockets	websocket: validate Origin header before accepting WebSocket upgrade		high
+
+ws-auth	*	\.on\s*\(\s*["']connection["']\s*,\s*\(?socket\)?\s*=>|\.on\s*\(\s*["']connection["']\s*,\s*function\s*\(?\s*socket	websocket: authenticate WebSocket connections — do not trust the HTTP upgrade alone		high
+ws-auth	py	@app\.websocket\s*\(|async\s+def\s+websocket_handler|asyncio\.websockets\.serve	websocket: authenticate after upgrade — reject unauthenticated sockets		high
+ws-auth	go	CheckOrigin\s*[:=]\s*func|Upgrader\s*\{	websocket: authenticate after upgrade — reject unauthenticated connections		high
+ws-auth	java,kt	@OnOpen|afterConnectionEstablished	websocket: validate authentication in onOpen handler		high
+ws-auth	rb	On\s*\(\s*["']websocket["']|def\s+connect	websocket: authenticate WebSocket connections on connect		high
+ws-auth	cs	OnConnected|WebSocketHandler\.OnConnected	websocket: authenticate WebSocket connections on connect		high

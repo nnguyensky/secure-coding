@@ -1,0 +1,13 @@
+# OWASP SCP - Data Protection [131-142]
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+
+world-writable	*	(chmod|chown)\s*\([^)]*0?777|0o777|0777	use 0600 or 0644, never 0777		low
+mktemp	*	\b(mktemp|tmpnam)\s*\(	use mkstemp or tempfile.mkdtemp		low
+
+# Insecure Deserialization
+insecure-deserialization	py	(pickle|_pickle|cPickle)\.(loads?|Unpickler)|yaml\.(unsafe_load|load\s*\([^)]*Loader\s*=\s*(?:yaml\.)?(?:UnsafeLoader|Loader))	never deserialize untrusted data with pickle or unsafe YAML loader; use JSON		critical
+insecure-deserialization	java,kt	ObjectInputStream.*\.readObject|XMLDecoder\s*\(	never use Java native ObjectInputStream on untrusted input; use JSON/Protobuf		critical
+insecure-deserialization	cs	(BinaryFormatter|NetDataContractSerializer)|TypeNameHandling\.(All|Auto|Objects)	avoid BinaryFormatter and TypeNameHandling.All; use System.Text.Json		critical
+insecure-deserialization	php	\bunserialize\s*\(	never pass untrusted user input to unserialize(); use json_decode()		critical
+insecure-deserialization	rb	Marshal\.(load|restore)\s*\(	never use Marshal.load on untrusted input; use JSON.parse		critical

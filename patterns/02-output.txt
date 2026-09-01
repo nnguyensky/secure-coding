@@ -1,0 +1,33 @@
+# OWASP SCP - Output Encoding [17-22]
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+
+xss-sink	*	dangerouslySetInnerHTML	use textContent or a sanitizer (DOMPurify)		high
+xss-sink	*	\.innerHTML\s*=	!innerHTML\s*=\s*(""|''|``)\s*;?\s*$	use textContent or a sanitizer (DOMPurify)	high
+xss-sink	*	\.outerHTML\s*=	use textContent or a sanitizer (DOMPurify)		high
+xss-sink	*	document\.write\s*\(			high
+xss-sink	*	v-html\s*=	sanitize with a maintained library, never a regex		high
+xss-sink	*	\|\s*safe\s*}}	use |escape or the framework's default escaping		high
+xss-sink	*	mark_safe\s*\(			high
+sql-concat	*	(execute|query|raw)\s*\(\s*f["']	use parameterized query: execute(sql, [param])		critical
+sql-concat	*	(execute|query|raw)\s*\(\s*["'].*(SELECT|INSERT|UPDATE|DELETE|WHERE).*["']\s*[+%]	use parameterized query: execute(sql, [param])		critical
+sql-concat	*	(const|let|var)\s+\w+\s*=\s*["']\s*(SELECT|INSERT|UPDATE|DELETE)\s.*["']\s*\+	use parameterized query: execute(sql, [param])		critical
+sql-concat	*	\w+\s*\+=\s*["']\s*(WHERE|AND|OR|VALUES|SET|FROM|JOIN|ORDER BY|LIMIT)\s.*["']\s*\+	use parameterized query: execute(sql, [param])		critical
+sql-concat	*	(SELECT|INSERT|UPDATE|DELETE).*\$\{			critical
+sql-concat	go	fmt\.Sprintf\s*\(\s*["'][^"']*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"']*["'][^)]*\+|db\.(Query|Exec|QueryRow)\s*\(\s*["'][^"']*(SELECT|INSERT|UPDATE|DELETE)[^"']*["']\s*\+|\.Query\s*\(\s*fmt\.Sprintf			critical
+sql-concat	java,kt	(createStatement|Statement)\s*\([^)]*\)\s*\.execute|\.execute(Query|Update)\s*\(\s*["'][^"']*(SELECT|INSERT|UPDATE|DELETE)[^"']*["']\s*\+|String\.format\s*\(\s*["'][^"']*(SELECT|INSERT|UPDATE|DELETE)			critical
+sql-concat	rb	(execute|query|exec)\s*\(\s*["'][^"']*(SELECT|INSERT|UPDATE|DELETE)[^"']*["']\s*\+|(execute|query)\s*\(\s*["'][^"']*#\{[^"']*(SELECT|INSERT|UPDATE|DELETE)			critical
+sql-concat	php	(mysqli_query|mysql_query|->query|->exec)\s*\([^)]*["'][^"']*(SELECT|INSERT|UPDATE|DELETE)[^"']*["']\s*\.|(mysqli_query|mysql_query)\s*\([^)]*["'][^"']*\$_			critical
+sql-concat	cs	(SqlCommand|\.ExecuteNonQuery|\.ExecuteReader|\.ExecuteScalar)\s*\([^)]*\+|string\.Format\s*\(\s*["'][^"']*(SELECT|INSERT|UPDATE|DELETE)			critical
+sql-concat	rs	format!\s*\(\s*["'][^"']*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"']*["'][^)]*\{|\.query\s*\(\s*&?\s*format!			critical
+shell	*	shell\s*=\s*True	use argument list: subprocess.run([cmd, arg])		critical
+shell	*	os\.system\s*\(			critical
+shell	*	\bpopen\s*\(			critical
+shell	*	child_process\.exec\s*\(	!execFile	use execFile, never exec with a string	critical
+shell	rb	\b(system|exec|`)\s*\(?\s*["'`]|Open3\.(popen|capture)|IO\.popen\s*\(			critical
+shell	php	\b(shell_exec|passthru|system|exec)\s*\(|`[^`]*\$_	PHP has no safe arg-list exec; avoid shell entirely		critical
+shell	go	exec\.Command\s*\(\s*["'](sh|bash)["']|\.arg\s*\(\s*["']-c["']	pass argument list, no shell		critical
+shell	rs	Command::new\s*\(\s*["'](sh|bash)["']|\.arg\s*\(\s*["']-c["']	pass argument list, no shell		critical
+
+# Autocomplete (OWASP [40,51])
+autocomplete-on	html,jsx,tsx,vue,php,erb,ejs,svelte,blade	autocomplete\s*=\s*["']on(["'])[^>]*type\s*=\s*["']password|type\s*=\s*["']password["'][^>]*autocomplete\s*=\s*["']on	use autocomplete="new-password" or "off" on password fields		low

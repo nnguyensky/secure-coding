@@ -1,0 +1,20 @@
+# SSRF Prevention patterns (OWASP SSRF Prevention CS, API-1 overlap)
+# New ID distinct from existing: ssrf
+# Note: API-1 covers the API-specific case. ssrf covers general SSRF.
+# Section 21 in the skill's group numbering.
+#
+# id	exts	regex	!exclude	hint
+ssrf	py	requests\.(get|post|put|delete|head|patch|options)\s*\(\s*(request\.(args|form|json|params|GET)\.get|req\.args\.get|req\.form\.get|req\.json\.get)\s*\(\s*["']\w+["']\s*\)	ssrf: user-supplied URL passed to HTTP client — validate against allowlist		critical
+ssrf	py	httpx\.(get|post|put|delete|head|patch|options)\s*\(\s*(request\.(args|form|json|params|GET)\.get|req\.args\.get|req\.form\.get|req\.json\.get)\s*\(\s*["']\w+["']\s*\)			critical
+ssrf	py	urllib\.request\.urlopen\s*\(\s*(request\.(args|form|json|params|GET)\.get|req\.args\.get|req\.form\.get|req\.json\.get)\s*\(\s*["']\w+["']\s*\)			critical
+ssrf	py	aiohttp\.ClientSession\(\)\.(get|post|put|delete)\s*\(\s*(request\.(args|form|json|params|GET)\.get|req\.args\.get)\s*\(\s*["']\w+["']\s*\)			critical
+ssrf	js,ts	fetch\s*\(\s*req\.(query|body|params)\.|\baxios\.(get|post|put|delete)\s*\(\s*req\.(query|body|params)\.|\bgot\s*\(\s*req\.(query|body|params)\.			critical
+ssrf	js,ts	new\s+URL\s*\(\s*req\.|url\.resolve\s*\(\s*[^,]+,\s*req\.|http\.get\s*\(\s*req\.(query|body|params)\.			critical
+ssrf	go	http\.Get\s*\(\s*r\.(URL\.Query|FormValue)|http\.Post\s*\(\s*r\.(URL\.Query|FormValue)|http\.NewRequest\s*\([^)]*r\.(URL\.Query|FormValue)			critical
+ssrf	go	httputil\.ReverseProxy\s*\(\s*func\s*\([^)]*\)\s*\{.*r\.(URL\.Query|FormValue)			critical
+ssrf	java,kt	HttpClient\.newHttpClient\(\)\.(send|sendAsync)\s*\([^)]*request\.getParameter|httpClient\.execute\s*\([^)]*request\.getParameter|RestTemplate\(\)\.(getForObject|postForObject)\s*\([^)]*request\.getParameter			critical
+ssrf	java,kt	URL\s*\(\s*request\.getParameter|new\s+URL\s*\(\s*req\.getParameter|HttpURLConnection.*request\.getParameter			critical
+ssrf	rb	Net::HTTP\.(get|post|put)\s*\(\s*params\[|HTTParty\.(get|post|put)\s*\(\s*params\[|Faraday\.(get|post|put)\s*\(\s*params\[			critical
+ssrf	php	file_get_contents\s*\(\s*\$_(GET|POST|REQUEST|COOKIE)|curl_setopt\s*\([^)]*CURLOPT_URL[^)]*\$_(GET|POST|REQUEST)|fopen\s*\(\s*\$_(GET|POST|REQUEST)			critical
+ssrf	cs	HttpClient\.GetAsync\s*\(\s*Request\.Query|WebClient\.DownloadString\s*\(\s*Request\.Query|HttpWebRequest\.Create\s*\(\s*Request\.Query			critical
+ssrf	rs	reqwest::get\s*\(\s*[^)]*query\.|surf::get\s*\(\s*[^)]*query\.			critical

@@ -1,0 +1,8 @@
+# Secure by Design (SbD) Architecture Patterns
+# id	exts	regex	!exclude	hint	severity
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+
+sbd-missing-timeout	py,js,ts,go	requests\.(get|post|put|delete|patch)\s*\([^)]+\)	!timeout=	specify an explicit timeout on HTTP client requests to prevent thread starvation and hang	medium
+sbd-legacy-tls	py,js,ts,go,java,c,cpp	(PROTOCOL_TLSv1_1|PROTOCOL_TLSv1_0|PROTOCOL_SSLv3|TLSv1\.0|TLSv1\.1|SSLv3)		deprecated legacy TLS/SSL protocol version; mandate TLSv1.2 or TLSv1.3	high
+sbd-dynamic-eval-reflection	py,js,ts	(eval|exec)\s*\([^)]*(req\.|request\.|params\.|body\.|query\.)		avoid dynamic code evaluation on untrusted request inputs	critical
+sbd-unauthenticated-route	py,js,ts	(router|app)\.(get|post|put|delete)\s*\(\s*["']/admin/	!auth|!authenticate|!require_auth|!jwt	administrative route missing authentication or authorization guard	high

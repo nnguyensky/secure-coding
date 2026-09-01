@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secure Coding — Policy Configuration Wizard</title>
+<style>
+:root {
+  --bg: #070913;
+  --bg-gradient: radial-gradient(circle at 50% -10%, #1e1b4b 0%, #0a0d1a 50%, #070913 100%);
+  --panel: rgba(18, 24, 38, 0.75);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-border-focus: rgba(99, 102, 241, 0.4);
+  --accent: #6366f1;
+  --accent-glow: rgba(99, 102, 241, 0.25);
+  --accent-hover: #4f46e5;
+  --accent-light: rgba(99, 102, 241, 0.12);
+  --text: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --danger: #f43f5e;
+  --danger-light: rgba(244, 63, 94, 0.12);
+  --warning: #f59e0b;
+  --warning-light: rgba(245, 158, 11, 0.12);
+  --success: #10b981;
+  --success-light: rgba(16, 185, 129, 0.12);
+  --info: #06b6d4;
+  --info-light: rgba(6, 182, 212, 0.12);
+  --card-bg: rgba(26, 34, 52, 0.55);
+  --card-bg-hover: rgba(33, 44, 67, 0.75);
+  --radius-lg: 20px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif; }
+
+body {
+  background: var(--bg);
+  background-image: var(--bg-gradient);
+  background-attachment: fixed;
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+}
+
+.container {
+  width: 100%;
+  max-width: 960px;
+  background: var(--panel);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  position: relative;
+}
+
+.container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.6), transparent);
+}
+
+header {
+  padding: 28px 36px;
+  border-bottom: 1px solid var(--panel-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.3);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.logo-icon {
+  font-size: 26px;
+  width: 44px;
+  height: 44px;
+  background: var(--accent-light);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.logo-text h1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.logo-text p {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.badge {
+  background: var(--accent-light);
+  color: #a5b4fc;
+  padding: 6px 14px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  letter-spacing: 0.02em;
+}
+
+/* Steps Navigation */
+.wizard-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: rgba(11, 17, 33, 0.6);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.step-tab {
+  padding: 16px 14px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.step-tab .step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+
+.step-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.step-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.step-tab.active .step-num {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 0 10px var(--accent);
+}
+
+/* Content Area */
+.content {
+  padding: 36px;
+  min-height: 440px;
+}
+
+.step-section {
+  display: none;
+}
+
+.step-section.active {
+  display: block;
+  animation: slideFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+p.desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+/* Grid & Cards */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--panel-border);
+  padding: 18px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--card-bg-hover);
+  transform: translateY(-2px);
+}
+
+.card.selected {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.card h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.card p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.ind-danger { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+.ind-warning { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
+.ind-info { background: var(--info); box-shadow: 0 0 8px var(--info); }
+.ind-success { background: var(--success); box-shadow: 0 0 8px var(--success); }
+
+/* Toggles & Rows */
+.toggle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card-bg);
+  border: 1px solid var(--panel-border);
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.toggle-row:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--card-bg-hover);
+}
+
+.toggle-info {
+  max-width: 80%;
+}
+
+.toggle-info strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 3px;
+  font-weight: 600;
+}
+
+.toggle-info span {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #334155;
+  transition: .3s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 24px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 50%;
+}
+input:checked + .slider { background-color: var(--accent); }
+input:checked + .slider:before { transform: translateX(20px); }
+
+/* Inputs & Textareas */
+label.input-label {
+  font-size: 13px;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 8px;
+  color: #cbd5e1;
+}
+
+textarea, input[type="text"] {
+  width: 100%;
+  background: rgba(11, 17, 33, 0.85);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  margin-bottom: 20px;
+  resize: vertical;
+  line-height: 1.5;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+textarea:focus, input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* Checkbox Chips */
+.chip-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.chip-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--panel-border);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chip-label:hover {
+  background: var(--card-bg-hover);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.chip-label input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Code Preview Box */
+.preview-container {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.preview-box {
+  background: #090e1b;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  color: #7dd3fc;
+  max-height: 260px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+/* Toast Notifications */
+.toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: rgba(16, 185, 129, 0.95);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+  opacity: 0;
+  z-index: 1000;
+}
+
+.toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+/* Footer & Buttons */
+footer {
+  padding: 20px 36px;
+  border-top: 1px solid var(--panel-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(11, 17, 33, 0.4);
+}
+
+.btn {
+  padding: 11px 24px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 4px 14px var(--accent-glow);
+}
+.btn-primary:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--panel-border);
+  color: var(--text);
+}
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.btn-success {
+  background: var(--success);
+  color: white;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+}
+.btn-success:hover {
+  background: #059669;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+@media (max-width: 768px) {
+  .grid-2, .grid-3, .chip-grid { grid-template-columns: 1fr; }
+  .wizard-steps { grid-template-columns: repeat(2, 1fr); }
+  .content { padding: 24px; }
+  header, footer { padding: 20px 24px; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🛡️</div>
+      <div class="logo-text">
+        <h1>Secure Coding Policy Wizard</h1>
+        <p>Interactive security governance for AI agents and engineering teams</p>
+      </div>
+    </div>
+    <span class="badge">.securecodingrc.json</span>
+  </header>
+
+  <div class="wizard-steps">
+    <div class="step-tab active" onclick="goStep(1)">
+      <span class="step-num">1</span>
+      <span>Severity Gate</span>
+    </div>
+    <div class="step-tab" onclick="goStep(2)">
+      <span class="step-num">2</span>
+      <span>Security Modules</span>
+    </div>
+    <div class="step-tab" onclick="goStep(3)">
+      <span class="step-num">3</span>
+      <span>Ecosystems & SBOM</span>
+    </div>
+    <div class="step-tab" onclick="goStep(4)">
+      <span class="step-num">4</span>
+      <span>Review & Export</span>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- Step 1: Severity Gate & Core Protections -->
+    <div class="step-section active" id="step1">
+      <h2>1. Enforcement & Failure Gate</h2>
+      <p class="desc">Select the minimum severity threshold required to block Git commits, PR merges, or CI/CD pipelines.</p>
+      
+      <div class="grid-2">
+        <div class="card selected" onclick="selectSeverity('high', this)">
+          <div class="card-header">
+            <h3>High & Critical</h3>
+            <div class="indicator ind-danger"></div>
+          </div>
+          <p><strong>Recommended for production.</strong> Blocks code injection, broken crypto, leaked credentials, and authorization flaws.</p>
+        </div>
+        <div class="card" onclick="selectSeverity('critical', this)">
+          <div class="card-header">
+            <h3>Critical Only</h3>
+            <div class="indicator ind-danger"></div>
+          </div>
+          <p>Permissive stance. Only blocks severe immediate risks like plaintext API keys and remote code execution.</p>
+        </div>
+        <div class="card" onclick="selectSeverity('medium', this)">
+          <div class="card-header">
+            <h3>Medium & Above</h3>
+            <div class="indicator ind-warning"></div>
+          </div>
+          <p>Strict security posture. Blocks weak password hashing, missing cookie flags, and unhandled debug leaks.</p>
+        </div>
+        <div class="card" onclick="selectSeverity('low', this)">
+          <div class="card-header">
+            <h3>All Findings (Low+)</h3>
+            <div class="indicator ind-info"></div>
+          </div>
+          <p>Zero-tolerance hygiene. Flags all minor security smells, documentation gaps, and informational warnings.</p>
+        </div>
+      </div>
+
+      <div class="toggle-group">
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <strong>Shannon Entropy Secret Detection</strong>
+            <span>Detect un-prefixed high-entropy API tokens and private keys ($H \ge 3.5\text{ bits/byte}$) in real time.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="cfgEntropy" checked onchange="updateConfig()">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <strong>Auto-Format PR Comment Tables</strong>
+            <span>Generate Markdown security summary tables automatically for GitHub and GitLab pull requests.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="cfgMarkdown" checked onchange="updateConfig()">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Patterns & Specialized Modules -->
+    <div class="step-section" id="step2">
+      <h2>2. Vulnerability Modules & AI Guardrails</h2>
+      <p class="desc">Enable or customize specialized architectural inspection modules matching your stack.</p>
+
+      <div class="toggle-group">
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <strong>OWASP Top 10 for LLMs & AI Workflows</strong>
+            <span>Prompt injection, excessive agency, insecure output handling, tenant RAG leaks, and token caps.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="modLLM" checked onchange="updateConfig()">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <strong>JWT & Token Verification</strong>
+            <span>Reject 'none' algorithm, hardcoded signing keys, insecure decodes, and missing expiry claims.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="modJWT" checked onchange="updateConfig()">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <strong>CORS & Communication Security</strong>
+            <span>Block wildcard origins with credentials, dynamic origin reflection, and permissive headers.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="modCORS" checked onchange="updateConfig()">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <strong>Clean Code Quality Standards (22 Rules)</strong>
+            <span>Flags magic numbers, multi-responsibility functions, swallowed errors, and dead code.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="modClean" checked onchange="updateConfig()">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <strong>Secure by Design Architecture (OWASP / ACSC)</strong>
+            <span>Enforce client timeouts, modern TLS 1.3, Postgres RLS, and Cross-Domain boundary checks.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="modSbD" checked onchange="updateConfig()">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <strong>IoT & Embedded Systems (AS ETSI EN 303 645)</strong>
+            <span>OTA update signing, MQTTS/CoAPS transport encryption, Secure Boot, and JTAG lockout.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="modIoT" checked onchange="updateConfig()">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Ecosystems, Paths & SBOM -->
+    <div class="step-section" id="step3">
+      <h2>3. Package Ecosystems, Exclusions & AI-SBOM</h2>
+      <p class="desc">Select monitored package managers and configure SBOM compliance exports.</p>
+
+      <label class="input-label">Monitored Package Ecosystems (Dependency Auditing):</label>
+      <div class="chip-grid">
+        <label class="chip-label"><input type="checkbox" name="eco" value="npm" checked onchange="updateConfig()"> npm (Node.js)</label>
+        <label class="chip-label"><input type="checkbox" name="eco" value="pnpm" checked onchange="updateConfig()"> pnpm</label>
+        <label class="chip-label"><input type="checkbox" name="eco" value="yarn" checked onchange="updateConfig()"> Yarn</label>
+        <label class="chip-label"><input type="checkbox" name="eco" value="pip" checked onchange="updateConfig()"> pip / Poetry (Python)</label>
+        <label class="chip-label"><input type="checkbox" name="eco" value="cargo" checked onchange="updateConfig()"> Cargo (Rust)</label>
+        <label class="chip-label"><input type="checkbox" name="eco" value="go" checked onchange="updateConfig()"> Go Modules</label>
+        <label class="chip-label"><input type="checkbox" name="eco" value="dotnet" checked onchange="updateConfig()"> .NET / NuGet</label>
+        <label class="chip-label"><input type="checkbox" name="eco" value="composer" checked onchange="updateConfig()"> Composer (PHP)</label>
+        <label class="chip-label"><input type="checkbox" name="eco" value="bundler" checked onchange="updateConfig()"> Bundler (Ruby)</label>
+      </div>
+
+      <div class="toggle-group">
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <strong>BSI AI-SBOM 7 Clusters (--ai)</strong>
+            <span>Include AI model parameters, dataset properties, safety KPIs, and runtime infrastructure in CycloneDX manifests.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="cfgAiSbom" checked onchange="updateConfig()">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <strong>ACSC / CISA VEX Exploitability Matrix (--vex)</strong>
+            <span>Export machine-readable Vulnerability Exploitability eXchange (VEX) statuses and reachability analysis.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="cfgVex" checked onchange="updateConfig()">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <label class="input-label">Excluded File Paths (Glob Patterns):</label>
+      <textarea id="cfgPaths" rows="3" oninput="updateConfig()">tests/**
+fixtures/**
+scripts/seed/**
+e2e/**</textarea>
+    </div>
+
+    <!-- Step 4: Review & Export -->
+    <div class="step-section" id="step4">
+      <h2>4. Review & Export Policy</h2>
+      <p class="desc">Save this configuration into your project root as <code>.securecodingrc.json</code>.</p>
+
+      <div class="preview-container">
+        <div class="preview-box" id="jsonPreview"></div>
+      </div>
+
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="copyConfig()">📋 Copy Policy JSON</button>
+        <button class="btn btn-success" onclick="downloadConfig()">💾 Download .securecodingrc.json</button>
+        <button class="btn btn-secondary" onclick="copyMcpConfig()">🔌 Copy MCP Server Config</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <button class="btn btn-secondary" id="btnBack" onclick="prevStep()">Back</button>
+    <button class="btn btn-primary" id="btnNext" onclick="nextStep()">Next Step &rarr;</button>
+  </footer>
+</div>
+
+<div class="toast" id="toast">Copied to clipboard!</div>
+
+<script>
+let currentStep = 1;
+let selectedSeverity = 'high';
+
+const config = {
+  failOn: 'high',
+  entropyDetection: true,
+  generateMarkdownPR: true,
+  modules: {
+    llm: true,
+    jwt: true,
+    cors: true,
+    cleanCode: true,
+    sbd: true,
+    iot: true
+  },
+  sbom: {
+    format: "cyclonedx",
+    includeAi: true,
+    includeVex: true
+  },
+  ignorePaths: [
+    "tests/**",
+    "fixtures/**",
+    "scripts/seed/**",
+    "e2e/**"
+  ],
+  ignorePatterns: [],
+  audit: {
+    ecosystems: ["npm", "pnpm", "yarn", "pip", "cargo", "go", "dotnet", "composer", "bundler"],
+    failOnAdvisory: "high"
+  }
+};
+
+function selectSeverity(sev, el) {
+  selectedSeverity = sev;
+  config.failOn = sev;
+  config.audit.failOnAdvisory = sev;
+  document.querySelectorAll('#step1 .card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  updateConfig();
+}
+
+function updateConfig() {
+  config.entropyDetection = document.getElementById('cfgEntropy').checked;
+  config.generateMarkdownPR = document.getElementById('cfgMarkdown').checked;
+  config.modules.llm = document.getElementById('modLLM').checked;
+  config.modules.jwt = document.getElementById('modJWT').checked;
+  config.modules.cors = document.getElementById('modCORS').checked;
+  config.modules.cleanCode = document.getElementById('modClean').checked;
+  config.modules.sbd = document.getElementById('modSbD').checked;
+  config.modules.iot = document.getElementById('modIoT').checked;
+
+  config.sbom = {
+    format: "cyclonedx",
+    includeAi: document.getElementById('cfgAiSbom').checked,
+    includeVex: document.getElementById('cfgVex').checked
+  };
+  
+  const paths = document.getElementById('cfgPaths').value.split('\n').map(s => s.trim()).filter(Boolean);
+  config.ignorePaths = paths;
+
+  const ecos = Array.from(document.querySelectorAll('input[name="eco"]:checked')).map(el => el.value);
+  config.audit.ecosystems = ecos;
+
+  document.getElementById('jsonPreview').textContent = JSON.stringify(config, null, 2);
+}
+
+function goStep(step) {
+  currentStep = step;
+  document.querySelectorAll('.step-tab').forEach((t, idx) => {
+    t.classList.toggle('active', idx + 1 === step);
+  });
+  document.querySelectorAll('.step-section').forEach((s, idx) => {
+    s.classList.toggle('active', idx + 1 === step);
+  });
+  document.getElementById('btnBack').style.visibility = step === 1 ? 'hidden' : 'visible';
+  document.getElementById('btnNext').textContent = step === 4 ? 'Download Policy 💾' : 'Next Step →';
+  updateConfig();
+}
+
+function nextStep() {
+  if (currentStep < 4) goStep(currentStep + 1);
+  else downloadConfig();
+}
+
+function prevStep() {
+  if (currentStep > 1) goStep(currentStep - 1);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function copyConfig() {
+  navigator.clipboard.writeText(JSON.stringify(config, null, 2)).then(() => {
+    showToast('✅ Copied .securecodingrc.json to clipboard!');
+  });
+}
+
+function copyMcpConfig() {
+  const mcpSnippet = {
+    mcpServers: {
+      "secure-coding": {
+        command: "node",
+        args: ["./mcp/server.js"],
+        description: "OWASP Secure Coding, AI-SBOM, Clean Code & Dependency Audit Engine"
+      }
+    }
+  };
+  navigator.clipboard.writeText(JSON.stringify(mcpSnippet, null, 2)).then(() => {
+    showToast('✅ Copied MCP configuration to clipboard!');
+  });
+}
+
+function downloadConfig() {
+  const blob = new Blob([JSON.stringify(config, null, 2) + '\n'], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '.securecodingrc.json';
+  a.click();
+  showToast('💾 Downloaded .securecodingrc.json');
+}
+
+goStep(1);
+</script>
+</body>
+</html>

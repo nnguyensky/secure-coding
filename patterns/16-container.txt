@@ -1,0 +1,26 @@
+# Container & Orchestration Security patterns
+# IDs use C- prefix to distinguish from OWASP SCP items (1-213).
+# Section 16 in the skill's group numbering.
+#
+# id	exts	regex	!exclude	hint
+C-1	Dockerfile,yml,yaml	USER\s+root|user:\s*root|user:\s*"root"|user:\s*'root'		C-1 Container root: container runs as root — create unprivileged user and USER it	high
+C-2	yml,yaml	privileged:\s*true|securityContext:.*privileged:\s*true		C-2 Privileged container: effectively no isolation — remove privileged flag	high
+C-3	yml,yaml	hostNetwork:\s*true|hostPID:\s*true|hostIPC:\s*true		C-3 Host namespace: container shares host network/pid/ipc — use container-scoped namespaces	high
+C-4	Dockerfile	readonlyRootFilesystem:\s*false|read_only:\s*false		C-4 Writable rootfs: container filesystem writable — set readOnlyRootFilesystem: true	medium
+C-5	yml,yaml	add:\s*\["SYS_ADMIN"\]|add:\s*\["ALL"\]|capabilities:.*add:.*ALL		C-5 Excessive capabilities: container has broad Linux capabilities — drop ALL, add only needed	high
+C-6	yml,yaml	volumes:.*docker\.sock|/var/run/docker\.sock		C-6 Docker socket mount: container can control Docker daemon — remove socket mount	high
+C-7	Dockerfile	HEALTHCHECK\s+NONE		C-7 No healthcheck: container has no liveness/readiness probe — add HEALTHCHECK	medium
+C-7	yml,yaml	livenessProbe:\s*null|readinessProbe:\s*null|livenessProbe:.*\{\}		C-7 No healthcheck: pod has no liveness/readiness probe — add probes	medium
+C-8	yml,yaml	securityContext:.*runAsNonRoot:\s*false|runAsUser:\s*0		C-8 Run as root: pod runs as UID 0 — set runAsNonRoot: true and runAsUser > 0	high
+C-9	yml,yaml	automountServiceAccountToken:\s*true|automountServiceAccountToken: true	!namespace		high
+C-10	yml,yaml	limits:.*\{\}|resources:\s*\{\}|resources:.*limits:.*null		C-10 No resource limits: container has no CPU/memory limits — set resource limits	medium
+
+# Additional K8s security patterns
+hostpath	yml,yaml	hostPath\s*:	docker: hostPath mounts host filesystem into pod — use PersistentVolumeClaim or emptyDir instead		medium
+hostpath	yml,yaml	hostPath\.path\s*:\s*[/"'](/[a-z]|/(etc|var|proc|sys|root|home))	docker: hostPath exposes sensitive host directories — use PVC or emptyDir		medium
+
+k8s-np	yml,yaml	networkPolicy\s*:\s*\{\}|kind:\s*NetworkPolicy	docker: no network policy — define NetworkPolicy to restrict pod-to-pod traffic		medium
+k8s-psa	yml,yaml	podSecurityAdmission\s*:\s*\{\}|pod-security.kubernetes.io/enforce\s*:\s*privileged	docker: permissive pod security standard — enforce restricted or baseline profile		high
+
+k8s-seccomp	yml,yaml	seccompProfile\s*:\s*\{\}|seccompProfile:\s*\{\}	docker: missing seccomp profile — set RuntimeDefault or custom seccomp profile		medium
+k8s-readonly	Dockerfile	^VOLUME\s+/etc|^VOLUME\s+/var/docker: mounting sensitive host paths — mount only what's needed, use read-only where possible			medium

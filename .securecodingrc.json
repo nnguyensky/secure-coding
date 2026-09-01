@@ -1,0 +1,24 @@
+{
+  "failOn": "high",
+  "entropyDetection": true,
+  "generateMarkdownPR": true,
+  "modules": {
+    "llm": true,
+    "jwt": true,
+    "cors": true,
+    "cleanCode": true,
+    "sbd": true,
+    "iot": true
+  },
+  "ignorePaths": [
+    "tests/**",
+    "fixtures/**",
+    "scripts/seed/**",
+    "e2e/**"
+  ],
+  "ignorePatterns": [],
+  "audit": {
+    "ecosystems": ["npm", "pnpm", "pip", "cargo", "go", "dotnet"],
+    "failOnAdvisory": "high"
+  }
+}

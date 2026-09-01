@@ -1,0 +1,12 @@
+# Session Fixation patterns (OWASP Session Management CS)
+# New ID: session-fixation
+# Section 25 in the skill's group numbering.
+#
+# id	exts	regex	!exclude	hint
+session-fixation	*	(req|request)\.session\.id\s*[:=]|session\.session_id\s*[:=]	session fixation: never accept session ID from client — regenerate after login		high
+session-fixation	py	session\[.id.\]\s*=\s*(request|req)\.(form|args|cookies)\.get	session fixation: do not set session ID from client input		high
+session-fixation	js,ts	req\.session\.id\s*=\s*(req\.|params\.|query\.)	session fixation: do not set session ID from client input		high
+session-fixation	go	r\.Session\.ID\s*=\s*(r\.URL|req\.URL)	session fixation: do not set session ID from client input		high
+session-fixation	java,kt	session\.setId\s*\(\s*request\.getParameter	session fixation: do not set session ID from client input		high
+session-fixation	rb	session\.id\s*=\s*params\[	session fixation: do not set session ID from client input		high
+session-fixation	cs	Session\.SessionID\s*=\s*Request\.(QueryString|Form)	session fixation: do not set session ID from client input		high

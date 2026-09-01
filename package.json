@@ -1,0 +1,71 @@
+{
+  "name": "secure-coding",
+  "version": "2.1.0",
+  "description": "Proactive OWASP Secure Coding, ACSC/CISA Secure-by-Design, Clean Code & AI Safety Engine for AI Agents & Developers.",
+  "keywords": [
+    "security",
+    "secure-coding",
+    "owasp",
+    "secure-by-design",
+    "clean-code",
+    "ai-safety",
+    "llm-security",
+    "mcp",
+    "mcp-server",
+    "sbom",
+    "ai-sbom",
+    "cyclonedx",
+    "vex",
+    "antigravity",
+    "claude-skill",
+    "cursor-rules"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "OWASP / Secure Coding Community"
+  },
+  "homepage": "https://github.com/owasp/secure-coding",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/owasp/secure-coding.git"
+  },
+  "bugs": {
+    "url": "https://github.com/owasp/secure-coding/issues"
+  },
+  "main": "./hooks/scan.js",
+  "bin": {
+    "secure-coding": "./install.js",
+    "secure-coding-scan": "./hooks/scan.js",
+    "secure-coding-mcp": "./mcp/server.js"
+  },
+  "files": [
+    "AGENTS.md",
+    "SKILL.md",
+    "README.md",
+    "INSTALLATION.md",
+    "checks/",
+    "hooks/",
+    "patterns/",
+    "templates/",
+    "reports/",
+    "mcp/",
+    "install.js",
+    "install.sh"
+  ],
+  "scripts": {
+    "test": "node hooks/sync.js && node hooks/test.js",
+    "scan": "node hooks/scan.js",
+    "staged": "node hooks/scan.js --staged",
+    "audit": "node hooks/audit.js",
+    "clean": "node hooks/clean.js",
+    "sbom": "node hooks/sbom.js --format cyclonedx --ai --vex",
+    "mcp": "node mcp/server.js",
+    "wizard": "node hooks/config.js --ui"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

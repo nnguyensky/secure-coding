@@ -1,0 +1,9 @@
+# OWASP SCP - Access Control [77-100]
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+
+jwt	*	algorithms?\s*[:=]\s*\[?\s*["']none["']	never accept "none" algorithm — require a real signature	never accept "none" algorithm — require a real signature	high
+jwt	*	verify\s*[:=]\s*false			high
+jwt	*	verify_signature[^)]*False			high
+cors	*	Access-Control-Allow-Origin["']?\s*[,:]\s*["']\*	never allow all origins with credentials — use explicit origin list	never allow all origins with credentials	high
+cors	*	origin\s*:\s*true.*credentials\s*:\s*true			high

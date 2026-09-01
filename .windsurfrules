@@ -1,0 +1,4 @@
+When writing code that handles user input, auth, secrets, databases, files, or LLM pipelines:
+- Read SKILL.md and apply matching templates from templates/.
+- When designing architecture, refer to checks/secure-by-design.md and checks/memory-safety.md.
+- After writing, verify using: node hooks/scan.js

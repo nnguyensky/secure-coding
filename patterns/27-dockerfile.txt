@@ -1,0 +1,22 @@
+# Dockerfile Security patterns (OWASP Docker Security CS)
+# New IDs: dockerfile-copy-secrets, dockerfile-latest, dockerfile-upgrade, dockerfile-env-secrets
+# Section 27 in the skill's group numbering.
+#
+# id	exts	regex	!exclude	hint
+docker-copy-secrets	Dockerfile	(COPY|ADD)\s+\.\s+\.|COPY\s+\*\s+\.|ADD\s+\*\s+\.	docker: COPY/ADD . copies everything into image — use .dockerignore, copy only needed files		critical
+docker-copy-secrets	Dockerfile	(COPY|ADD)\s+[.](env|secret|key|pem|crt|env\.local|\.env\.production)	docker: secrets copied into image — use build secrets or runtime env vars		critical
+docker-copy-secrets	Dockerfile	(COPY|ADD)\s+\.\s+/app/docker: copying entire context into image — use .dockerignore to exclude secrets, .git, node_modules			critical
+
+dockerfile-latest	Dockerfile	^FROM\s+\S+:latest\s*$	docker: unpinned :latest tag — pin to specific version (e.g., node:20-slim)		high
+dockerfile-latest	Dockerfile	^FROM\s+\S+\s+(as|AS)\s+\S+\s*$	!scratch	!localhost	high
+
+dockerfile-upgrade	Dockerfile	apt(-get)?\s+(install|upgrade).*&&.*apt(-get)?\s+(install|upgrade)	docker: multiple apt commands — combine into single RUN with cleanup		medium
+dockerfile-upgrade	Dockerfile	apt-get\s+upgrade|apt\s+upgrade	docker: apt upgrade in Dockerfile — pin base image version instead of upgrading		medium
+
+dockerfile-env-secrets	Dockerfile	^ENV\s+\S*(password|passwd|secret|token|api_?key|auth)\s*=\s*\S	docker: secret in ENV — use build secrets or runtime environment variables		critical
+dockerfile-env-secrets	Dockerfile	^ENV\s+\S*(PASSWORD|SECRET|TOKEN|API_?KEY|AUTH)\s*=\s*\S			critical
+
+dockerfile-curl-bash	Dockerfile	(curl|wget)\s+.*\|\s*(bash|sh|zsh)	docker: piping remote script to shell — download, verify checksum, then execute		medium
+dockerfile-curl-bash	Dockerfile	(curl|wget)\s+.*>\s*\S+.*&&.*bash\s+\S+			medium
+
+dockerfile-add	Dockerfile	^ADD\s+(?!.*\.(tar\.gz|tgz|zip|rar|7z|bz2|xz)\s)\S+\s+\S+	docker: prefer COPY over ADD — ADD auto-extracts archives and fetches URLs, unexpected behavior		medium

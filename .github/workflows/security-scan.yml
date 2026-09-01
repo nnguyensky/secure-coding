@@ -1,0 +1,60 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  security-audit:
+    name: OWASP Secure Coding & Dependency Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Secure Coding Sync Validation
+        run: node hooks/sync.js
+
+      - name: Run Security Pattern Tests
+        run: node hooks/test.js
+
+      - name: Run Dependency Vulnerability Audit
+        run: node hooks/audit.js
+
+      - name: Scan PR Changes for Security Smells
+        if: github.event_name == 'pull_request'
+        run: |
+          git diff --name-only origin/${{ github.base_ref }}...HEAD > pr_files.txt
+          node hooks/scan.js --files $(cat pr_files.txt)
+
+      - name: Generate SARIF Security Report
+        if: always()
+        run: node hooks/report.js --sarif > results.sarif
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: results.sarif
+        continue-on-error: true
+
+      - name: Generate CycloneDX AI-SBOM & VEX
+        if: always()
+        run: node hooks/sbom.js --format cyclonedx --ai --vex --out sbom.json
+
+      - name: Upload CycloneDX SBOM Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cyclonedx-ai-sbom
+          path: sbom.json

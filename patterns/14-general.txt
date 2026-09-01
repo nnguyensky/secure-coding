@@ -1,0 +1,49 @@
+# OWASP SCP - General Coding Practices [202-213]
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+
+insecure-deserialization	*	pickle\.loads?\s*\(	use JSON or a safe format; validate shape after parsing		critical
+insecure-deserialization	*	cPickle\.loads?\s*\(			critical
+insecure-deserialization	*	yaml\.load\s*\(			critical
+insecure-deserialization	*	\bunserialize\s*\(			critical
+insecure-deserialization	*	readObject\s*\(\s*\)			critical
+insecure-deserialization	*	Marshal\.load\s*\(			critical
+insecure-deserialization	java,kt	(XMLDecoder|ObjectInputStream)\s*\(|\.readObject\s*\(\s*\)	use JSON or a safe format; validate shape after parsing		critical
+insecure-deserialization	rb	YAML\.load\s*\(|Marshal\.load\s*\(			critical
+insecure-deserialization	cs	BinaryFormatter\s*\(\)?\.Deserialize|(XmlSerializer|DataContractSerializer)\.ReadObject			critical
+insecure-deserialization	go	gob\.NewDecoder\s*\(			critical
+eval	*	\beval\s*\(	use a lookup table, JSON.parse, or a real parser		critical
+eval	*	new\s+Function\s*\(			critical
+eval	*	setTimeout\s*\(\s*["'`]			critical
+eval	*	exec\s*\(\s*f["']	use a lookup table, JSON.parse, or a real parser		critical
+eval	java,kt	(ScriptEngineManager|GroovyShell|NashornScriptEngineFactory)\b|\.eval\s*\(\s*["']			critical
+eval	rb	\b(instance_eval|class_eval|module_eval)\s*\(			critical
+eval	cs	CSharpScript\.|Microsoft\.CSharp\.CSharpCodeProvider|CompileAssemblyFromSource			critical
+exec-py	py	\bexec\s*\(	use a lookup table, JSON.parse, or a real parser		critical
+
+# Server-Side Template Injection (SSTI)
+ssti	py	render_template_string\s*\(|jinja2\.Template\s*\(|Environment\(.*\)\.from_string\s*\(	do not render raw strings as templates; pass variables into static template files		critical
+ssti	js,ts	ejs\.render\s*\([^,]*\+|Handlebars\.compile\s*\([^)]*req\.|nunjucks\.renderString\s*\(|pug\.compile\s*\([^)]*req\.	do not render user input as templates; use precompiled templates		critical
+ssti	rb	ERB\.new\s*\([^)]*params\[|Liquid::Template\.parse\s*\([^)]*params\[	do not parse user input into template engine		critical
+ssti	java,kt	Velocity\.evaluate\s*\(|Template\s*\([^,]*,\s*new\s+StringReader\s*\(	do not evaluate template strings directly		critical
+
+# Prototype Pollution
+prototype-pollution	js,ts	Object\.assign\s*\(\s*\{\}\s*,\s*req\.(body|query|params)|lodash\.merge\s*\([^,]*,\s*req\.(body|query|params)	validate object keys; disallow __proto__ and constructor prototype injection		high
+
+# RegEx Denial of Service (ReDoS)
+redos-input	js,ts	new\s+RegExp\s*\(\s*req\.(query|body|params|headers)	escape user input before passing to RegExp or use fixed patterns		medium
+redos-input	py	re\.(compile|search|match|findall)\s*\(\s*(request\.|req\.)	escape user input before compiling regex		medium
+
+# XML External Entity (XXE)
+xxe	py	lxml\.etree\.fromstring\s*\(|xml\.etree\.ElementTree\.parse\s*\(	!defusedxml	disable external entity resolution or use defusedxml	high
+xxe	java,kt	DocumentBuilderFactory\.newInstance\(\)\.newDocumentBuilder|XMLInputFactory\.newInstance	!FEATURE_SECURE_PROCESSING|!disallow-doctype-decl	disable external DTDs and entities in XML parsers	high
+xxe	php	libxml_disable_entity_loader\s*\(\s*false\s*\)|simplexml_load_string\s*\([^)]*\$_	disable external entity loading in XML parsers		high
+
+# LLM & AI Security (OWASP Top 10 for LLMs)
+llm-prompt-injection	py	(openai|anthropic|gemini|client|chat)\.(chat|completions|messages|generate)\.[a-zA-Z0-9_]*\s*\([^)]*f["'].*\{.*(user|input|prompt|req\.|request\.)	use system/user message separation and parameter structure instead of raw f-strings in LLM prompts		high
+llm-prompt-injection	js,ts	(openai|anthropic|google|ai)\.(chat|completions|generateText|streamText)\s*\([^)]*\$\{[^}]*(user|input|prompt|req\.)	use structured messages and roles rather than string interpolation in LLM prompts		high
+llm-unsafe-exec	py	(eval|exec)\s*\(\s*(response|completion|message|output)\.(content|text|choices)	never execute raw LLM-generated code without sandboxing and human-in-the-loop review		critical
+llm-unsafe-exec	js,ts	(eval|new\s+Function)\s*\(\s*(response|completion|result|output)\.(content|text)	never evaluate raw LLM-generated code strings directly		critical
+
+# React Server Components & Server Actions Security
+rsc-unvalidated-action	js,ts	['"]use\s+server['"][\s\S]*?(export\s+)?(async\s+)?function\s+\w+\s*\([^)]*\)	!z\.|!parse|!validate|!safeParse	validate all Server Action arguments using a schema parser (e.g. Zod) before processing	high

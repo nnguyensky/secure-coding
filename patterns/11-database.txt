@@ -1,0 +1,6 @@
+# OWASP SCP - Database Security [167-179]
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+
+default-db-account	*	(GRANT\s+ALL|WITH\s+GRANT\s+OPTION)	use least privilege: GRANT only what is needed		high
+default-db-account	*	CREATE\s+USER[^;]*IDENTIFIED\s+BY\s*["'](password|admin|changeme|root)["']	use a unique password from a secret manager		high

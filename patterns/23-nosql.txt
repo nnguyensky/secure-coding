@@ -1,0 +1,15 @@
+# NoSQL Injection patterns (OWASP NoSQL Security CS)
+# New ID distinct from existing: nosql-inject
+# Section 23 in the skill's group numbering.
+#
+# id	exts	regex	!exclude	hint
+nosql-inject	js,ts	\.find\s*\(\s*\{[^}]*req\.(body|query|params)\.|\.(findOne|findOneAndUpdate|findOneAndDelete|updateOne|deleteOne)\s*\(\s*\{[^}]*req\.(body|query|params)	!String\(|!Number\(|!parseInt\(|!parseFloat\(|!Boolean\(	nosql injection: sanitize and validate user input before using in MongoDB queries	critical
+nosql-inject	js,ts	\$where\s*:|\$regex\s*:|\$gt\s*:|\$ne\s*:|\$nin\s*:|\$exists\s*:	nosql injection: user input may inject MongoDB operators — validate input type		critical
+nosql-inject	js,ts	\.aggregate\s*\(\s*\[[^]]*req\.(body|query|params)	nosql injection: user input in aggregation pipeline — validate input		critical
+nosql-inject	py	\.find\s*\(\s*\{.*request\.(form|json|args|data)\.get|\.find_one\s*\(\s*\{.*request\.(form|json|args|data)\.get	nosql injection: user input in MongoDB query — validate input type and value		critical
+nosql-inject	py	\$where|\$regex|\$gt|\$ne|\$nin|\$exists	nosql injection: MongoDB operators in user-controlled input — validate and sanitize		critical
+nosql-inject	py	(Notebook|pymongo)\..*(find|update|delete|aggregate)\s*\(\s*\{.*request\.(form|json|args)	nosql injection: user input in MongoDB query — validate input		critical
+nosql-inject	rb	Mongoid|Mongo::Collection.*(find|update|delete|aggregate)\s*\(\s*\{.*params\[	nosql injection: user input in MongoDB query — validate input type		critical
+nosql-inject	java,kt	MongoCollection.*(find|update|delete|aggregate)\s*\(\s*(Filters\.eq|Document)\s*\([^)]*request\.getParameter	nosql injection: user input in MongoDB query — validate input		critical
+nosql-inject	cs	IMongoCollection.*(Find|Update|Delete|Aggregate)\s*\([^)]*Request\.(Form|Query|QueryString)	nosql injection: user input in MongoDB query — validate input		critical
+nosql-inject	*	\"\$where\"\s*:|\$where\s*\(|\.where\s*\(\s*function	nosql injection: $where executes JS in MongoDB — avoid or sanitize strictly		critical

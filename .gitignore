@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+
+# Generated per-session HTML reports (findings.jsonl is committed)
+# Keep reports/security.html (scaffold), ignore timestamped copies
+reports/security-*.html

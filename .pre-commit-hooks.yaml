@@ -1,0 +1,25 @@
+- id: secure-coding-scan
+  name: Secure Coding Staged Scan
+  description: Fast proactive scan of staged files for OWASP vulnerabilities, leaked secrets, and dangerous APIs (<20ms).
+  entry: node hooks/scan.js --staged
+  language: node
+  types: [text]
+  stages: [pre-commit]
+  pass_filenames: false
+
+- id: secure-coding-clean
+  name: Clean Code Quality Linter
+  description: Lints code against 22 universal Clean Code quality standards (magic numbers, multi-responsibility functions).
+  entry: node hooks/clean.js
+  language: node
+  types: [text]
+  stages: [pre-commit]
+  pass_filenames: true
+
+- id: secure-coding-audit
+  name: Dependency Vulnerability Audit
+  description: Audits third-party dependencies across 9 package ecosystems for known CVEs and advisories.
+  entry: node hooks/audit.js
+  language: node
+  stages: [pre-push]
+  pass_filenames: false

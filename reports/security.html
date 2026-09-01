@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secure Coding — Security Audit & Compliance Report</title>
+<style>
+:root {
+  --bg: #070913;
+  --bg-gradient: radial-gradient(circle at 50% -10%, #1e1b4b 0%, #0a0d1a 50%, #070913 100%);
+  --panel: rgba(18, 24, 38, 0.75);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-border-hover: rgba(255, 255, 255, 0.18);
+  --accent: #6366f1;
+  --accent-glow: rgba(99, 102, 241, 0.25);
+  --accent-hover: #4f46e5;
+  --accent-light: rgba(99, 102, 241, 0.12);
+  --text: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --danger: #f43f5e;
+  --danger-light: rgba(244, 63, 94, 0.15);
+  --danger-border: rgba(244, 63, 94, 0.3);
+  --warning: #f59e0b;
+  --warning-light: rgba(245, 158, 11, 0.15);
+  --warning-border: rgba(245, 158, 11, 0.3);
+  --success: #10b981;
+  --success-light: rgba(16, 185, 129, 0.15);
+  --success-border: rgba(16, 185, 129, 0.3);
+  --info: #06b6d4;
+  --info-light: rgba(6, 182, 212, 0.15);
+  --info-border: rgba(6, 182, 212, 0.3);
+  --card-bg: rgba(26, 34, 52, 0.55);
+  --card-bg-hover: rgba(33, 44, 67, 0.75);
+  --radius-lg: 20px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
+
+body {
+  background: var(--bg);
+  background-image: var(--bg-gradient);
+  background-attachment: fixed;
+  color: var(--text);
+  min-height: 100vh;
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 1120px;
+  background: var(--panel);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  position: relative;
+}
+
+.container::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.6), transparent);
+}
+
+/* Header */
+header {
+  padding: 28px 36px;
+  border-bottom: 1px solid var(--panel-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.3);
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.logo { display: flex; align-items: center; gap: 14px; }
+.logo-icon {
+  font-size: 26px;
+  width: 46px;
+  height: 46px;
+  background: var(--accent-light);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+.logo-text h1 { font-size: 19px; font-weight: 700; color: var(--text); }
+.logo-text p { font-size: 12px; color: var(--text-muted); }
+
+.header-actions { display: flex; align-items: center; gap: 10px; }
+
+.btn {
+  padding: 9px 18px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-primary { background: var(--accent); color: white; box-shadow: 0 4px 14px var(--accent-glow); }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: rgba(255, 255, 255, 0.06); border-color: var(--panel-border); color: var(--text); }
+.btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* KPI Stats Cards */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  padding: 24px 36px 12px;
+}
+.stat-card {
+  background: var(--card-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.stat-card:hover { transform: translateY(-2px); border-color: var(--panel-border-hover); }
+.stat-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 700; margin-bottom: 6px; }
+.stat-num { font-size: 26px; font-weight: 800; }
+.stat-num.open { color: var(--danger); text-shadow: 0 0 15px rgba(244, 63, 94, 0.3); }
+.stat-num.fixed { color: var(--success); text-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
+.stat-num.audit { color: var(--warning); text-shadow: 0 0 15px rgba(245, 158, 11, 0.3); }
+.stat-num.neutral { color: #38bdf8; }
+
+/* Progress Bar */
+.progress-container {
+  padding: 0 36px 24px;
+}
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.progress-track {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #10b981);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+/* Tabs & Toolbar */
+.toolbar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(11, 17, 33, 0.5);
+  padding: 0 36px;
+  gap: 16px;
+}
+.tab-btn {
+  padding: 14px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  background: none;
+  border-top: none; border-left: none; border-right: none;
+  transition: all 0.2s ease;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.filter-bar {
+  padding: 18px 36px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.2);
+  border-bottom: 1px solid var(--panel-border);
+}
+.search-input {
+  flex: 1;
+  min-width: 220px;
+  background: rgba(11, 17, 33, 0.85);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  color: var(--text);
+  font-size: 13px;
+}
+.search-input:focus { outline: none; border-color: var(--accent); }
+.filter-select {
+  background: rgba(11, 17, 33, 0.85);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.filter-select:focus { outline: none; border-color: var(--accent); }
+
+/* Table View */
+.table-wrap {
+  padding: 0 36px 36px;
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 18px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--card-bg);
+}
+thead th {
+  background: rgba(11, 17, 33, 0.8);
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--panel-border);
+  text-align: left;
+  cursor: pointer;
+}
+tbody tr {
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+tbody tr:hover { background: var(--card-bg-hover); }
+tbody td {
+  padding: 13px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--panel-border);
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.badge.open { background: var(--danger-light); color: #fda4af; border: 1px solid var(--danger-border); }
+.badge.fixed { background: var(--success-light); color: #6ee7b7; border: 1px solid var(--success-border); }
+
+.sev {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.sev.critical { background: var(--danger-light); color: #f43f5e; border: 1px solid var(--danger-border); }
+.sev.high { background: var(--warning-light); color: #fb923c; border: 1px solid var(--warning-border); }
+.sev.medium { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); }
+.sev.low { background: var(--info-light); color: #38bdf8; border: 1px solid var(--info-border); }
+
+.file-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  color: #7dd3fc;
+}
+
+/* Detail Box inside Rows */
+.detail-box {
+  background: #080c16;
+  border-top: 1px solid var(--panel-border);
+  padding: 18px 24px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.fix-block {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  margin-top: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: pre-wrap;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 50px 20px;
+  color: var(--text-muted);
+}
+.empty-state-icon { font-size: 38px; margin-bottom: 12px; }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 30px; left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: rgba(16, 185, 129, 0.95);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0; z-index: 1000;
+}
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+@media (max-width: 768px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); padding: 18px 20px; }
+  .toolbar-tabs, .filter-bar, .table-wrap, .progress-container { padding-left: 20px; padding-right: 20px; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🛡️</div>
+      <div class="logo-text">
+        <h1>Secure Coding Report</h1>
+        <p>Generated <span id="genTime"><!--[GENERATED]--></span> &middot; Multi-Ecosystem &amp; AI-SBOM Verification</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary" onclick="exportCsv()">📥 Export CSV</button>
+      <button class="btn btn-primary" onclick="copyMarkdown()">📋 Copy PR Markdown</button>
+    </div>
+  </header>
+
+  <!-- KPI Cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-title">Open Findings</div>
+      <div class="stat-num open" id="statOpen">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title">Resolved Issues</div>
+      <div class="stat-num fixed" id="statFixed">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title">Dependency Advisories</div>
+      <div class="stat-num audit" id="statAudit">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title">Remediation Rate</div>
+      <div class="stat-num neutral" id="statRate">100%</div>
+    </div>
+  </div>
+
+  <div class="progress-container">
+    <div class="progress-label">
+      <span>Security Compliance Progress</span>
+      <span id="progressText">0 / 0 Resolved</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill" style="width: 100%;"></div>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="toolbar-tabs">
+    <button class="tab-btn active" onclick="setTab('all', this)">All Findings (<span id="countAll">0</span>)</button>
+    <button class="tab-btn" onclick="setTab('open', this)">Open Findings (<span id="countOpen">0</span>)</button>
+    <button class="tab-btn" onclick="setTab('fixed', this)">Resolved (<span id="countFixed">0</span>)</button>
+    <button class="tab-btn" onclick="setTab('audit', this)">Dependencies (<span id="countAudit">0</span>)</button>
+  </div>
+
+  <!-- Filter & Search Toolbar -->
+  <div class="filter-bar" id="filterBar">
+    <input type="search" class="search-input" id="searchQ" placeholder="🔍 Search finding ID, file path, snippet, or remediation..." oninput="renderTable()">
+    <select class="filter-select" id="filterSev" onchange="renderTable()">
+      <option value="">All Severities</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
+    <select class="filter-select" id="filterSec" onchange="renderTable()">
+      <option value="">All Domains / Sections</option>
+    </select>
+  </div>
+
+  <!-- Table Container -->
+  <div class="table-wrap">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Severity</th>
+          <th>Finding ID</th>
+          <th>Domain / Section</th>
+          <th>File Location</th>
+          <th>Session</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+      <tbody id="auditBody" style="display:none"></tbody>
+    </table>
+
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <div class="empty-state-icon">✅</div>
+      <h3>No matching security findings</h3>
+      <p style="font-size:13px; margin-top:4px;">All scanned code conforms to OWASP, Clean Code, and Secure-by-Design standards.</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Copied to clipboard!</div>
+
+<script>
+const DATA = [/*FINDINGS_DATA*/];
+const AUDIT_DATA = [/*AUDIT_DATA*/];
+
+let activeTab = 'all';
+let expandedRows = new Set();
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function initDashboard() {
+  const openCount = DATA.filter(d => d.status === 'open').length;
+  const fixedCount = DATA.filter(d => d.status === 'fixed').length;
+  const auditCount = Array.isArray(AUDIT_DATA) ? AUDIT_DATA.length : 0;
+  const total = openCount + fixedCount;
+  const rate = total > 0 ? Math.round((fixedCount / total) * 100) : 100;
+
+  document.getElementById('statOpen').textContent = openCount;
+  document.getElementById('statFixed').textContent = fixedCount;
+  document.getElementById('statAudit').textContent = auditCount;
+  document.getElementById('statRate').textContent = rate + '%';
+
+  document.getElementById('countAll').textContent = total;
+  document.getElementById('countOpen').textContent = openCount;
+  document.getElementById('countFixed').textContent = fixedCount;
+  document.getElementById('countAudit').textContent = auditCount;
+
+  document.getElementById('progressText').textContent = `${fixedCount} / ${total} Resolved (${rate}%)`;
+  document.getElementById('progressFill').style.width = rate + '%';
+
+  // Populate sections filter
+  const sections = [...new Set(DATA.map(d => d.secName).filter(Boolean))].sort();
+  const secSelect = document.getElementById('filterSec');
+  sections.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    secSelect.appendChild(opt);
+  });
+
+  renderTable();
+}
+
+function setTab(tab, el) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderTable();
+}
+
+function toggleRow(idx) {
+  if (expandedRows.has(idx)) expandedRows.delete(idx);
+  else expandedRows.add(idx);
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  const empty = document.getElementById('emptyState');
+  const search = document.getElementById('searchQ').value.trim().toLowerCase();
+  const sevFilter = document.getElementById('filterSev').value;
+  const secFilter = document.getElementById('filterSec').value;
+
+  tbody.innerHTML = '';
+
+  if (activeTab === 'audit') {
+    if (!AUDIT_DATA || AUDIT_DATA.length === 0) {
+      empty.style.display = 'block';
+      empty.querySelector('h3').textContent = 'No dependency vulnerabilities found';
+      return;
+    }
+    empty.style.display = 'none';
+
+    AUDIT_DATA.forEach(d => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><span class="badge open">ADVISORY</span></td>
+        <td><span class="sev ${escapeHtml(d.severity || 'high')}">${escapeHtml(d.severity || 'high')}</span></td>
+        <td><code>${escapeHtml(d.package)}</code></td>
+        <td>${escapeHtml(d.ecosystem || 'npm')}</td>
+        <td class="file-code">${escapeHtml(d.title || d.advisory || '')}</td>
+        <td>${escapeHtml(d.installed || '—')}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    return;
+  }
+
+  let filtered = DATA.filter(d => {
+    if (activeTab === 'open' && d.status !== 'open') return false;
+    if (activeTab === 'fixed' && d.status !== 'fixed') return false;
+    if (sevFilter && d.severity !== sevFilter) return false;
+    if (secFilter && d.secName !== secFilter) return false;
+    if (search) {
+      const text = `${d.id} ${d.file} ${d.secName} ${d.fix} ${d.severity}`.toLowerCase();
+      if (!text.includes(search)) return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    empty.style.display = 'block';
+    empty.querySelector('h3').textContent = 'No matching security findings';
+    return;
+  }
+  empty.style.display = 'none';
+
+  filtered.forEach((d, idx) => {
+    const isExpanded = expandedRows.has(idx);
+    const tr = document.createElement('tr');
+    tr.onclick = () => toggleRow(idx);
+
+    tr.innerHTML = `
+      <td><span class="badge ${escapeHtml(d.status)}">${escapeHtml(d.status)}</span></td>
+      <td><span class="sev ${escapeHtml(d.severity)}">${escapeHtml(d.severity)}</span></td>
+      <td><strong>${escapeHtml(d.id)}</strong></td>
+      <td>${escapeHtml(d.secName || 'General')}</td>
+      <td class="file-code">${escapeHtml(d.file || '—')}</td>
+      <td style="color:var(--text-muted); font-size:12px;">${escapeHtml(d.run_id || 'run-1')}</td>
+    `;
+    tbody.appendChild(tr);
+
+    if (isExpanded) {
+      const detailTr = document.createElement('tr');
+      detailTr.innerHTML = `
+        <td colspan="6" style="padding:0;">
+          <div class="detail-box">
+            <div style="font-weight:600; margin-bottom:6px; color:#e2e8f0;">💡 Remediation &amp; Secure Pattern:</div>
+            <div class="fix-block">${escapeHtml(d.fix || 'Apply standard OWASP parameterized query / allowlist validation.')}</div>
+            <div style="margin-top:10px; font-size:12px; color:var(--text-muted);">
+              First seen: <strong>${escapeHtml(d.first || '—')}</strong> &bull; Resolved at: <strong>${escapeHtml(d.resolved || 'Open')}</strong>
+            </div>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(detailTr);
+    }
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function copyMarkdown() {
+  const openRows = DATA.filter(r => r.status === 'open');
+  let md = '### 🛡️ Security Scan Summary\n\n';
+  md += `**Findings:** ${openRows.length} open, ${DATA.filter(r => r.status === 'fixed').length} resolved.\n\n`;
+
+  if (openRows.length > 0) {
+    md += '| Severity | Finding ID | Location | Remediation |\n|:---|:---|:---|:---|\n';
+    openRows.forEach(r => {
+      md += `| **${r.severity.toUpperCase()}** | \`${r.id}\` | \`${r.file}\` | ${r.fix.replace(/\n/g, ' ').slice(0, 100)} |\n`;
+    });
+  } else {
+    md += '✅ **No open security vulnerabilities found.**\n';
+  }
+
+  navigator.clipboard.writeText(md).then(() => {
+    showToast('📋 Copied PR Markdown to clipboard!');
+  });
+}
+
+function exportCsv() {
+  let csv = 'Status,Severity,ID,Section,File,RunID,FirstSeen,Resolved\n';
+  DATA.forEach(d => {
+    csv += `"${d.status}","${d.severity}","${d.id}","${d.secName}","${d.file}","${d.run_id}","${d.first}","${d.resolved}"\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `security-report-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  showToast('📥 Exported report CSV');
+}
+
+initDashboard();
+</script>
+</body>
+</html>

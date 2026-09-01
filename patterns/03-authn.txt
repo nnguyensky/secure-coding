@@ -1,0 +1,22 @@
+# OWASP SCP - Authentication & Password Management [23-57]
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+
+weak-hash	*	\b(md5|sha1)\s*\(	never use MD5/SHA-1 for security — use sha256+ for checksums, argon2id for passwords		high
+weak-hash	*	hashlib\.(md5|sha1)\b			high
+weak-hash	*	MessageDigest\.getInstance\s*\(\s*["'](MD5|SHA-?1)["']			high
+weak-hash	*	createHash\s*\(\s*["'](md5|sha1)["']	never use MD5/SHA-1 for security		high
+weak-hash	go	(crypto/md5|crypto/sha1)|md5\.New\s*\(|sha1\.New\s*\(			high
+weak-hash	java,kt	DigestUtils\.(md5|sha1)|(MD5|SHA-?1)\.digest\s*\(			high
+weak-hash	rb	Digest::(MD5|SHA1)\b			high
+weak-hash	php	hash\s*\(\s*["'](md5|sha1)["']			high
+weak-hash	cs	(MD5|SHA1)\.Create\s*\(|System\.Security\.Cryptography\.(MD5|SHA1)\b			high
+weak-hash	rs	(Md5|Sha1)::new\s*\(|md5::|sha1::			high
+pw-fast-hash	*	(sha256|sha512|md5|sha1)\s*\(\s*\w*(password|passwd|pwd)\w*	use argon2id; else scrypt or bcrypt at cost 12+	use argon2id; else scrypt or bcrypt at cost 12+	high
+pw-fast-hash	*	hashlib\.\w+\s*\(\s*\w*(password|passwd|pwd)\w*			high
+pw-fast-hash	go	sha256\.Sum256\s*\(\s*\[\]\s*byte\s*\(\s*\w*(password|passwd|pwd)\w*			high
+pw-fast-hash	java,kt	(MessageDigest|DigestUtils)\.[a-zA-Z]+\s*\([^)]*(password|passwd|pwd)			high
+pw-fast-hash	rb	Digest::[A-Za-z0-9]+\.hexdigest\s*\([^)]*(password|passwd|pwd)			high
+pw-fast-hash	php	(password_hash|hash)\s*\(\s*["'](sha256|sha512|md5|sha1)["']			high
+pw-fast-hash	cs	(SHA256|SHA512|MD5|SHA1)\.Create\s*\(\s*\)\s*\.ComputeHash\s*\([^)]*(password|passwd|pwd)			high
+pw-fast-hash	rs	(Sha256|Sha512|Md5|Sha1)::digest\s*\([^)]*(password|passwd|pwd)			high

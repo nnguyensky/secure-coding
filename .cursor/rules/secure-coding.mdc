@@ -1,0 +1,6 @@
+---
+globs: ["**/*.{py,js,ts,go,java,kt,swift,rb,php,cs,rs,c,cpp,h,sh,tf,yaml,yml}"]
+alwaysApply: false
+---
+Apply OWASP Secure Coding Practices, ACSC Modern Defensible Architecture, and Clean Code rules while writing code.
+Refer to SKILL.md, templates/, and checks/secure-by-design.md for secure patterns.

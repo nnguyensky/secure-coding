@@ -1,0 +1,23 @@
+# OWASP SCP - Communication Security [143-150]
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+
+tls-off	*	verify\s*=\s*False	leave TLS verification on; for self-signed dev certs, add CA to trust store		critical
+tls-off	*	rejectUnauthorized\s*:\s*false			critical
+tls-off	*	NODE_TLS_REJECT_UNAUTHORIZED			critical
+tls-off	*	InsecureSkipVerify\s*:\s*true			critical
+tls-off	*	CURLOPT_SSL_VERIFYPEER\s*,\s*(0|false)			critical
+tls-off	*	setHostnameVerifier\s*\(\s*.*ALLOW_ALL			critical
+tls-off	rb	VERIFY_NONE|verify_mode\s*=\s*OpenSSL::SSL::VERIFY_NONE			critical
+tls-off	cs	ServerCertificateValidationCallback\s*=\s*.*(return\s+true|=>\s*true)|RemoteCertificateValidationCallback[^)]*return\s+true			critical
+tls-off	java,kt	TrustManager[^}]*checkServerTrusted[^}]*\{\s*\}|X509TrustManager[^}]*return\s*;\s*\}			critical
+tls-off	java,kt	setHostnameVerifier\s*\(\s*\([^)]*\)\s*->\s*true|HostnameVerifier[^}]*return\s+true			critical
+
+# HSTS missing (OWASP HSTS CS, HTTP Headers CS)
+# Detected by absence in HTTP response headers — review item.
+# HSTS not set means first visit is vulnerable to SSL stripping.
+# See review.md §5 for the review check.
+
+# CORS Misconfigurations
+cors-wildcard-credentials	*	(Access-Control-Allow-Origin|origin)['"]?\s*[,:=]\s*['"]\*['"].*(credentials|Access-Control-Allow-Credentials)	never combine wildcard Access-Control-Allow-Origin with credentials: true		high
+cors-origin-reflection	js,ts,py,go,java,kt,cs	(Access-Control-Allow-Origin|setHeader\(['"]Access-Control-Allow-Origin['"])\s*,\s*(req\.headers\.(origin|get\(['"]origin['"]\))|request\.headers\[['"]Origin['"]\])	validate Origin against a strict allowlist before reflecting		high

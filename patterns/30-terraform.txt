@@ -1,0 +1,10 @@
+# Terraform/IaC security patterns
+
+# provisioner "local-exec" — executes arbitrary commands on the machine running Terraform
+provisioner-local	tf,tfvars	provisioner\s*["']local-exec["']	avoid local-exec; use null_resource with a controlled script		high
+
+# provisioner "remote-exec" — executes arbitrary commands on the target machine
+provisioner-remote	tf,tfvars	provisioner\s*["']remote-exec["']	avoid remote-exec; use configuration management tool		high
+
+# password in connection block — using password instead of SSH key
+tf-password	tf,tfvars	connection\s*\{[^}]*password\s*=	use SSH key authentication; never hardcode passwords		high

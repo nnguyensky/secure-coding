@@ -1,0 +1,14 @@
+# Supply Chain Security patterns (OWASP Supply Chain CS, Software Supply Chain CS)
+# New IDs: unpinned-action, lockfile-missing
+# Section 28 in the skill's group numbering.
+#
+# id	exts	regex	!exclude	hint
+unpinned-action	yml,yaml	uses:\s+\S+/\S+@\s*(v\d|main|master|latest|HEAD|develop)	supply chain: unpinned GitHub Action — pin to full commit SHA		high
+unpinned-action	yml,yaml	uses:\s+\S+/\S+@[^a-f0-9\s]{7,}	supply chain: GitHub Action pinned to tag, not commit SHA — pin to full SHA for immutability		high
+unpinned-action	yml,yaml	uses:\s+actions/checkout@v\d|uses:\s+actions/setup-\w+@v\d	supply chain: first-party action pinned to tag — still pin to SHA for defense in depth		high
+
+docker-digest	Dockerfile	^FROM\s+\S+:[^@\s]+\s*$	!slim|!alpine|!bookworm|!distroless|!dockerio	docker: base image pinned to tag only — consider pinning to digest (image@sha256:...) for immutable builds	medium
+docker-digest	Dockerfile	^FROM\s+\S+:(?!latest)[a-zA-Z0-9._-]+\s*$	!slim|!alpine|!bookworm|!distroless|!dockerio	docker: pin to digest for reproducible builds: image:tag@sha256:...	medium
+
+npm-audit	yml,yaml	.*npm\s+install.*--production|.*npm\s+ci\s+--production	supply chain: production install without audit — run npm audit before deploy		medium
+npm-audit	yml,yaml	.*npm\s+ci\b.*--ignore-scripts	supply chain: --ignore-scripts skips lifecycle hooks — verify scripts are safe before disabling		medium

@@ -1,0 +1,20 @@
+# Shell script security patterns
+# Covers sh, bash, zsh scripts
+
+# Unquoted variable — word splitting and glob expansion
+# simple heuristic, catches dangerous commands with unquoted variables
+unquoted-var	sh,bash,zsh	(?:^|[\s;])(?:rm|mv|cp|cat|chmod|chown|kill|dd|mkdir|rmdir)\s+\$(?![{(])	quote variables to prevent word splitting		high
+
+# eval on user input — code execution via shell
+eval-input	sh,bash,zsh	\beval\b\s+.*\$(?:\{|\(|[a-zA-Z_])	never eval user input; use a case statement or safe parsing		critical
+
+# Temp file race condition — predictable names
+temp-race	sh,bash,zsh	\b(mktemp\s+-u|tmpnam)\b	mktemp -u and tmpnam have race conditions; use mktemp without -u		low
+
+# set +e hides errors — security controls may silently fail
+set-hide-error	sh,bash,zsh	^\s*set\s+\+e\b	leave errexit on; handle errors explicitly		medium
+
+# Unquoted variable in conditional — word splitting on test
+# Matches: [ $var == yes ], test $var -eq 0
+# Does not match: [ "$var" == "yes" ] (quoted is safe)
+unquoted-test	sh,bash,zsh	(?:\[|test)\s+(?!\")\$(?![{(])\S+\s+(?:-[a-z]|==|!=)	quote variables in test expressions: "$var"		medium

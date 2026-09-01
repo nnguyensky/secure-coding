@@ -1,0 +1,7 @@
+# OWASP SCP - JWT & Token Security
+# id	exts	regex	!exclude	hint	severity
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+
+jwt-none-alg	js,ts,py,go,java,kt,cs	(algorithms\s*:\s*\[\s*['"]none['"]|algorithm\s*[:=]\s*['"]none['"]|algorithms\s*=\s*\[\s*['"]none['"]|Algorithm\.none\s*\(\))	never allow 'none' algorithm in JWT verification or signing		critical
+jwt-hardcoded-secret	js,ts,py,go,java,kt,cs	(jwt\.(sign|encode)|Jwts\.builder\(\)|JwtBuilder)\s*\([^,]+,\s*['"][^'"]*(secret|password|123456|default|key)	never hardcode symmetric JWT secrets in source code; use secret manager		critical
+jwt-no-verify	js,ts,py,go,java,kt,cs	(jwt\.decode|decode_token)\s*\([^)]*(verify\s*=\s*False|verify_signature\s*:\s*False|verifySignature\s*:\s*false)	always verify JWT signatures on backend		high

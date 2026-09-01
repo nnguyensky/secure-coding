@@ -1,0 +1,24 @@
+# OAuth2 Security patterns (OWASP OAuth2 CS)
+# New IDs: oauth2-state, oauth2-token, oauth2-redirect
+# Section 24 in the skill's group numbering.
+#
+# id	exts	regex	!exclude	hint
+oauth2-state	*	oauth.*callback.*state\s*[:=]\s*(null|false|""|'')	oauth2: state parameter must be a cryptographically random, non-guessable value		high
+oauth2-state	*	(state\s*[:=]\s*(req\.|request\.|params\.|query\.))	oauth2: never trust client-supplied state — generate and validate server-side		high
+oauth2-state	py	state\s*=\s*(request\.(args|form|query)\.get|req\.args\.get)\s*\(\s*["']state["']\s*\)	oauth2: validate state parameter against server-stored value		high
+oauth2-state	js,ts	state\s*=\s*(req\.query\.state|req\.body\.state|params\.state)	oauth2: validate state parameter against server-stored value		high
+oauth2-state	go	state\s*:=\s*r\.URL\.Query\(\)\.Get\s*\(\s*["']state["']\s*\)	oauth2: validate state parameter against server-stored value		high
+oauth2-state	java,kt	state\s*=\s*request\.getParameter\s*\(\s*["']state["']\s*\)	oauth2: validate state parameter against server-stored value		high
+
+oauth2-token	*	verify\s*[:=]\s*false.*token|token.*verify\s*[:=]\s*false	oauth2: always verify access token signature and claims (exp, aud, iss)		high
+oauth2-token	*	expired\s*[:=]\s*(false|skip)|skip.*expir	oauth2: never skip token expiration check		high
+oauth2-token	py	oauthlib.*skip.*token|authlib.*verify\s*=\s*False	oauth2: verify token signature and claims		high
+oauth2-token	js,ts	introspect.*false|verify\s*:\s*false.*jwt|jwt\.verify\s*\([^)]*false	oauth2: verify token signature and claims		high
+oauth2-token	go	tokeninfo.*skip|oidc.*skip.*verify	oauth2: verify token signature and claims		high
+oauth2-token	java,kt	setVerifySignature\s*\(\s*false\)|skipIntrospection\s*\(\s*true\)	oauth2: verify token signature and claims		high
+
+oauth2-redirect	*	redirect.*uri.*req\.|redirect_uri.*req\.(query|body|params)	oauth2: redirect_uri must match pre-registered URI — never accept from user input		high
+oauth2-redirect	py	redirect_uri\s*=\s*request\.(args|form|json)\.get\s*\(\s*["']redirect_uri["']\)	oauth2: validate redirect_uri against allowlist, not from user input		high
+oauth2-redirect	js,ts	redirect_uri\s*=\s*req\.(query|body)\.redirect_uri	oauth2: validate redirect_uri against pre-registered URIs		high
+oauth2-redirect	go	redirect_uri\s*:=\s*r\.URL\.Query\(\)\.Get\s*\(\s*["']redirect_uri["']\)	oauth2: validate redirect_uri against pre-registered URIs		high
+oauth2-redirect	java,kt	redirect_uri\s*=\s*request\.getParameter\s*\(\s*["']redirect_uri["']\)	oauth2: validate redirect_uri against pre-registered URIs		high

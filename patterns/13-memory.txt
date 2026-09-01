@@ -1,0 +1,8 @@
+# OWASP SCP - Memory Management [194-202]
+# id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint
+# POSIX ERE only - BSD grep has no -P and fails silently on it.
+
+mem	c,h,cpp,cc,hpp	\b(strcpy|strcat|sprintf|gets|vsprintf)\s*\(	use bounded copies (snprintf, strlcpy); check allocs; free once+null		medium
+mem	c,h,cpp,cc,hpp	\balloca\s*\(	use malloc with bounds check, or a fixed-size buffer		medium
+mem	rs	unsafe\s*\{	Minimize unsafe blocks; validate all inputs before entering		medium
+mem	cs	\bunsafe\s*\{			medium
