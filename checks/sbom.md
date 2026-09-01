@@ -70,11 +70,12 @@ AI and Machine Learning systems require specialized tracking across 7 distinct c
 
 Elements in **bold** are the ones most often missing from a hand-rolled AI-SBOM.
 
-> `node hooks/sbom.js --ai` emits a **scaffold** — a `machine-learning-model` component with
-> `bsi:cluster:*` properties and example metrics. It is a starting point, not a conformant
-> AI-SBOM: the values are placeholders and the Models, Dataset, and KPI clusters must be filled
-> in from your actual model and training data. Treat a generated file as unfinished until each
-> element above is either populated or explicitly marked not-applicable.
+> `node hooks/sbom.js --ai` emits a **complete scaffold**: every element listed above appears as a
+> `bsi:cluster:<cluster>:<element>` property across all 7 clusters. Values that cannot be derived
+> automatically carry the literal `TODO`, so nothing is silently missing and no placeholder can be
+> mistaken for real data. The command reports how many remain — e.g.
+> `AI-SBOM scaffold — 42/49 BSI elements still marked TODO` — on stderr, so piped JSON stays clean.
+> Fill each one in or mark it not-applicable before publishing.
 
 ---
 

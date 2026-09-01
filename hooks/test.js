@@ -606,6 +606,45 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   clean('notAssignment', 'const eq = req.query.x == other;\nfetch(other);', 'js');
 })();
 
+// --- BSI AI-SBOM: all 7 clusters present ---
+(function aiSbomClusters() {
+  const { generateAiClusters, countAiTodos } = require('./sbom.js');
+  const comp = generateAiClusters()[0];
+  const props = comp.properties || [];
+  const clusters = new Set(props
+    .filter(p => p.name.startsWith('bsi:cluster:'))
+    .map(p => p.name.split(':')[2]));
+
+  uniq('ai-sbom-7-clusters');
+  const want = ['metadata', 'slp', 'models', 'dp', 'infra', 'sp', 'kpi'];
+  const missing = want.filter(c => !clusters.has(c));
+  if (missing.length === 0) pass++;
+  else { fail++; console.log(`MISS  ai-sbom-7-clusters: no ${missing.join(', ')}`); }
+
+  // Every element the BSI document names must be emitted, not just some.
+  uniq('ai-sbom-elements');
+  const { BSI_ELEMENTS } = require('./sbom.js');
+  const names = new Set(props.map(p => p.name));
+  const absent = BSI_ELEMENTS
+    .map(([c, e]) => `bsi:cluster:${c}:${e}`)
+    .filter(n => !names.has(n));
+  if (absent.length === 0) pass++;
+  else { fail++; console.log(`MISS  ai-sbom-elements: ${absent.length} absent, e.g. ${absent[0]}`); }
+
+  // Unknown values must be an explicit TODO, never a plausible fake that could
+  // ship as if it were real data.
+  uniq('ai-sbom-todo-marked');
+  const { todo, total } = countAiTodos([comp]);
+  if (todo > 0 && total >= 40 && todo <= total) pass++;
+  else { fail++; console.log(`MISS  ai-sbom-todo-marked: todo=${todo} total=${total}`); }
+
+  // The scaffold must not invent model metrics.
+  uniq('ai-sbom-no-fake-metrics');
+  const metrics = comp.modelCard?.quantitativeAnalysis?.performanceMetrics || [];
+  if (metrics.length === 0) pass++;
+  else { fail++; console.log(`MISS  ai-sbom-no-fake-metrics: ${metrics.length} invented metrics`); }
+})();
+
 // --- SKILL.md references resolve ---
 // A renamed or missing checks/ file would silently send the agent nowhere.
 (function skillLinks() {

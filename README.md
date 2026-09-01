@@ -268,7 +268,7 @@ npm run wizard
 | | `node hooks/fix.js --suggest <id>` | Shows Wrong vs Right guide for any pattern ID. |
 | | `node hooks/fix.js --apply` | Applies in-place automated code refactoring. |
 | | `node hooks/fix.js --dry-run` | Previews autofix diff without writing files. |
-| **🧹 Quality** | `node hooks/clean.js` | Lints against 22 clean code standards. |
+| **🧹 Quality** | `node hooks/clean.js` | Lints against 14 clean code standards. |
 | | `node hooks/summary.js` | One-line status check (`3 open, 5 fixed`). |
 | | `node hooks/stats.js` | Displays pattern metrics and false-positive rates. |
 | **🔌 MCP Server** | `node mcp/server.js` | Launches native Model Context Protocol stdio server. |
@@ -400,7 +400,7 @@ Always write secure code from the start. Never defer security fixes.
 | `secure_code_scan` | Scans in-memory code snippets or staged files for 356+ OWASP & SbD bugs. | *"Scan this authentication function for vulnerabilities."* |
 | `secure_code_autofix` | Returns exact remediation diffs or refactors code in-place. | *"Fix the weak random number generator in auth.ts."* |
 | `security_dependency_audit` | Scans lockfiles across 9 package ecosystems for CVEs. | *"Check package.json and requirements.txt for vulnerabilities."* |
-| `clean_code_lint` | Lints source code against 22 universal Clean Code quality standards. | *"Lint my recent changes for clean code issues."* |
+| `clean_code_lint` | Lints source code against 14 universal Clean Code quality standards. | *"Lint my recent changes for clean code issues."* |
 | `generate_ai_sbom` | Exports CycloneDX v1.5 / SPDX v2.3 SBOM with BSI 7 AI clusters & VEX data. | *"Generate a CycloneDX AI-SBOM with VEX exploitability."* |
 | `security_summary` | Returns a one-line status of open vs resolved security findings. | *"Give me a security status summary of the workspace."* |
 

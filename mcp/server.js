@@ -87,7 +87,7 @@ const TOOLS = [
   },
   {
     name: 'clean_code_lint',
-    description: 'Lints source code against 22 universal Clean Code standards (magic numbers, multi-responsibility functions, swallowed errors, boolean flag parameters).',
+    description: 'Lints source code against 14 universal Clean Code standards (magic numbers, multi-responsibility functions, swallowed errors, boolean flag parameters).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -97,7 +97,7 @@ const TOOLS = [
         },
         listRules: {
           type: 'boolean',
-          description: 'List all 22 clean code standards with explanations.',
+          description: 'List all 14 clean code standards with explanations.',
         },
       },
     },

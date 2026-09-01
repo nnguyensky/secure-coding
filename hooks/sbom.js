@@ -298,34 +298,112 @@ function detectAiComponents(components) {
   return components.some(c => aiNames.has(c.name.toLowerCase()));
 }
 
-function generateAiClusters() {
+// --- BSI/G7 "SBOM for AI" minimum elements ---
+// All 7 clusters. Every element the document names is emitted, so nothing is
+// silently missing; unknown values carry the TODO sentinel rather than a
+// plausible-looking default that would ship as if it were real.
+const AI_TODO = 'TODO';
+
+// [cluster, element, value] — value null means "must be filled in by the author".
+const BSI_ELEMENTS = [
+  // 2.1 Metadata (about the SBOM itself, not the component)
+  ['metadata', 'sbom_author', null],
+  ['metadata', 'sbom_version', '1'],
+  ['metadata', 'sbom_data_format_name', 'CycloneDX'],
+  ['metadata', 'sbom_data_format_version', '1.5'],
+  ['metadata', 'sbom_author_signature', null],
+  ['metadata', 'sbom_generation_context', null],
+  ['metadata', 'sbom_dependency_relationship', null],
+  // 2.2 System Level Properties
+  ['slp', 'system_name', null],
+  ['slp', 'system_components', null],
+  ['slp', 'system_producer', null],
+  ['slp', 'system_version', null],
+  ['slp', 'system_data_flow', null],
+  ['slp', 'system_data_usage', null],
+  ['slp', 'system_input_output_properties', null],
+  ['slp', 'intended_application_area', null],
+  // 2.3 Models
+  ['models', 'model_name', null],
+  ['models', 'model_identifier', null],
+  ['models', 'model_version', null],
+  ['models', 'model_producer', null],
+  ['models', 'model_description', null],
+  ['models', 'model_hash_value', null],
+  ['models', 'model_hash_algorithm', null],
+  ['models', 'model_properties', null],
+  ['models', 'model_input_output_properties', null],
+  ['models', 'model_training_properties', null],
+  ['models', 'model_license', null],
+  ['models', 'model_external_references', null],
+  // 2.4 Dataset Properties
+  ['dp', 'dataset_name', null],
+  ['dp', 'dataset_description', null],
+  ['dp', 'dataset_content', null],
+  ['dp', 'dataset_identifier', null],
+  ['dp', 'dataset_hash', null],
+  ['dp', 'dataset_provenance', null],
+  ['dp', 'dataset_statistical_properties', null],
+  ['dp', 'dataset_sensitivity', null],
+  ['dp', 'dataset_dependency_relationship', null],
+  ['dp', 'dataset_license', null],
+  // 2.5 Infrastructure
+  ['infra', 'infrastructure_software', null],
+  ['infra', 'infrastructure_hardware', null],
+  // 2.6 Security Properties
+  ['sp', 'security_controls', null],
+  ['sp', 'security_compliance', null],
+  ['sp', 'cybersecurity_policy_information', null],
+  ['sp', 'vulnerability_referencing', null],
+  // 2.7 Key Performance Indicators
+  ['kpi', 'security_metrics', null],
+  ['kpi', 'operational_performance_kpis', null],
+];
+
+function generateAiClusters(opts = {}) {
+  const now = opts.timestamp || new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const properties = [];
+
+  for (const [cluster, element, value] of BSI_ELEMENTS) {
+    properties.push({
+      name: `bsi:cluster:${cluster}:${element}`,
+      value: value === null ? AI_TODO : value,
+    });
+  }
+  // Timestamps are the elements we can legitimately fill in.
+  for (const cluster of ['metadata', 'slp', 'models', 'dp']) {
+    properties.push({ name: `bsi:cluster:${cluster}:timestamp`, value: now });
+  }
+
   return [
     {
       type: 'machine-learning-model',
       name: 'primary-ai-model',
       version: '1.0.0',
-      description: 'AI model component conforming to BSI SBOM for AI Minimum Elements',
+      description:
+        'AI component scaffold covering all 7 BSI/G7 SBOM-for-AI clusters. ' +
+        `Every element marked "${AI_TODO}" must be completed before this is a conformant AI-SBOM.`,
       modelCard: {
-        modelParameters: {
-          task: 'generative-ai',
-          architecture: 'transformer',
-        },
-        quantitativeAnalysis: {
-          performanceMetrics: [
-            { type: 'safety-eval-toxicity', value: '<0.01', slice: 'red-team-benchmark' },
-            { type: 'jailbreak-resistance', value: '0.99', slice: 'adversarial-suite' },
-          ],
-        },
+        modelParameters: { task: AI_TODO, architecture: AI_TODO },
+        quantitativeAnalysis: { performanceMetrics: [] },
       },
-      properties: [
-        { name: 'bsi:cluster:slp:intended_use', value: 'assistive-task-automation' },
-        { name: 'bsi:cluster:sp:guardrails', value: 'enabled' },
-        { name: 'bsi:cluster:sp:prompt_sanitization', value: 'strict' },
-        { name: 'bsi:cluster:sp:encryption_at_rest', value: 'AES-256-GCM' },
-        { name: 'bsi:cluster:infra:runtime', value: 'onnx-runtime / vllm' },
-      ],
+      properties,
     },
   ];
+}
+
+// How many BSI elements are still unfilled. Lets the CLI warn instead of
+// letting a scaffold be mistaken for a finished artifact.
+function countAiTodos(components) {
+  let todo = 0, total = 0;
+  for (const c of components || []) {
+    for (const p of c.properties || []) {
+      if (!p.name.startsWith('bsi:cluster:')) continue;
+      total++;
+      if (p.value === AI_TODO) todo++;
+    }
+  }
+  return { todo, total };
 }
 
 // --- ACSC & CISA VEX Generation ---
@@ -466,6 +544,15 @@ function main() {
     : generateCycloneDX(components, { includeAi, includeVex });
   const jsonStr = JSON.stringify(sbom, null, 2) + '\n';
 
+  // Warn on stderr so it never corrupts piped JSON: a scaffold with unfilled
+  // BSI elements is not a conformant AI-SBOM and should not be shipped as one.
+  const { todo, total } = countAiTodos(sbom.components);
+  if (todo > 0) {
+    process.stderr.write(
+      `secure-coding: AI-SBOM scaffold — ${todo}/${total} BSI elements still marked TODO. ` +
+      `Fill them in (or mark not-applicable) before publishing.\n`);
+  }
+
   if (outFile) {
     fs.writeFileSync(outFile, jsonStr);
     process.stderr.write(`secure-coding: SBOM written to ${outFile} (${components.length} components, AI: ${includeAi || detectAiComponents(components)}, VEX: ${includeVex})\n`);
@@ -484,5 +571,7 @@ module.exports = {
   generateSPDX,
   detectAiComponents,
   generateAiClusters,
+  countAiTodos,
+  BSI_ELEMENTS,
   generateVexVulnerabilities,
 };

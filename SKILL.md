@@ -27,6 +27,7 @@ No finding is marked as accepted, deferred, or ignored without an explicit revie
    - **Adopting a Dependency, Vendor or SaaS** → [`checks/technology-selection.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/technology-selection.md) (ACSC procurement questions, Secure by Default, supply chain & jurisdiction)
    - **AI/LLMs & Prompts** → [`checks/llm-top10.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/llm-top10.md) (Prompt injection, output handling, excessive agency, token caps)
    - **Threat Modeling** → [`checks/threat-model.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/threat-model.md) (STRIDE & DREAD analysis)
+   - **SSDF Attestation & Coverage** → [`checks/ssdf-mapping.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/ssdf-mapping.md) (NIST SP 800-218 PO/PS/PW/RV map, and the gaps this skill does not cover)
 
 2. **Identify which of the 9 code groups apply:**
    - (1) Data in/out • (2) Identity & Auth • (3) Secrets & Crypto • (4) Errors & Logs • (5) Storage & Transport • (6) Files & System • (7) Deployment & Config • (8) API Security • (9) Containers & Cloud
@@ -237,7 +238,7 @@ Even when no automated pattern flags, check for these design smells:
 | **`audit.js`** | Dependency vulnerability scan across 9 ecosystems | `node hooks/audit.js` |
 | **`fix.js`** | View remediation guidance or apply automated refactors | `node hooks/fix.js --apply` |
 | **`sbom.js`** | CycloneDX v1.5 & SPDX v2.3 SBOM with AI-SBOM & VEX | `node hooks/sbom.js --ai --vex` |
-| **`clean.js`** | Universal clean code linter (22 rules) | `node hooks/clean.js --file <f>` |
+| **`clean.js`** | Universal clean code linter (14 rules) | `node hooks/clean.js --file <f>` |
 | **`report.js`** | Export HTML report, PR Markdown, or SARIF v2.1.0 | `node hooks/report.js --sarif` |
 | **`config.js`** | Manage policy or launch visual browser UI | `node hooks/config.js --ui` |
 | **`mcp/server.js`** | Native Model Context Protocol (MCP) stdio server | `node mcp/server.js` |
