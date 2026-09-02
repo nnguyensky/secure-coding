@@ -369,7 +369,8 @@ When writing code that handles user input, authentication, sessions, permissions
 2. When architecting systems, review \`checks/secure-by-design.md\`, \`checks/memory-safety.md\`, \`checks/cryptography.md\`, \`checks/iot-security.md\`, \`checks/deployment-safety.md\`, or \`checks/sbom.md\`.
 3. When building AI/LLM workflows or RAG pipelines, review \`checks/llm-top10.md\`.
 4. After writing code, run: \`node hooks/scan.js --staged\`
-5. Before declaring completion, verify zero open vulnerabilities with: \`node hooks/summary.js && node hooks/audit.js\`
+5. Before declaring completion, run the Done Gate: \`node hooks/summary.js && node hooks/audit.js && node hooks/gate.js --check\`
+6. \`gate.js --check\` exits 2 until you answer the four questions no pattern can check — ownership, authorization, taint, failure-direction. Record each with \`node hooks/gate.js --answer <question> "<what enforces it>"\`. A clean scan is not a pass on its own.
 `;
       fs.writeFileSync(agentsMd, content);
       console.log(`${GREEN}✅ Configured Antigravity instructions:${NC} ${agentsMd}`);
@@ -411,6 +412,7 @@ alwaysApply: false
 ---
 Apply OWASP Secure Coding Practices, ACSC Modern Defensible Architecture, and Clean Code rules while writing code.
 Refer to SKILL.md, templates/, and checks/secure-by-design.md for secure patterns.
+After writing, run \`node hooks/scan.js --staged\`, then \`node hooks/gate.js --check\` before declaring the task complete.
 `;
     fs.writeFileSync(cursorRule, content);
     console.log(`${GREEN}✅ Configured Cursor rule:${NC} ${cursorRule}`);
@@ -422,7 +424,7 @@ Refer to SKILL.md, templates/, and checks/secure-by-design.md for secure pattern
       const content = `When writing code that handles user input, auth, secrets, databases, files, or LLM pipelines:
 - Read SKILL.md and apply matching templates from templates/.
 - When designing architecture, refer to checks/secure-by-design.md and checks/memory-safety.md.
-- After writing, verify using: node hooks/scan.js --staged
+- After writing, verify using: node hooks/scan.js --staged\n- Before declaring done: node hooks/gate.js --check (exits 2 until the manual review is answered)
 `;
       fs.writeFileSync(windsurfRules, content);
       console.log(`${GREEN}✅ Configured Windsurf rules:${NC} ${windsurfRules}`);
@@ -436,7 +438,7 @@ Refer to SKILL.md, templates/, and checks/secure-by-design.md for secure pattern
 Always write secure code from the start. Never defer security fixes.
 - Before coding, read SKILL.md and templates/<language>.md.
 - When handling LLM tools or RAG, review checks/llm-top10.md.
-- After writing code, run \`node hooks/scan.js --staged\` and fix any reported findings immediately.
+- After writing code, run \`node hooks/scan.js --staged\` and fix any reported findings immediately.\n- Before declaring done, run \`node hooks/gate.js --check\` and answer the four manual questions it names.
 `;
       fs.writeFileSync(clineRules, content);
       console.log(`${GREEN}✅ Configured Cline rules:${NC} ${clineRules}`);
@@ -544,6 +546,7 @@ async function runInteractive() {
   console.log(`\n${GREEN}${BOLD}🎉 Setup Complete!${NC}`);
   console.log('----------------------------------------------------------------------');
   console.log('• Fast Staged Scan:   node hooks/scan.js --staged');
+  console.log('• Done Gate:         node hooks/gate.js --check');
   console.log('• Dependency Audit:   node hooks/audit.js');
   console.log('• MCP Stdio Server:   node mcp/server.js');
   console.log('• Policy Wizard UI:   node hooks/config.js --ui');

@@ -4,3 +4,4 @@ alwaysApply: false
 ---
 Apply OWASP Secure Coding Practices, ACSC Modern Defensible Architecture, and Clean Code rules while writing code.
 Refer to SKILL.md, templates/, and checks/secure-by-design.md for secure patterns.
+After writing, run `node hooks/scan.js --staged`, then `node hooks/gate.js --check` before declaring the task complete.

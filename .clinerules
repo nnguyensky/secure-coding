@@ -3,3 +3,6 @@ Always write secure code from the start. Never defer security fixes.
 - Before coding, read SKILL.md and templates/<language>.md.
 - When handling LLM tools or RAG, review checks/llm-top10.md.
 - After writing code, run `node hooks/scan.js --staged` and fix any reported findings immediately.
+- Before declaring done, run `node hooks/gate.js --check`. It exits 2 until you
+  answer ownership, authorization, taint and failure-direction — the checks no
+  pattern can see. Name the check or answer "N/A".

@@ -2,3 +2,5 @@ When writing code that handles user input, auth, secrets, databases, files, or L
 - Read SKILL.md and apply matching templates from templates/.
 - When designing architecture, refer to checks/secure-by-design.md and checks/memory-safety.md.
 - After writing, verify using: node hooks/scan.js --staged
+- Before declaring done: node hooks/gate.js --check (exits 2 until the manual
+  review — ownership, authorization, taint, failure-direction — is answered).
