@@ -1,5 +1,12 @@
 # Fixes
 # One block per check id. scan.js prints only the blocks it matched.
+#
+# Deliberately one file. It is never loaded into an agent's context — SKILL.md
+# does not reference it, and every consumer (scan.js fixBlock, fix.js,
+# report.js cweFor/fixText, coverage.js, sync.js) extracts a single block. A
+# scan surfaces ~100 tokens, not the file. Splitting it would save no tokens
+# and would give the id/CWE consistency checks several files to drift between.
+# The parse is cached per process, so size costs nothing at runtime either.
 
 ## weak-hash
 OWASP: 30,105 | CWE-328 | A04:2025
