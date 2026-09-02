@@ -741,6 +741,47 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log(`MISS  ai-sbom-no-fake-metrics: ${metrics.length} invented metrics`); }
 })();
 
+// --- Done Gate enforcement ---
+// The manual review is the only thing covering IDOR, missing authz and
+// fail-open. As prose it was skippable; gate.js makes it fail closed.
+(function doneGate() {
+  const GATE = path.join(TMP, 'gate.json');
+  const run = (...a) => spawnSync('node', [path.join(DIR, 'hooks', 'gate.js'), ...a], {
+    env: { ...process.env, SECURE_CODING_GATE: GATE }, encoding: 'utf8',
+  });
+  try { fs.unlinkSync(GATE); } catch {}
+
+  uniq('gate-empty-fails');
+  if (run('--check').status === 2) pass++;
+  else { fail++; console.log('MISS  gate-empty-fails: an unanswered gate must exit 2'); }
+
+  // A non-answer looks reviewed and is not — worse than silence.
+  uniq('gate-rejects-nonanswer');
+  const r = run('--answer', 'ownership', 'yes');
+  if (r.status === 64 && /does not name a check/.test(r.stderr)) pass++;
+  else { fail++; console.log(`MISS  gate-rejects-nonanswer: status=${r.status}`); }
+
+  uniq('gate-rejects-unknown');
+  if (run('--answer', 'nope', 'x').status === 64) pass++;
+  else { fail++; console.log('MISS  gate-rejects-unknown'); }
+
+  uniq('gate-complete-passes');
+  run('--answer', 'ownership', 'scoped by userId predicate');
+  run('--answer', 'authorization', 'requireAdmin middleware');
+  run('--answer', 'taint', 'N/A');
+  run('--answer', 'failure-direction', 'catch denies with 403');
+  if (run('--check').status === 0) pass++;
+  else { fail++; console.log('MISS  gate-complete-passes'); }
+
+  // Answers must not carry forward to a different commit.
+  uniq('gate-expires-on-new-commit');
+  const d = JSON.parse(fs.readFileSync(GATE, 'utf8'));
+  d.ref = 'stale000000';
+  fs.writeFileSync(GATE, JSON.stringify(d));
+  if (run('--check').status === 2) pass++;
+  else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
+})();
+
 // --- template roster & README matrix ---
 // sync.js validates the templates that exist; it could not see that shell.md
 // was absent while the README's matrix claimed a Sh column.

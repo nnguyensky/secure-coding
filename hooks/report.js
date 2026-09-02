@@ -49,11 +49,19 @@ function sectionName(sec) {
   return SECTION_NAMES[String(sec).replace(/^0+/, '')] || 'Other';
 }
 
+// fixes.md is ~55KB and was re-read for every finding, twice (cweFor and
+// fixText). Read and split it once per process.
+let _fixText = null;
+function fixesRaw() {
+  if (_fixText === null) _fixText = fs.existsSync(FIXES) ? fs.readFileSync(FIXES, 'utf8') : '';
+  return _fixText;
+}
+
 // Read "OWASP: ... | CWE-89 | A05:2025" off a fixes.md block. SARIF consumers
 // (GitHub code scanning included) key on CWE, so surface it as a real taxonomy.
 function cweFor(id) {
-  if (!fs.existsSync(FIXES)) return null;
-  const text = fs.readFileSync(FIXES, 'utf8');
+  const text = fixesRaw();
+  if (!text) return null;
   const m = text.match(new RegExp('^## ' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\n([^\\n]*)', 'm'));
   if (!m) return null;
   const cwe = m[1].match(/CWE-(\d+)/);
@@ -62,8 +70,8 @@ function cweFor(id) {
 }
 
 function fixText(id) {
-  if (!fs.existsSync(FIXES)) return '';
-  const text = fs.readFileSync(FIXES, 'utf8');
+  const text = fixesRaw();
+  if (!text) return '';
   const parts = text.split(/^## /m);
   for (const part of parts) {
     const header = part.match(/^([^\n]+)/);

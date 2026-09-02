@@ -9,3 +9,6 @@ reports/security-*.html
 results.sarif
 sbom.json
 *.sarif
+
+# Done Gate answers are per-developer, per-commit state
+checks/gate.json

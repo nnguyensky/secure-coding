@@ -601,17 +601,23 @@ function updateState(file, hits) {
 }
 
 // Extract the `## id` block from fixes.md (including the `## id` header).
-function fixBlock(id) {
-  if (!fs.existsSync(FIXES)) return '';
-  const text = fs.readFileSync(FIXES, 'utf8');
-  const parts = text.split(/^## /m);
-  for (const part of parts) {
+// fixes.md is ~55KB and was re-read and re-split for every finding. Parse it
+// once per process into an id -> block map.
+let _fixIndex = null;
+function fixIndex() {
+  if (_fixIndex) return _fixIndex;
+  _fixIndex = new Map();
+  if (!fs.existsSync(FIXES)) return _fixIndex;
+  for (const part of fs.readFileSync(FIXES, 'utf8').split(/^## /m)) {
     const header = part.match(/^([^\n]+)/);
-    if (header && header[1].trim() === id) {
-      return `## ${id}\n${part.replace(/^[^\n]*\n/, '').trim()}`;
-    }
+    if (header) _fixIndex.set(header[1].trim(), part.replace(/^[^\n]*\n/, '').trim());
   }
-  return '';
+  return _fixIndex;
+}
+
+function fixBlock(id) {
+  const body = fixIndex().get(id);
+  return body ? `## ${id}\n${body}` : '';
 }
 
 if (require.main === module) {

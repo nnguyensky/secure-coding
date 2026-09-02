@@ -18,7 +18,7 @@ Use this to translate a scanner finding into the language auditors, SARIF consum
 | **A06** | Insecure Design | 73, 256, 269, 311, 312, 362, 434, 501, 522, 602, 653, 656, 799, 807, 840, 841, 1021, 1173 | `file-upload` `upload-exec` `temp-race` `mktemp` `API-*` `llm-excessive-agency`; **primarily `threat-model.md` + `secure-by-design.md`, not patterns** |
 | **A07** | Authentication Failures | 258, 259, 287, 288, 290, 294, 295, 297, 304, 306, 307, 308, 384, 521, 613, 620, 640, 798, 940, 1216 | `default-cred` `jwt-*` `session-fixation` `oauth2-state` `oauth2-redirect` `pw-*-hash` `secret-*` `API-2` `ws-auth` `sbd-unauthenticated-route` |
 | **A08** | Software or Data Integrity Failures | 345, 353, 426, 427, 494, 502, 506, 509, 565, 784, 829, 830, 915, 926 | `insecure-deserialization` `unpinned-action` `docker-digest` `dockerfile-curl-bash` `rsc-unvalidated-action` `prototype-pollution`; signing/attestation in `sbom.md` §5 |
-| **A09** | Security Logging & Alerting Failures | 117, 221, 223, 532, 778 | `log-inject` `log-leak` `set-hide-error` — **thin. Absence of logging cannot be pattern-matched**; see Done Gate and `secure-by-design.md` MT-01…07 |
+| **A09** | Security Logging & Alerting Failures | 117, 221, 223, 532, 778 | `log-inject` `log-leak` `logging-disabled` `auth-no-log` `log-truncated` `set-hide-error`. Covers CWE-117/532 (injection, leakage) and now 778/223/221 (disabled logging, unlogged auth failure, truncated records). **A total absence of logging still cannot be pattern-matched** — Done Gate and `secure-by-design.md` MT-01…07 |
 | **A10** | **Mishandling of Exceptional Conditions** *(new)* | 209, 215, 248, 252, 274, 280, 369, 390, 391, 394, 396, 397, 460, 476, 544, 584, 600, 636, 703, 754, 755 | `fail-open-catch` `swallowed-exception` `broad-except` `unchecked-error` `error-detail-exposed` `uncaught-handler-empty` `recover-empty` (`patterns/07-errors.txt`) + `set-hide-error`, `cc-swallowed-error`/`cc-empty-throw` via `clean.js`. Structural fail-open across a call boundary still needs the Done Gate "failure direction" check and `secure-by-design.md` Fail-Closed |
 
 ---
@@ -27,7 +27,7 @@ Use this to translate a scanner finding into the language auditors, SARIF consum
 Three categories cannot be substantially pattern-matched, because they are about what is **missing or wrongly structured**, not what is present:
 
 - **A01** — missing ownership/authorization checks (IDOR/BOLA).
-- **A09** — absent or unmonitored logging.
+- **A09** — *partially covered now*: disabled logging, unlogged auth failures and truncated records are detected. A codebase that simply never calls a logger still cannot be flagged.
 - **A10** — *partially covered now* (`patterns/07-errors.txt`): swallowed handlers, fail-open catches, discarded security errors and leaked stack traces are detected. What remains is structural — an exception that propagates to a caller which then treats the failure as success.
 
 These are covered by the **Done Gate manual review** in `SKILL.md`. A clean scan is not evidence for any of them — see *What the Scanner Cannot See*.

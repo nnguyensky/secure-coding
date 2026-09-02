@@ -28,6 +28,7 @@ No finding is marked as accepted, deferred, or ignored without an explicit revie
    - **AI/LLMs & Prompts** → [`checks/llm-top10.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/llm-top10.md) (Prompt injection, output handling, excessive agency, token caps)
    - **Threat Modeling** → [`checks/threat-model.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/threat-model.md) (STRIDE & DREAD analysis)
    - **SSDF Attestation & Coverage** → [`checks/ssdf-mapping.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/ssdf-mapping.md) (NIST SP 800-218 PO/PS/PW/RV map, and the gaps this skill does not cover)
+   - **Dynamic Testing & Fuzzing** → [`checks/dynamic-testing.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/dynamic-testing.md) (what to fuzz based on findings, tooling per language, races and authz matrices)
    - **OWASP Top 10 (2025) & CWE ids** → [`checks/owasp-top10-2025.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/owasp-top10-2025.md) (category → CWE → pattern map, and which categories patterns cannot cover)
 
 2. **Identify which of the 9 code groups apply:**
@@ -80,7 +81,7 @@ Run verification to confirm zero open issues:
 3. **Autofix:** Run `node hooks/fix.js --apply` to automatically refactor common deterministic issues.
 4. **Audit Dependencies:** `node hooks/audit.js` (scans package lockfiles).
 5. **Quality Check:** `node hooks/clean.js --file <path>`.
-6. **Done Gate:** Run `node hooks/summary.js && node hooks/audit.js`.
+6. **Done Gate:** Run `node hooks/summary.js && node hooks/audit.js && node hooks/gate.js --check`.
 
 #### Done Gate Criteria:
 
@@ -89,11 +90,23 @@ Run verification to confirm zero open issues:
 - [ ] `audit.js` reports `0 critical/high` vulnerabilities.
 - [ ] Every finding is fixed in code (never marked as accepted or deferred).
 - [ ] Tests pass cleanly (`node hooks/test.js`).
+- [ ] `gate.js --check` reports complete.
 
-**Manual review — required, because the scanner cannot check these.**
-A green scan is not a pass on its own. For every route, handler, or data
-access you added or changed, answer these in writing. "N/A" is a valid
-answer; silence is not:
+**Manual review — enforced by `node hooks/gate.js --check`, which exits 2 until
+every question is answered.** A green scan is not a pass on its own. Record each
+answer as you go:
+
+```bash
+node hooks/gate.js --answer ownership "scoped by db.order.findFirst({where:{id, userId}})"
+node hooks/gate.js --answer authorization "requireAdmin middleware on the router"
+node hooks/gate.js --answer taint "N/A — no new request values"
+node hooks/gate.js --answer failure-direction "catch returns 403; covered by test"
+```
+
+"N/A" is valid when a question does not apply. `"yes"`, `"ok"` and `"done"` are
+rejected — name the check. Answers are tied to the current commit, so new work
+needs a new review. For every route, handler, or data access you added or
+changed:
 
 - [ ] **Ownership:** For each record fetched by an ID from the request, what
       scopes it to the caller? Name the check. `findById(req.params.id)` with

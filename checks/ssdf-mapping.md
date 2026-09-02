@@ -41,7 +41,7 @@ Use it when asked for an **SSDF attestation** (`technology-selection.md` asks ve
 | PW.5.1–5.2 Secure coding practices | **`patterns/` (359 rules, 122 ids), taint tracking, `fixes.md` remediation** |
 | PW.6.1–6.2 Harden build & compiler settings | `memory-safety.md` §5 compiler flags; `patterns/27-dockerfile.txt`, `30-terraform.txt` |
 | PW.7.1–7.2 Code review / static analysis | `scan.js`, `clean.js` (14 rules), `review.md`, `report.js --sarif` for code scanning |
-| PW.8.1–8.2 Test executable code | `test.js`; **dynamic/fuzz testing is a gap — see below** |
+| PW.8.1–8.2 Test executable code | `test.js` for the skill itself; `dynamic-testing.md` turns findings into a fuzz plan. **Running the fuzzer is still yours** — see below.** |
 | PW.9.1–9.2 Secure settings by default | `patterns/` config rules (debug flags, default creds), `secure-by-design.md` |
 
 ## RV — Respond to Vulnerabilities
@@ -57,7 +57,7 @@ Use it when asked for an **SSDF attestation** (`technology-selection.md` asks ve
 ---
 
 ## Known gaps — do not claim these
-- **Dynamic testing.** SSDF PW.8 expects executable testing; the joint memory-safety guidance specifically calls for **fuzzing**. This skill is static-analysis only. Pair it with fuzzing and DAST.
+- **Dynamic testing.** SSDF PW.8 expects executable testing and the memory-safety guidance names **fuzzing**. This skill never runs your code. `checks/dynamic-testing.md` says what to fuzz and with which tool, but executing it — and the races, authz matrices and load tests alongside it — is outside the scanner.
 - **Runtime and deployment state.** PO.5 build-environment hardening and live configuration are outside a source scanner.
 - **Anything organisational** — roles, training, policy, management commitment, retention. The skill produces evidence for these; it does not satisfy them.
 

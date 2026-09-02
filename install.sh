@@ -185,7 +185,7 @@ fi
 if [ -f "$SCAN_SCRIPT" ]; then
   node "$SCAN_SCRIPT" --staged
   EXIT_CODE=$?
-  if [ $EXIT_CODE -ne 0 ]; then
+  if [ "$EXIT_CODE" -ne 0 ]; then
     echo ""
     echo "❌ Commit rejected due to open security findings."
     echo "💡 Fix the highlighted code or bypass with: git commit --no-verify (or SECURE_CODING_SKIP=1)"
@@ -215,7 +215,7 @@ fi
 if [ -f "$AUDIT_SCRIPT" ]; then
   node "$AUDIT_SCRIPT"
   EXIT_CODE=$?
-  if [ $EXIT_CODE -ne 0 ]; then
+  if [ "$EXIT_CODE" -ne 0 ]; then
     echo "❌ Push rejected: dependency vulnerabilities found by hooks/audit.js"
     exit $EXIT_CODE
   fi

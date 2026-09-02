@@ -779,6 +779,27 @@ Wrong: defer func() { recover() }()
 Right: defer func() { if r := recover(); r != nil { log.Printf("panic: %v", r); /* fail closed */ } }()
 Watch: recovering in a request handler is reasonable; recovering and then returning a success response is not.
 
+## logging-disabled
+OWASP: 117,130 | CWE-778 | A09:2025
+Logging turned off means an intrusion leaves no trace. You cannot detect, investigate, or prove what happened.
+Wrong: LOG_LEVEL=off, logger.level = "silent", Level.OFF, logging.disable(logging.CRITICAL)
+Right: keep at least info in production, and route security events (authn, authz, admin actions) to a separate durable sink.
+Watch: a level set from config defaults to off if the variable is unset — default to info, not silence.
+
+## auth-no-log
+OWASP: 117,130 | CWE-223 | A09:2025
+A 401 or 403 returned without a log entry lets an attacker probe credentials and permissions invisibly.
+Wrong: catch (e) { return res.status(401).send("denied") }
+Right: log the failure with who, what, and when before returning — then rate-limit on the same signal.
+Watch: log the outcome, never the submitted password or token.
+
+## log-truncated
+OWASP: 117,130 | CWE-221 | A09:2025
+Truncating a value to a few characters before logging destroys the evidence the log was written to preserve.
+Wrong: logger.info(userInput.slice(0, 8))
+Right: log the whole sanitized value, or a stable hash if length is the concern.
+Watch: this is about audit fields; truncating for a UI preview is fine.
+
 ## llm-prompt-injection
 OWASP: LLM Applications Security | CWE-1427 | A05:2025
 Concatenating unescaped user input directly into LLM prompt strings enables direct prompt injection attacks.
