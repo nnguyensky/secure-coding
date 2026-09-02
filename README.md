@@ -10,7 +10,7 @@
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-388%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-393%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -43,7 +43,7 @@
 │  • 9 Focused Trigger Groups  • 13 Drop-In Templates (25 Standards Each)     │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  LAYER 2: MECHANICAL SCANNER & SHANNON ENTROPY (0 Tokens Clean, <20ms)      │
-│  • 32 Pattern Files (370 Regexes)  • Shannon Entropy H ≥ 3.5 Bits/Byte      │
+│  • 32 Pattern Files (376 Regexes)  • Shannon Entropy H ≥ 3.5 Bits/Byte      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  LAYER 3: VERIFICATION & MULTI-ECOSYSTEM AUDITING                           │
 │  • 213 Verifiable Controls  • 9 Package Managers  • 14 Clean Code Standards │
@@ -85,7 +85,7 @@ flowchart TD
     subgraph L2["Layer 2: Fast Mechanical Scanner (0 Tokens Clean)"]
         SCAN["hooks/scan.js (&lt;20ms)<br/>• Line Numbers &amp; Code Snippets"]
         ENTROPY["Shannon Entropy Engine<br/>• Un-prefixed Secret Detection ($H \\ge 3.5$)"]
-        PATTERNS["patterns/*.txt (32 Files, 370 Regexes)<br/>• JWT, CORS, Deser, Cloud Keys, SbD, IoT"]
+        PATTERNS["patterns/*.txt (32 Files, 376 Regexes)<br/>• JWT, CORS, Deser, Cloud Keys, SbD, IoT"]
         SUPPRESS["Inline Comment Suppression<br/>• // secure-coding-ignore: id"]
     end
 
@@ -142,6 +142,9 @@ sequenceDiagram
         Scan-->>Dev: [Exit 0] Silent (0 tokens consumed)
     end
 
+    Dev->>Dev: gate.js --check (manual review: ownership, authz, taint, failure)
+    Note over Dev: Exits 2 until all four are answered — patterns cannot see these
+
     Dev->>Git: git commit (triggers pre-commit hook)
     Git->>Scan: scan.js --staged
     Git-->>Dev: Commit accepted
@@ -180,6 +183,7 @@ Applied during system design and boundary definition:
 - **Precise Extraction**: Pinpoints exact line numbers and code snippets (`Line 42: const key = ...`).
 - **Multi-Line Taint Tracking**: Regex alone only matches when untrusted input sits *inside* the sink call. The scanner also follows `var = req.query.x` into a later file, HTTP, process, or query call — reported as `taint-*` — within one function and one hop through interpolation. Sanitizers (`basename`, `validate`, `parseInt`, allowlist checks, parameterized queries) clear the taint. Disable with `"taintTracking": false`.
 - **Per-Occurrence Findings**: Three SQL injections in one file are three findings, tracked by `(file, id, line)`. Fixing one closes only that one, so a partial fix can never silently clear a live vulnerability.
+- **Absence-of-Control Detection**: Some defects are the *lack* of something. `logging-disabled` catches `LOG_LEVEL=off` and `Level.OFF`; `auth-no-log` catches a 401/403 returned with no logging call nearby; `fail-open-catch` catches a `catch` block that returns success. What remains genuinely undetectable — a codebase that simply never logs, or an IDOR — routes to the Done Gate.
 - **Shannon Entropy Secret Detection**:
   $$H(S) = -\sum_{i=1}^n p(x_i) \log_2 p(x_i)$$
   Calculates string randomness to distinguish true cryptographic keys ($H \ge 3.5\text{ bits/byte}$) from repetitive test strings (`"aaaaaaaaaaaaaaaa"`).
@@ -195,12 +199,14 @@ Applied during system design and boundary definition:
 - **Clean Code Linter** ([`hooks/clean.js`](hooks/clean.js)): Flags magic numbers, multi-responsibility functions, and unneeded context. Standards documented in [`checks/clean-code.md`](checks/clean-code.md).
 - **OWASP Top 10:2025 → CWE Map** ([`checks/owasp-top10-2025.md`](checks/owasp-top10-2025.md)): Every category mapped to its key CWEs and the pattern ids that cover it — including the two new 2025 categories (**A03 Software Supply Chain Failures**, **A10 Mishandling of Exceptional Conditions**) and an explicit note on which categories patterns *cannot* cover.
 - **NIST SSDF (SP 800-218) Coverage Map** ([`checks/ssdf-mapping.md`](checks/ssdf-mapping.md)): All 4 practice groups and 20 practices mapped to the skill's tooling, with the gaps stated plainly for attestation purposes.
+- **Dynamic Testing & Fuzzing Plan** ([`checks/dynamic-testing.md`](checks/dynamic-testing.md)): The scanner never runs your code. This maps findings to fuzz targets (deserializers, XML parsers, ReDoS regexes, buffer functions), lists per-language tooling, and covers what fuzzing also misses — races, authorization matrices, load, and deployed configuration.
 
 ### 📜 Layer 4: Policy, Governance & CI/CD Integration
 - **Interactive UI Configuration Wizard** ([`reports/config-wizard.html`](reports/config-wizard.html)): Modern browser wizard to customize failure thresholds, excluded paths, and monitored ecosystems into `.securecodingrc.json`.
 - **SARIF v2.1.0 Export** (`hooks/report.js --sarif`): Emits OASIS standard SARIF for GitHub Code Scanning, tagged with `external/cwe/cwe-N`, `OWASP-Annn:2025`, and `security-severity` so alerts land correctly classified rather than untyped.
 - **Software Bill of Materials (SBOM & AI-SBOM)** ([`hooks/sbom.js`](hooks/sbom.js)): Generates CycloneDX v1.5 and SPDX v2.3 manifests with BSI AI-SBOM 7 clusters and ACSC/CISA VEX data.
 - **Git Pre-commit & Pre-push Hooks** (`install.sh` / `hooks/install.js`): Automates staged and repository-wide protection.
+- **Enforced Done Gate** ([`hooks/gate.js`](hooks/gate.js)): IDOR, missing authorization and fail-open error paths cannot be pattern-matched — they are about what is *absent*. The gate records a written answer for each and exits `2` until all four are present. Answers are tied to the current commit, so new work needs a new review, and `"yes"`/`"ok"`/`"done"` are rejected: name the check or say `N/A`.
 
 ### 🔧 Layer 5: Automated In-Place Remediation & MCP Server
 - **Interactive Guidance**: `node hooks/fix.js --suggest <id>` prints the `When / Wrong / Right / Watch` block for a finding, sourced from [`checks/fixes.md`](checks/fixes.md) — 135 blocks, every one tagged with its CWE and OWASP 2025 category.
@@ -318,7 +324,13 @@ Ask your agent to read `SKILL.md`, then have it write something insecure — a q
 | | `node hooks/summary.js` | One-line status check (`3 open, 5 fixed`). |
 | | `node hooks/stats.js` | Displays pattern metrics and false-positive rates. |
 | **🔌 MCP Server** | `node mcp/server.js` | Launches native Model Context Protocol stdio server. |
+| **✅ Done Gate** | `node hooks/gate.js --check` | Exits `2` until the manual review is answered. |
+| | `node hooks/gate.js --answer <q> "<a>"` | Records one answer: `ownership`, `authorization`, `taint`, `failure-direction`. |
+| | `node hooks/gate.js --status` | Shows which questions remain. |
 | **🧪 Testing** | `node hooks/sync.js` | Validates pattern regexes and template coverage. |
+| | `node hooks/coverage.js` | Verifies all 213 OWASP SCP items are accounted for. |
+| | `node hooks/detect.js` | Reports which languages a project uses. |
+| | `node hooks/reset.js` | Clears findings state for a new session. |
 | | `node hooks/test.js` | Executes full 298-test self-check suite. |
 
 ---
@@ -443,7 +455,7 @@ Always write secure code from the start. Never defer security fixes.
 
 | MCP Tool | Purpose | Example AI Prompt |
 |---|---|---|
-| `secure_code_scan` | Scans in-memory code snippets or staged files for 370 OWASP & SbD patterns. | *"Scan this authentication function for vulnerabilities."* |
+| `secure_code_scan` | Scans in-memory code snippets or staged files for 376 OWASP & SbD patterns. | *"Scan this authentication function for vulnerabilities."* |
 | `secure_code_autofix` | Returns exact remediation diffs or refactors code in-place. | *"Fix the weak random number generator in auth.ts."* |
 | `security_dependency_audit` | Scans lockfiles across 9 package ecosystems for CVEs. | *"Check package.json and requirements.txt for vulnerabilities."* |
 | `clean_code_lint` | Lints source code against 14 universal Clean Code quality standards. | *"Lint my recent changes for clean code issues."* |
@@ -528,7 +540,7 @@ echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"secure_cod
 
 ## 🧪 Validation & Test Suite
 
-Verify all 388 test assertions, pattern compilation, secret masking, and MCP tools:
+Verify all 393 test assertions, pattern compilation, secret masking, and MCP tools:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js
