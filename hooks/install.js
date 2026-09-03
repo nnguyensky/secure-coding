@@ -115,13 +115,19 @@ function writeHookSafely(hookPath, script) {
 }
 
 function installGitHooks(targetDir) {
-  const gitDir = path.join(targetDir, '.git');
-  if (!fs.existsSync(gitDir)) {
-    console.log(`${YELLOW}⚠️  No .git directory found at ${targetDir}. Skipping Git hooks.${NC}`);
+  // Ask git where the hooks live. In a worktree or submodule .git is a FILE
+  // pointing elsewhere, so path.join(targetDir, '.git', 'hooks') fails with
+  // ENOTDIR. --git-path also honours core.hooksPath if the project sets it.
+  let hooksDir;
+  try {
+    const p = execSync('git rev-parse --git-path hooks', { cwd: targetDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (!p) throw new Error('no hooks path');
+    hooksDir = path.resolve(targetDir, p);
+  } catch {
+    console.log(`${YELLOW}⚠️  Not a git repository at ${targetDir}. Skipping Git hooks.${NC}`);
     return;
   }
 
-  const hooksDir = path.join(gitDir, 'hooks');
   fs.mkdirSync(hooksDir, { recursive: true });
 
   // Pre-commit hook
@@ -206,9 +212,25 @@ fi
 if [ -f "$AUDIT_SCRIPT" ]; then
   node "$AUDIT_SCRIPT"
   EXIT_CODE=$?
-  if [ $EXIT_CODE -ne 0 ]; then
+  if [ "$EXIT_CODE" -ne 0 ]; then
     echo "❌ Push rejected: dependency vulnerabilities found by hooks/audit.js"
-    exit $EXIT_CODE
+    exit "$EXIT_CODE"
+  fi
+fi
+
+# Second net: a commit made with --no-verify, or from a GUI that skips hooks,
+# never ran the scanner. Catch it before the code leaves the machine.
+SUMMARY_SCRIPT="$ROOT_DIR/hooks/summary.js"
+if [ ! -f "$SUMMARY_SCRIPT" ] && [ -f "$HOME/.secure-coding/hooks/summary.js" ]; then
+  SUMMARY_SCRIPT="$HOME/.secure-coding/hooks/summary.js"
+fi
+if [ -f "$SUMMARY_SCRIPT" ]; then
+  node "$SUMMARY_SCRIPT"
+  SUMMARY_CODE=$?
+  if [ "$SUMMARY_CODE" -ne 0 ]; then
+    echo "❌ Push rejected: open security findings remain."
+    echo "💡 Fix them, or bypass with: git push --no-verify"
+    exit "$SUMMARY_CODE"
   fi
 fi
 exit 0

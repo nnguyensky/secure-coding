@@ -6,7 +6,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A518.0.0-green?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![MCP Protocol](https://img.shields.io/badge/MCP%202024--11--05-Compatible-purple?style=for-the-badge&logo=probot&logoColor=white)](mcp/server.js)
-[![Tests](https://img.shields.io/badge/Tests-427%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-434%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 
 <p align="center">
   <a href="#-quickstart-options">⚡ Quickstart</a> •
@@ -71,7 +71,7 @@ node hooks/config.js --ui
 
 ## 🔌 Model Context Protocol (MCP) Setup
 
-`secure-coding` includes a native, zero-dependency JSON-RPC 2.0 MCP server ([`mcp/server.js`](mcp/server.js)) exposing 7 standard security tools directly to AI editors and agent runtimes:
+`secure-coding` includes a native, zero-dependency JSON-RPC 2.0 MCP server ([`mcp/server.js`](mcp/server.js)) exposing 9 standard security tools directly to AI editors and agent runtimes:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -83,6 +83,8 @@ node hooks/config.js --ui
 │  • clean_code_lint           • Lint code against 14 Clean Code rules        │
 │  • generate_ai_sbom          • Export BSI AI-SBOM & ACSC/CISA VEX manifests │
 │  • get_security_frontier     • Pre-write architecture questions to ask      │
+│  • record_security_decision  • Record one Done Gate answer                  │
+│  • check_done_gate           • Gate status, or render it as an ADR          │
 │  • security_summary          • Fast status check of open vs resolved bugs   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```

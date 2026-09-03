@@ -17,6 +17,7 @@ const SCAN_SCRIPT = path.join(ROOT_DIR, 'hooks', 'scan.js');
 const FIX_SCRIPT = path.join(ROOT_DIR, 'hooks', 'fix.js');
 const AUDIT_SCRIPT = path.join(ROOT_DIR, 'hooks', 'audit.js');
 const CLEAN_SCRIPT = path.join(ROOT_DIR, 'hooks', 'clean.js');
+const GATE_SCRIPT = path.join(ROOT_DIR, 'hooks', 'gate.js');
 const SBOM_SCRIPT = path.join(ROOT_DIR, 'hooks', 'sbom.js');
 const SUMMARY_SCRIPT = path.join(ROOT_DIR, 'hooks', 'summary.js');
 
@@ -146,6 +147,36 @@ const TOOLS = [
     },
   },
   {
+    name: 'record_security_decision',
+    description: 'Records one Done Gate answer — what actually enforces a control. Use after settling a frontier question, so the decision is captured without shell access. Rejects filler like "yes" or "ok": name the guard, predicate or test, or answer "N/A — <why>".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        question: {
+          type: 'string',
+          enum: ['ownership', 'authorization', 'taint', 'failure-direction'],
+          description: 'Which control this answers.',
+        },
+        answer: { type: 'string', description: 'What enforces it, in concrete terms.' },
+      },
+      required: ['question', 'answer'],
+    },
+  },
+  {
+    name: 'check_done_gate',
+    description: 'Reports which Done Gate questions are answered and which remain, and whether the staged code needs a review at all. Use before declaring work complete.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        format: {
+          type: 'string',
+          enum: ['status', 'adr'],
+          description: 'status (default) lists what remains; adr renders the settled answers as an Architecture Decision Record.',
+        },
+      },
+    },
+  },
+  {
     name: 'security_summary',
     description: 'Returns a one-line status check of open versus resolved security findings in the workspace.',
     inputSchema: {
@@ -161,6 +192,22 @@ function handleToolCall(name, args) {
   args = args || {};
 
   switch (name) {
+    case 'record_security_decision': {
+      // Shell out rather than reimplement: gate.js owns the filler rejection,
+      // the N/A rule and the per-commit expiry. A second copy would drift.
+      const res = spawnSync('node', [GATE_SCRIPT, '--answer', String(args.question || ''), String(args.answer || '')],
+        { encoding: 'utf8' });
+      const text = (res.stdout || '') + (res.stderr || '');
+      return { content: [{ type: 'text', text: text.trim() || 'No output.' }], isError: res.status !== 0 };
+    }
+
+    case 'check_done_gate': {
+      const mode = args.format === 'adr' ? '--adr' : '--status';
+      const res = spawnSync('node', [GATE_SCRIPT, mode], { encoding: 'utf8' });
+      const text = (res.stdout || '') + (res.stderr || '');
+      return { content: [{ type: 'text', text: text.trim() || 'No output.' }] };
+    }
+
     case 'get_security_frontier': {
       const { render, DOMAINS } = require(path.join(__dirname, '..', 'hooks', 'frontiers.js'));
       const domain = args.domain;

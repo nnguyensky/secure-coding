@@ -10,7 +10,7 @@
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-427%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-434%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -33,7 +33,7 @@ carry findings. What static analysis genuinely cannot see — a missing ownershi
 check, an absent guard, a fail-open `catch` — it asks as four written questions
 before the change lands.
 
-13 language templates · 376 patterns mapped to CWE and OWASP Top 10:2025 · 427
+13 language templates · 376 patterns mapped to CWE and OWASP Top 10:2025 · 434
 self-tests · zero dependencies.
 
 ## 💡 The Inverted Architecture
@@ -153,7 +153,7 @@ questions that only make sense once a change is complete.
 | Ask an agent to write code touching input, auth, secrets, files, or network calls | The agent loads `SKILL.md` | It reads the rules for that topic before writing, not all 376 patterns |
 | The agent finishes writing a file | `scan.js`, via the PostToolUse hook `install.js` sets up | ~1ms. Silent when clean, so it costs no tokens. Otherwise prints the finding and how to fix it, immediately — no commit needed |
 | `git commit` | `scan.js --staged`, then `gate.js --check` | Blocks the commit if the staged code has findings, or if it handles requests and the review is unanswered |
-| `git push` | `audit.js` | Blocks the push on a known-vulnerable dependency |
+| `git push` | `audit.js`, then `summary.js` | Blocks on a vulnerable dependency, or on findings left over from a commit that skipped the hooks |
 | Open a PR or push to `main` | GitHub Actions | Re-runs the checks, uploads SARIF so findings appear on the PR diff |
 | Weekly, on GitHub | Dependabot | Opens a PR when a pinned GitHub Action has an update |
 
@@ -328,7 +328,7 @@ node install.js --agent all --mcp
 ### 2. Verify it works
 
 ```bash
-node hooks/test.js     # expect: pass=427 fail=0
+node hooks/test.js     # expect: pass=434 fail=0
 node hooks/sync.js     # expect: 0 errors, 0 warnings
 ```
 
@@ -410,7 +410,7 @@ when you type it.
 |---|---|---|
 | ⚡ | `scan.js --staged` | `git commit` — blocks on findings |
 | ⚡ | `gate.js --check` | `git commit`, after the scan — blocks if the staged code needs review |
-| ⚡ | `audit.js` | `git push` — blocks on a vulnerable dependency |
+| ⚡ | `audit.js`, `summary.js` | `git push` — blocks on a vulnerable dependency, or on findings a `--no-verify` commit skipped |
 | ⚡ | `report.js` | Any scan that finds something, writing `reports/security-<date>.html`. Set `SECURE_CODING_REPORT=off` to stop it |
 | ⚡ | `sync.js`, `test.js`, `audit.js`, `scan.js --files`, `report.js --sarif`, `sbom.js` | A push or PR to `main`/`master`/`develop`, via GitHub Actions |
 | ⚡ | `scan.js` (stdin) | **An agent finishes writing a file.** `install.js --agent claude` configures this, so scanning happens at write time and never waits for a commit |
@@ -457,7 +457,7 @@ pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js
 | | `node hooks/coverage.js` | Verifies all 213 OWASP SCP items are accounted for. |
 | | `node hooks/detect.js` | Reports which languages a project uses. |
 | | `node hooks/reset.js` | Clears findings state for a new session. |
-| | `node hooks/test.js` | Executes the full 427-test self-check suite. |
+| | `node hooks/test.js` | Executes the full 434-test self-check suite. |
 
 ---
 
@@ -646,6 +646,8 @@ agent can act on.
 | `clean_code_lint` | Lints source code against 14 universal Clean Code quality standards. | *"Lint my recent changes for clean code issues."* |
 | `generate_ai_sbom` | Exports CycloneDX v1.5 / SPDX v2.3 SBOM with BSI 7 AI clusters & VEX data. | *"Generate a CycloneDX AI-SBOM with VEX exploitability."* |
 | `get_security_frontier` | Returns the questions to put to the user **before** writing a route, auth change, data model or LLM tool. | *"What should I ask before building this endpoint?"* |
+| `record_security_decision` | Records one Done Gate answer, for agents without shell access. | *"Record that ownership is scoped by org_id."* |
+| `check_done_gate` | Reports what the review still needs, or renders it as an ADR. | *"Is the security review complete?"* |
 | `security_summary` | Returns a one-line status of open vs resolved security findings. | *"Give me a security status summary of the workspace."* |
 
 ---

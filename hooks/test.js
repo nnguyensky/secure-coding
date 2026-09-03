@@ -817,6 +817,90 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
 })();
 
+// --- Done Gate over MCP ---
+// An agent in a sandboxed IDE has no shell, so the whole loop has to be
+// reachable as tools. These delegate to gate.js rather than reimplementing it.
+(function gateOverMcp() {
+  const GATE = path.join(TMP, 'mcpgate.json');
+  try { fs.unlinkSync(GATE); } catch {}
+  const call = (name, args) => {
+    const req = [
+      JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize',
+        params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 't', version: '1' } } }),
+      JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name, arguments: args } }),
+    ].join('\n') + '\n';
+    const r = spawnSync('node', [path.join(DIR, 'mcp', 'server.js')],
+      { input: req, encoding: 'utf8', env: { ...process.env, SECURE_CODING_GATE: GATE } });
+    try { return JSON.parse(r.stdout.trim().split('\n').pop()).result; } catch { return null; }
+  };
+
+  // Filler must be rejected through MCP exactly as it is on the CLI.
+  uniq('mcp-gate-rejects-filler');
+  const bad = call('record_security_decision', { question: 'ownership', answer: 'yes' });
+  if (bad && bad.isError && /does not name a check/.test(bad.content[0].text)) pass++;
+  else { fail++; console.log('MISS  mcp-gate-rejects-filler'); }
+
+  uniq('mcp-gate-records');
+  const ok = call('record_security_decision', { question: 'ownership', answer: 'scoped by an org_id predicate' });
+  if (ok && !ok.isError && /recorded/.test(ok.content[0].text)) pass++;
+  else { fail++; console.log('MISS  mcp-gate-records'); }
+
+  uniq('mcp-gate-status-and-adr');
+  const st = call('check_done_gate', {});
+  const adr = call('check_done_gate', { format: 'adr' });
+  if (st && /Done Gate/.test(st.content[0].text) &&
+      adr && /### ADR/.test(adr.content[0].text) && /org_id predicate/.test(adr.content[0].text)) pass++;
+  else { fail++; console.log('MISS  mcp-gate-status-and-adr'); }
+})();
+
+// --- PR template carries the gate questions ---
+(function prTemplate() {
+  uniq('pr-template-questions');
+  const f = path.join(DIR, '.github', 'pull_request_template.md');
+  const text = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
+  const qs = ['Ownership', 'Authorization', 'Taint', 'Failure direction'];
+  const absent = qs.filter(q => !text.includes(q));
+  if (text && absent.length === 0) pass++;
+  else { fail++; console.log(`MISS  pr-template-questions: ${absent.join(', ') || 'file missing'}`); }
+})();
+
+// --- git worktrees ---
+// In a worktree (and a submodule) .git is a FILE pointing elsewhere, so
+// path.join(top, '.git', ...) crashes: EEXIST in gate.js, ENOTDIR in
+// install.js. git rev-parse resolves the real directory in every layout.
+(function worktrees() {
+  const base = path.join(TMP, 'wtbase');
+  fs.rmSync(base, { recursive: true, force: true });
+  fs.mkdirSync(base, { recursive: true });
+  const git = (cwd, ...a) => spawnSync('git', a, { cwd, encoding: 'utf8' });
+  git(base, 'init', '-q');
+  fs.writeFileSync(path.join(base, 'i.txt'), 'init\n');
+  git(base, 'add', 'i.txt');
+  git(base, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'init');
+  const wt = path.join(base, 'wt');
+  git(base, 'worktree', 'add', '-q', wt, '-b', 'br');
+
+  uniq('worktree-is-a-file');
+  if (fs.existsSync(path.join(wt, '.git')) && fs.statSync(path.join(wt, '.git')).isFile()) pass++;
+  else { fail++; console.log('MISS  worktree-is-a-file: fixture did not produce a worktree'); }
+
+  // gate.js must record without crashing, into the worktree's own git dir.
+  uniq('worktree-gate-records');
+  const g = spawnSync('node', [path.join(DIR, 'hooks', 'gate.js'),
+    '--answer', 'ownership', 'scoped by an org predicate'], { cwd: wt, encoding: 'utf8' });
+  if (g.status === 0 && !/EEXIST/.test(g.stderr)) pass++;
+  else { fail++; console.log(`MISS  worktree-gate-records: ${(g.stderr || '').slice(0, 60)}`); }
+
+  // install.js must find the shared hooks dir rather than <wt>/.git/hooks.
+  uniq('worktree-install-hooks');
+  const i = spawnSync('node', [path.join(DIR, 'install.js'), '--target', wt, '--yes'],
+    { env: { ...process.env, HOME: path.join(TMP, 'wthome') }, encoding: 'utf8' });
+  const hooks = spawnSync('git', ['rev-parse', '--git-path', 'hooks'], { cwd: wt, encoding: 'utf8' }).stdout.trim();
+  const installed = hooks && fs.existsSync(path.resolve(wt, hooks, 'pre-commit'));
+  if (installed && !/ENOTDIR/.test(i.stderr || '')) pass++;
+  else { fail++; console.log(`MISS  worktree-install-hooks: ${(i.stderr || '').slice(0, 60)}`); }
+})();
+
 // --- ADR output ---
 (function adrOutput() {
   const GATE = path.join(TMP, 'adr-gate.json');

@@ -20,9 +20,12 @@ const { execFileSync } = require('child_process');
 const DIR = path.join(__dirname, '..');
 function defaultState() {
   try {
-    const top = execFileSync('git', ['rev-parse', '--show-toplevel'],
+    // --git-dir, not <top>/.git: in a worktree or submodule .git is a FILE
+    // pointing elsewhere, so joining to it crashes with EEXIST on mkdir.
+    // git resolves it to the real directory in every layout.
+    const gitDir = execFileSync('git', ['rev-parse', '--git-dir'],
       { cwd: process.cwd(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    if (top) return path.join(top, '.git', 'secure-coding-gate.json');
+    if (gitDir) return path.resolve(process.cwd(), gitDir, 'secure-coding-gate.json');
   } catch { /* not a repo */ }
   return path.join(DIR, 'checks', 'gate.json');
 }
