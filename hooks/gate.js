@@ -136,6 +136,7 @@ function main() {
   node hooks/gate.js --check     exit 2 if any question is unanswered
   node hooks/gate.js --reset     clear answers (start a new review)
   node hooks/gate.js --grill [domain]   preview the questions to ask BEFORE coding
+  node hooks/gate.js --adr       print the settled answers as an ADR
                                  domain: api | auth | storage | llm (default: all)
 
 Questions:
@@ -163,6 +164,35 @@ An answer of "yes"/"ok"/"done" is rejected — name the actual check.
       process.exit(64);
     }
     process.stdout.write(render(domain) + '\n');
+    return;
+  }
+
+  if (cmd === '--adr') {
+    // The answers are already a record of the decisions; this just formats them
+    // in the ADR shape from checks/secure-by-design.md. Print, do not write —
+    // where the ADR belongs is the project's choice, not ours.
+    const missing0 = Object.keys(QUESTIONS).filter(q => !data.answers[q]);
+    if (missing0.length === Object.keys(QUESTIONS).length) {
+      process.stderr.write('gate: nothing recorded yet — answer the questions first\n');
+      process.exit(2);
+    }
+    const when = new Date().toISOString().slice(0, 10);
+    const out = [
+      `### ADR: Security boundary for this change`,
+      `- **Status**: Accepted`,
+      `- **Date**: ${when}`,
+      `- **Commit**: ${ref}`,
+      '',
+      '| Decision | What enforces it |',
+      '|---|---|',
+    ];
+    for (const q of Object.keys(QUESTIONS)) {
+      const a = data.answers[q];
+      out.push(`| ${q} | ${a ? a.answer.replace(/\|/g, '\\|') : '_unanswered_'} |`);
+    }
+    out.push('');
+    out.push('_Recorded by `hooks/gate.js`. Each row is checked again at commit time._');
+    process.stdout.write(out.join('\n') + '\n');
     return;
   }
 

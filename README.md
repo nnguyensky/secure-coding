@@ -10,7 +10,7 @@
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-419%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-427%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -33,7 +33,7 @@ carry findings. What static analysis genuinely cannot see — a missing ownershi
 check, an absent guard, a fail-open `catch` — it asks as four written questions
 before the change lands.
 
-13 language templates · 376 patterns mapped to CWE and OWASP Top 10:2025 · 419
+13 language templates · 376 patterns mapped to CWE and OWASP Top 10:2025 · 427
 self-tests · zero dependencies.
 
 ## 💡 The Inverted Architecture
@@ -328,7 +328,7 @@ node install.js --agent all --mcp
 ### 2. Verify it works
 
 ```bash
-node hooks/test.js     # expect: pass=419 fail=0
+node hooks/test.js     # expect: pass=427 fail=0
 node hooks/sync.js     # expect: 0 errors, 0 warnings
 ```
 
@@ -450,13 +450,14 @@ pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js
 | | `node hooks/gate.js --answer <q> "<a>"` | Records one answer: `ownership`, `authorization`, `taint`, `failure-direction`. |
 | | `node hooks/gate.js --grill [domain]` | Prints the questions to ask **before** coding. Domain: `api`, `auth`, `storage`, `llm`. |
 | | `node hooks/gate.js --status` | Shows which questions remain. |
+| | `node hooks/gate.js --adr` | Prints the settled answers as an Architecture Decision Record. |
 | | `node hooks/gate.js --check --all` | Force a full review even for a docs-only change. |
 | | `git config secure-coding.gate false` | Turn commit blocking off for this repository. |
 | **🧪 Testing** | `node hooks/sync.js` | Validates pattern regexes and template coverage. |
 | | `node hooks/coverage.js` | Verifies all 213 OWASP SCP items are accounted for. |
 | | `node hooks/detect.js` | Reports which languages a project uses. |
 | | `node hooks/reset.js` | Clears findings state for a new session. |
-| | `node hooks/test.js` | Executes the full 419-test self-check suite. |
+| | `node hooks/test.js` | Executes the full 427-test self-check suite. |
 
 ---
 

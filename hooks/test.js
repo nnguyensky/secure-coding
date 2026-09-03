@@ -817,6 +817,33 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
 })();
 
+// --- ADR output ---
+(function adrOutput() {
+  const GATE = path.join(TMP, 'adr-gate.json');
+  const run = (...a) => spawnSync('node', [path.join(DIR, 'hooks', 'gate.js'), ...a],
+    { env: { ...process.env, SECURE_CODING_GATE: GATE }, encoding: 'utf8' });
+  try { fs.unlinkSync(GATE); } catch {}
+
+  // Nothing recorded is not an ADR; say so rather than print an empty table.
+  uniq('adr-empty-fails');
+  if (run('--adr').status === 2) pass++;
+  else { fail++; console.log('MISS  adr-empty-fails'); }
+
+  uniq('adr-renders-answers');
+  run('--answer', 'ownership', 'scoped by org_id predicate in the query');
+  const out = run('--adr');
+  if (out.status === 0 && /org_id predicate/.test(out.stdout) && /_unanswered_/.test(out.stdout)) pass++;
+  else { fail++; console.log(`MISS  adr-renders-answers: status=${out.status}`); }
+
+  // A pipe in an answer must not break the markdown table.
+  uniq('adr-escapes-pipes');
+  run('--answer', 'authorization', 'requireAuth | requireAdmin on the router');
+  const piped = run('--adr');
+  const row = piped.stdout.split('\n').find(l => l.startsWith('| authorization'));
+  if (row && row.includes('\\|') && !/[^\\]\|.*\|.*[^\\]\|.*\|/.test(row)) pass++;
+  else { fail++; console.log(`MISS  adr-escapes-pipes: ${row}`); }
+})();
+
 // --- frontier surfaces: CLI and MCP ---
 (function frontierSurfaces() {
   const { FRONTIERS, DOMAINS, forDomain, render } = require('./frontiers.js');

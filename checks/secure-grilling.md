@@ -40,6 +40,12 @@ Ask the whole frontier in **one round**. Number each question, give options, and
 ➡️ **Recommended: A** — <one line on why, in terms of what it prevents>
 ```
 
+If your environment has a native multiple-choice tool — Claude Code's
+`AskUserQuestion`, Antigravity's or Cursor's equivalent — use it instead, with
+the same options and the same recommended default. It is easier to answer than
+prose, and the answer comes back structured. Fall back to the markdown above
+when no such tool exists.
+
 Two rules that make this work:
 
 - **Facts are your job, decisions are the user's.** If a question needs a fact
@@ -114,6 +120,10 @@ commit time.
 Write the settled decisions down before you write code. Use the ADR template in
 [`secure-by-design.md`](secure-by-design.md), or the plan file you are already
 working from.
+
+Once the answers are recorded, `node hooks/gate.js --adr` prints them in that
+ADR shape, ready to paste into your plan or `docs/adr/`. It prints rather than
+writes — where the record belongs is your project's decision.
 
 Then pre-answer the Done Gate, so the decision and the check are the same
 sentence:

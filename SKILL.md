@@ -204,6 +204,7 @@ Even when no automated pattern flags, check for these design smells:
 |---|---|---|
 | **`scan.js`** | Fast mechanical scan with line snippets & entropy engine | `node hooks/scan.js --staged` |
 | **`install.js`** | Interactive setup wizard (Git hooks, tasks, agent rules) | `node install.js` |
+| **`gate.js`** | Pre-write frontier questions, and the Done Gate at commit | `node hooks/gate.js --grill` / `--check` |
 | **`summary.js`** | One-line status check & automated done gate | `node hooks/summary.js` |
 | **`audit.js`** | Dependency vulnerability scan across 9 ecosystems | `node hooks/audit.js` |
 | **`fix.js`** | View remediation guidance or apply automated refactors | `node hooks/fix.js --apply` |
