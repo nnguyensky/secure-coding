@@ -13,6 +13,13 @@ const SCAN = path.join(DIR, 'hooks', 'scan.js');
 const REPORT = path.join(DIR, 'hooks', 'report.js');
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-test-'));
 
+// Redirect all run state into TMP before anything requires scan.js. Tests that
+// call scanSingleFile() in-process would otherwise write fixtures into the real
+// checks/findings.jsonl and leave the repo reporting a finding it does not have.
+process.env.SECURE_CODING_STATE = process.env.SECURE_CODING_STATE || path.join(TMP, 'findings.jsonl');
+process.env.SECURE_CODING_AUDIT = process.env.SECURE_CODING_AUDIT || path.join(TMP, 'audit.json');
+process.env.SECURE_CODING_REPORT = 'off';
+
 let pass = 0, fail = 0;
 const seen = new Set();
 
@@ -808,6 +815,51 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   fs.writeFileSync(GATE, JSON.stringify(d));
   if (run('--check').status === 2) pass++;
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
+})();
+
+// --- review findings: state isolation, staged blobs, hook chaining ---
+(function reviewFixes() {
+  const repo = path.join(TMP, 'revrepo');
+  fs.rmSync(repo, { recursive: true, force: true });
+  fs.mkdirSync(repo, { recursive: true });
+  const git = (...a) => spawnSync('git', a, { cwd: repo, encoding: 'utf8' });
+  git('init', '-q');
+
+  // --staged must judge the index, not the working tree. An unstaged fix must
+  // not hide a staged flaw, and an unstaged flaw must not fail a clean commit.
+  const scanStaged = (state) => spawnSync('node', [SCAN, '--staged'], {
+    cwd: repo, encoding: 'utf8',
+    env: { ...process.env, SECURE_CODING_STATE: path.join(TMP, state), SECURE_CODING_REPORT: 'off' },
+  });
+
+  uniq('staged-reads-index-clean');
+  fs.writeFileSync(path.join(repo, 'a.js'), 'const x = 1;\n');
+  git('add', 'a.js');
+  fs.writeFileSync(path.join(repo, 'a.js'), 'eval(req.body.x);\n');  // dirty, unstaged
+  if (scanStaged('s1.jsonl').status === 0) pass++;
+  else { fail++; console.log('MISS  staged-reads-index-clean: flagged an unstaged change'); }
+
+  uniq('staged-reads-index-dirty');
+  fs.writeFileSync(path.join(repo, 'b.js'), 'eval(req.body.x);\n');
+  git('add', 'b.js');
+  fs.writeFileSync(path.join(repo, 'b.js'), 'const y = 2;\n');       // fixed only in the tree
+  if (scanStaged('s2.jsonl').status === 2) pass++;
+  else { fail++; console.log('MISS  staged-reads-index-dirty: missed a staged flaw'); }
+
+  // Installing must not destroy an existing pre-commit hook.
+  uniq('hook-chaining-preserves');
+  const hookRepo = path.join(TMP, 'hookrepo');
+  fs.rmSync(hookRepo, { recursive: true, force: true });
+  fs.mkdirSync(hookRepo, { recursive: true });
+  spawnSync('git', ['init', '-q'], { cwd: hookRepo });
+  const hookPath = path.join(hookRepo, '.git', 'hooks', 'pre-commit');
+  fs.writeFileSync(hookPath, '#!/bin/sh\necho "husky here"\nexit 0\n', { mode: 0o755 });
+  spawnSync('node', [path.join(DIR, 'install.js'), '--target', hookRepo, '--yes'],
+    { env: { ...process.env, HOME: path.join(TMP, 'hookhome') }, encoding: 'utf8' });
+  const backup = `${hookPath}.pre-secure-coding`;
+  const chained = fs.existsSync(hookPath) && fs.readFileSync(hookPath, 'utf8').includes('pre-secure-coding');
+  if (fs.existsSync(backup) && chained) pass++;
+  else { fail++; console.log('MISS  hook-chaining-preserves: existing hook was clobbered'); }
 })();
 
 // --- --global actually installs the skill ---

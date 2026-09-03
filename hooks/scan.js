@@ -9,6 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const DIR = path.resolve(__dirname, '..');
 const PATTERNS_DIR = path.join(DIR, 'patterns');
@@ -385,6 +386,26 @@ function isIgnoredPath(file) {
   });
 }
 
+// Scan the index copy of a file rather than the working tree, so `--staged`
+// reflects the commit. Falls back to the worktree if the blob cannot be read.
+function scanStagedBlob(file, patterns) {
+  const ext = path.extname(file).slice(1).toLowerCase();
+  if (SKIP_EXT.has(ext)) return [];
+  if (file.split(path.sep).some(s => SKIP_SEG.includes(s))) return [];
+  if (isIgnoredPath(file)) return [];
+  let content;
+  try {
+    const rel = path.relative(process.cwd(), file) || path.basename(file);
+    content = execFileSync('git', ['show', `:${rel}`],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch {
+    return scanSingleFile(file, patterns);
+  }
+  const hits = matchContent(content, file, patterns);
+  updateState(file, hits);
+  return hits;
+}
+
 function scanSingleFile(file, patterns) {
   if (!fs.existsSync(file)) return [];
   // git can list directories (submodules, extensionless dirs); never read one.
@@ -468,7 +489,11 @@ function main() {
 
     let allHits = [];
     for (const f of filesToScan) {
-      const hits = scanSingleFile(f, patterns);
+      // --staged must judge what is being committed, not what happens to be on
+      // disk. Reading the worktree lets an unstaged fix hide a staged flaw.
+      const hits = args[0] === '--staged'
+        ? scanStagedBlob(f, patterns)
+        : scanSingleFile(f, patterns);
       if (hits.length > 0) {
         allHits.push({ file: f, hits });
       }

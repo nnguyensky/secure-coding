@@ -12,3 +12,8 @@ sbom.json
 
 # Done Gate answers are per-developer, per-commit state
 checks/gate.json
+
+# Local run state — rewritten on every scan/audit, so tracking it means every
+# run dirties the tree (six "Update audit.json" commits in the last twelve).
+checks/findings.jsonl
+checks/audit.json

@@ -3,7 +3,7 @@
     "secure-coding": {
       "command": "node",
       "args": [
-        "/Users/nhan/Personal/My AI Workspace/My Skills/secure-coding/mcp/server.js"
+        "<path-to>/secure-coding/mcp/server.js"
       ],
       "description": "OWASP Secure Coding, AI-SBOM, Clean Code & Dependency Audit Engine"
     }

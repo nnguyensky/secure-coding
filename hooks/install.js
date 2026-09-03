@@ -90,6 +90,28 @@ function askYesNo(rl, query, defaultYes = true) {
   });
 }
 
+// Install a git hook without destroying one that is already there. An
+// existing hook is preserved as <name>.pre-secure-coding and invoked first,
+// so Husky or lint-staged keeps working and its exit code still blocks.
+function writeHookSafely(hookPath, script) {
+  const name = path.basename(hookPath);
+  let chained = script;
+  if (fs.existsSync(hookPath)) {
+    const current = fs.readFileSync(hookPath, 'utf8');
+    if (current.includes('secure-coding')) {
+      fs.writeFileSync(hookPath, script, { mode: 0o755 });
+      return;
+    }
+    const backup = `${hookPath}.pre-secure-coding`;
+    fs.copyFileSync(hookPath, backup);
+    chained = script.replace(/\nexit 0\n?$/,
+      `\n# Run the hook that was here before secure-coding was installed.\n` +
+      `if [ -x "${backup}" ]; then\n  "${backup}" "$@" || exit $?\nfi\nexit 0\n`);
+    console.log(`${YELLOW}ℹ️  Existing ${name} preserved and chained:${NC} ${backup}`);
+  }
+  fs.writeFileSync(hookPath, chained, { mode: 0o755 });
+}
+
 function installGitHooks(targetDir) {
   const gitDir = path.join(targetDir, '.git');
   if (!fs.existsSync(gitDir)) {
@@ -160,7 +182,9 @@ if [ -n "$GATE_REQUIRED" ] && [ -f "$GATE_SCRIPT" ]; then
 fi
 exit 0
 `;
-  fs.writeFileSync(preCommitPath, preCommitScript, { mode: 0o755 });
+  // Never clobber an existing hook — Husky, lint-staged and hand-written
+  // hooks all live here. Back it up and chain to it instead.
+  writeHookSafely(preCommitPath, preCommitScript);
   console.log(`${GREEN}✅ Git pre-commit hook installed:${NC} ${preCommitPath}`);
 
   // Pre-push hook
@@ -187,7 +211,7 @@ if [ -f "$AUDIT_SCRIPT" ]; then
 fi
 exit 0
 `;
-  fs.writeFileSync(prePushPath, prePushScript, { mode: 0o755 });
+  writeHookSafely(prePushPath, prePushScript);
   console.log(`${GREEN}✅ Git pre-push hook installed:${NC} ${prePushPath}`);
 }
 

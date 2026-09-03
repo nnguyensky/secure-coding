@@ -3,6 +3,10 @@
 Universal rules from clean-code-python, clean-code-javascript, clean-code-typescript,
 clean-go-article, and clean-code-ruby. ~220 tokens. Check before shipping.
 
+This is the full checklist for a human or agent to read. `hooks/clean.js`
+automates the 14 of these that can be detected mechanically; the rest need
+judgement and are not scanned.
+
 ## Naming
 - [ ] N1: Names reveal intent — no abbreviations, no single-letter except loop vars
 - [ ] N2: Same word for same concept — one name per entity

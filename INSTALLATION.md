@@ -6,7 +6,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A518.0.0-green?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![MCP Protocol](https://img.shields.io/badge/MCP%202024--11--05-Compatible-purple?style=for-the-badge&logo=probot&logoColor=white)](mcp/server.js)
-[![Tests](https://img.shields.io/badge/Tests-301%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-411%20Passing-brightgreen)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 
 <p align="center">
   <a href="#-quickstart-options">⚡ Quickstart</a> •
@@ -94,7 +94,7 @@ Add to your project root `mcp_config.json` (or `.vscode/mcp.json`):
   "mcpServers": {
     "secure-coding": {
       "command": "node",
-      "args": ["/Users/nhan/Personal/My AI Workspace/My Skills/secure-coding/mcp/server.js"],
+      "args": ["<path-to>/secure-coding/mcp/server.js"],
       "description": "OWASP Secure Coding, AI-SBOM, Clean Code & Dependency Audit Engine"
     }
   }

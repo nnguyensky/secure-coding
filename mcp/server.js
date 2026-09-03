@@ -27,7 +27,7 @@ const PROTOCOL_VERSION = '2024-11-05';
 const TOOLS = [
   {
     name: 'secure_code_scan',
-    description: 'Scans source code or files against 356+ OWASP, Secure by Design, IoT, LLM, and Shannon entropy secret patterns. Returns precise line numbers, code snippets, and remediation guidance.',
+    description: 'Scans source code or files against 376 OWASP, Secure by Design, IoT, LLM, and Shannon entropy secret patterns. Returns precise line numbers, code snippets, and remediation guidance.',
     inputSchema: {
       type: 'object',
       properties: {

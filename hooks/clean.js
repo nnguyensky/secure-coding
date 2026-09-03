@@ -7,7 +7,7 @@
 //   node hooks/clean.js --list                                 (list all rules)
 //   node hooks/clean.js --count                                (count violations)
 //
-// No dependencies. Regex-based. ~20 rules from clean code consensus.
+// No dependencies. Regex-based. 14 automated rules; checks/clean-code.md has the full 23-item checklist.
 'use strict';
 
 const fs = require('fs');
