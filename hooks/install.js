@@ -116,11 +116,29 @@ fi
 if [ -f "$SCAN_SCRIPT" ]; then
   node "$SCAN_SCRIPT" --staged
   EXIT_CODE=$?
-  if [ $EXIT_CODE -ne 0 ]; then
+  if [ "$EXIT_CODE" -ne 0 ]; then
     echo ""
     echo "❌ Commit rejected due to open security findings."
     echo "💡 Fix the highlighted code or bypass with: git commit --no-verify (or SECURE_CODING_SKIP=1)"
-    exit $EXIT_CODE
+    exit "$EXIT_CODE"
+  fi
+fi
+
+# Done Gate: the manual review no pattern can perform. Opt in by setting
+# SECURE_CODING_GATE_REQUIRED=1 — off by default so it never surprises a
+# first-time user.
+GATE_SCRIPT="$ROOT_DIR/hooks/gate.js"
+if [ ! -f "$GATE_SCRIPT" ] && [ -f "$HOME/.secure-coding/hooks/gate.js" ]; then
+  GATE_SCRIPT="$HOME/.secure-coding/hooks/gate.js"
+fi
+if [ -n "$SECURE_CODING_GATE_REQUIRED" ] && [ -f "$GATE_SCRIPT" ]; then
+  node "$GATE_SCRIPT" --check
+  GATE_CODE=$?
+  if [ "$GATE_CODE" -ne 0 ]; then
+    echo ""
+    echo "❌ Commit rejected: the manual security review is incomplete."
+    echo '💡 Answer with: node hooks/gate.js --answer <question> "<what enforces it>"'
+    exit "$GATE_CODE"
   fi
 fi
 exit 0

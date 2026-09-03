@@ -23,3 +23,11 @@
   language: node
   stages: [pre-push]
   pass_filenames: false
+
+- id: secure-coding-gate
+  name: Done Gate (manual security review)
+  description: Fails until ownership, authorization, taint and failure-direction are answered — the checks no pattern can perform.
+  entry: node hooks/gate.js --check
+  language: node
+  stages: [pre-commit]
+  pass_filenames: false

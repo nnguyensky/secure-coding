@@ -761,6 +761,22 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   if (r.status === 64 && /does not name a check/.test(r.stderr)) pass++;
   else { fail++; console.log(`MISS  gate-rejects-nonanswer: status=${r.status}`); }
 
+  // A blocklist only catches filler someone thought of. These are the answers
+  // an agent under pressure to finish would actually try.
+  uniq('gate-rejects-filler');
+  const junk = ['x', '-', 'TODO', 'handled', 'none', 'nothing', 'see above', 'ok done', 'N/A'];
+  const slipped = junk.filter(j => run('--answer', 'ownership', j).status === 0);
+  if (slipped.length === 0) pass++;
+  else { fail++; console.log(`MISS  gate-rejects-filler: accepted ${JSON.stringify(slipped)}`); }
+
+  // ...without rejecting answers that genuinely name a check.
+  uniq('gate-accepts-real');
+  const real = ['requireAdmin middleware', 'scoped by userId predicate',
+                'catch denies with 403', 'N/A — no data access in this change'];
+  const blocked = real.filter(x => run('--answer', 'ownership', x).status !== 0);
+  if (blocked.length === 0) pass++;
+  else { fail++; console.log(`MISS  gate-accepts-real: rejected ${JSON.stringify(blocked)}`); }
+
   uniq('gate-rejects-unknown');
   if (run('--answer', 'nope', 'x').status === 64) pass++;
   else { fail++; console.log('MISS  gate-rejects-unknown'); }
@@ -768,10 +784,22 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   uniq('gate-complete-passes');
   run('--answer', 'ownership', 'scoped by userId predicate');
   run('--answer', 'authorization', 'requireAdmin middleware');
-  run('--answer', 'taint', 'N/A');
+  run('--answer', 'taint', 'N/A — no request values in this change');
   run('--answer', 'failure-direction', 'catch denies with 403');
   if (run('--check').status === 0) pass++;
   else { fail++; console.log('MISS  gate-complete-passes'); }
+
+  // The ref must follow the repo being reviewed, not wherever gate.js lives —
+  // otherwise a global install and the skill copy disagree and answers never
+  // resolve, silently blocking every commit.
+  uniq('gate-ref-follows-cwd');
+  const fromSkill = spawnSync('node', [path.join(DIR, 'hooks', 'gate.js'), '--status'], {
+    cwd: DIR, env: { ...process.env, SECURE_CODING_GATE: GATE }, encoding: 'utf8' }).stdout;
+  const fromTmp = spawnSync('node', [path.join(DIR, 'hooks', 'gate.js'), '--status'], {
+    cwd: TMP, env: { ...process.env, SECURE_CODING_GATE: GATE }, encoding: 'utf8' }).stdout;
+  const ref = t => (t.match(/Done Gate @ (\S+)/) || [])[1];
+  if (ref(fromSkill) && ref(fromTmp) && ref(fromSkill) !== ref(fromTmp)) pass++;
+  else { fail++; console.log(`MISS  gate-ref-follows-cwd: ${ref(fromSkill)} vs ${ref(fromTmp)}`); }
 
   // Answers must not carry forward to a different commit.
   uniq('gate-expires-on-new-commit');

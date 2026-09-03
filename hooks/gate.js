@@ -29,9 +29,18 @@ const QUESTIONS = {
 
 // Answers are tied to a commit: new work needs a new review.
 function currentRef() {
+  // Track the repo being worked on, not wherever gate.js happens to live —
+  // the same answers must resolve identically whether it runs from the skill
+  // directory or a global install.
   try {
-    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: DIR, encoding: 'utf8' }).trim().slice(0, 12);
-  } catch { return 'no-git'; }
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: process.cwd(), encoding: 'utf8', stdio: ['ignore','pipe','ignore'] }).trim().slice(0, 12);
+  } catch {
+    // A repo with no commits yet still has a working tree to review.
+    try {
+      execFileSync('git', ['rev-parse', '--git-dir'], { cwd: process.cwd(), stdio: 'ignore' });
+      return 'pre-initial-commit';
+    } catch { return 'no-git'; }
+  }
 }
 
 function load() {
@@ -89,9 +98,23 @@ An answer of "yes"/"ok"/"done" is rejected — name the actual check.
       process.exit(64);
     }
     // A non-answer is worse than no answer: it looks reviewed and is not.
-    if (/^(yes|no|ok|okay|done|n\/?a\b.{0,3}$|checked|fine|good|true)$/i.test(a) && !/^n\/?a$/i.test(a)) {
-      process.stderr.write(`gate: "${a}" does not name a check. Say what enforces it, or "N/A".\n`);
+    // A blocklist only catches the filler someone thought of, so require
+    // substance instead: either a bare "N/A", or something that actually says
+    // what enforces the control.
+    const isNA = /^n\/?a\b/i.test(a) && a.replace(/^n\/?a\b[\s—:-]*/i, '').trim().length >= 8;
+    if (/^n\/?a\b/i.test(a) && !isNA) {
+      process.stderr.write('gate: "N/A" needs a reason — say why the question does not apply.\n');
+      process.stderr.write('  e.g. "N/A — no data access added in this change"\n');
       process.exit(64);
+    }
+    const words = a.split(/\s+/).filter(w => /[a-z0-9]/i.test(w));
+    if (!isNA) {
+      const filler = /^(yes|no|ok|okay|done|checked|fine|good|true|none|nothing|handled|todo|tbd|n\/?a|x|-|\.|see above|as above|same)$/i;
+      if (filler.test(a) || words.length < 2 || a.replace(/[^a-z0-9]/gi, '').length < 12) {
+        process.stderr.write(`gate: "${a}" does not name a check.\n`);
+        process.stderr.write('Say what enforces it (a guard, predicate, middleware, or test), or "N/A — <why it does not apply>".\n');
+        process.exit(64);
+      }
     }
     data.answers[q] = { answer: a, at: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
     save(data);
