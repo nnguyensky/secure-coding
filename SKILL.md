@@ -13,7 +13,23 @@ No finding is marked as accepted, deferred, or ignored without an explicit revie
 
 ---
 
-## 🚀 3-Step Workflow
+## 🚀 4-Step Workflow
+
+### Step 0: Before Deciding — Ask, Don't Guess
+
+If the task creates or changes a **route, auth, tenancy, a data model, an
+upload, an outbound call, or an LLM tool**, the security-relevant decisions are
+not yours to assume. Run the interview in
+[`checks/secure-grilling.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/secure-grilling.md):
+ask the whole frontier in one round, recommend the secure default for each, and
+wait for the answer.
+
+Five frontiers, each pre-answering a Done Gate question: **identity & boundary**,
+**tenancy & ownership**, **data classification**, **failure direction**, and
+**action irreversibility**.
+
+Skip this for a bug fix inside an existing boundary, a pure refactor, docs, or
+tests. Look facts up yourself — only unsettled *decisions* go to the user.
 
 ### Step 1: Before Writing — Pick Rules & Architecture
 
@@ -26,6 +42,7 @@ No finding is marked as accepted, deferred, or ignored without an explicit revie
    - **Supply Chain, AI-SBOM & VEX** → [`checks/sbom.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/sbom.md) (BSI 7 AI clusters, ACSC/CISA VEX exploitability states)
    - **Adopting a Dependency, Vendor or SaaS** → [`checks/technology-selection.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/technology-selection.md) (ACSC procurement questions, Secure by Default, supply chain & jurisdiction)
    - **AI/LLMs & Prompts** → [`checks/llm-top10.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/llm-top10.md) (Prompt injection, output handling, excessive agency, token caps)
+   - **Settling Architecture Before Coding** → [`checks/secure-grilling.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/secure-grilling.md) (5 security frontiers, frontier rounds with secure defaults, pre-answers the Done Gate)
    - **Threat Modeling** → [`checks/threat-model.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/threat-model.md) (STRIDE & DREAD analysis)
    - **SSDF Attestation & Coverage** → [`checks/ssdf-mapping.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/ssdf-mapping.md) (NIST SP 800-218 PO/PS/PW/RV map, and the gaps this skill does not cover)
    - **Dynamic Testing & Fuzzing** → [`checks/dynamic-testing.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/dynamic-testing.md) (what to fuzz based on findings, tooling per language, races and authz matrices)

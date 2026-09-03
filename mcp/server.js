@@ -132,6 +132,20 @@ const TOOLS = [
     },
   },
   {
+    name: 'get_security_frontier',
+    description: 'Returns the security questions to put to the user BEFORE writing a route, auth change, data model, upload, outbound call or LLM tool. Each frontier pre-answers a Done Gate question, so the decision settled here is the one verified at commit time. Ask the whole round at once with the recommended secure default for each.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: {
+          type: 'string',
+          enum: ['api', 'auth', 'storage', 'llm', 'all'],
+          description: 'Which frontier subset applies. Omit for all five.',
+        },
+      },
+    },
+  },
+  {
     name: 'security_summary',
     description: 'Returns a one-line status check of open versus resolved security findings in the workspace.',
     inputSchema: {
@@ -147,6 +161,15 @@ function handleToolCall(name, args) {
   args = args || {};
 
   switch (name) {
+    case 'get_security_frontier': {
+      const { render, DOMAINS } = require(path.join(__dirname, '..', 'hooks', 'frontiers.js'));
+      const domain = args.domain;
+      if (domain && domain !== 'all' && !DOMAINS.includes(domain)) {
+        return { content: [{ type: 'text', text: `Unknown domain '${domain}'. One of: ${DOMAINS.join(', ')}, all` }], isError: true };
+      }
+      return { content: [{ type: 'text', text: render(domain) }] };
+    }
+
     case 'secure_code_scan': {
       if (args.code) {
         const patterns = loadPatterns();

@@ -438,7 +438,7 @@ function configureAgent(targetDir, agentName) {
       const content = `# AI Agent Instructions
 
 When writing code that handles user input, authentication, sessions, permissions, secrets, databases, files, network calls, LLM prompts/tools, or raw memory:
-1. Read \`SKILL.md\` and apply matching design groups and templates (\`templates/<language>.md\`).
+0. If the task creates or changes a route, auth, tenancy, a data model, an upload, an outbound call, or an LLM tool: ask the five security frontiers in \`checks/secure-grilling.md\` before writing — identity, tenancy, data classification, failure direction, irreversibility — each with your recommended secure default. Skip for bug fixes, refactors, docs and tests.\n1. Read \`SKILL.md\` and apply matching design groups and templates (\`templates/<language>.md\`).
 2. When architecting systems, review \`checks/secure-by-design.md\`, \`checks/memory-safety.md\`, \`checks/cryptography.md\`, \`checks/iot-security.md\`, \`checks/deployment-safety.md\`, or \`checks/sbom.md\`.
 3. When building AI/LLM workflows or RAG pipelines, review \`checks/llm-top10.md\`.
 4. After writing code, run: \`node hooks/scan.js --staged\`
@@ -483,7 +483,7 @@ When writing code that handles user input, authentication, sessions, permissions
 globs: ["**/*.{py,js,ts,go,java,kt,swift,rb,php,cs,rs,c,cpp,h,sh,tf,yaml,yml}"]
 alwaysApply: false
 ---
-Apply OWASP Secure Coding Practices, ACSC Modern Defensible Architecture, and Clean Code rules while writing code.
+Before writing a route, auth, data model, upload or LLM tool, ask the five security frontiers in checks/secure-grilling.md with recommended secure defaults.\nApply OWASP Secure Coding Practices, ACSC Modern Defensible Architecture, and Clean Code rules while writing code.
 Refer to SKILL.md, templates/, and checks/secure-by-design.md for secure patterns.
 After writing, run \`node hooks/scan.js --staged\`, then \`node hooks/gate.js --check\` before declaring the task complete.
 `;
@@ -495,7 +495,7 @@ After writing, run \`node hooks/scan.js --staged\`, then \`node hooks/gate.js --
     const windsurfRules = path.join(targetDir, '.windsurfrules');
     if (!fs.existsSync(windsurfRules)) {
       const content = `When writing code that handles user input, auth, secrets, databases, files, or LLM pipelines:
-- Read SKILL.md and apply matching templates from templates/.
+- Read SKILL.md and apply matching templates from templates/.\n- Before writing a route, auth, data model, upload or LLM tool, ask the five security frontiers in checks/secure-grilling.md with recommended secure defaults.
 - When designing architecture, refer to checks/secure-by-design.md and checks/memory-safety.md.
 - After writing, verify using: node hooks/scan.js --staged\n- Before declaring done: node hooks/gate.js --check (exits 2 until the manual review is answered)
 `;
@@ -509,7 +509,7 @@ After writing, run \`node hooks/scan.js --staged\`, then \`node hooks/gate.js --
     if (!fs.existsSync(clineRules)) {
       const content = `# Secure Coding Instructions
 Always write secure code from the start. Never defer security fixes.
-- Before coding, read SKILL.md and templates/<language>.md.
+- Before coding, read SKILL.md and templates/<language>.md.\n- Before writing a route, auth, data model, upload, outbound call or LLM tool, ask the five security frontiers in checks/secure-grilling.md with a recommended secure default for each.
 - When handling LLM tools or RAG, review checks/llm-top10.md.
 - After writing code, run \`node hooks/scan.js --staged\` and fix any reported findings immediately.\n- Before declaring done, run \`node hooks/gate.js --check\` and answer the four manual questions it names.
 `;

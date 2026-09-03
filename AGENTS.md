@@ -1,6 +1,12 @@
 # AI Agent Instructions
 
 When writing code that handles user input, authentication, sessions, permissions, secrets, databases, files, network calls, LLM prompts/tools, or raw memory:
+0. If the task creates or changes a route, auth, tenancy, a data model, an upload,
+   an outbound call, or an LLM tool: do not guess the security decisions. Ask the
+   user the five frontiers in `checks/secure-grilling.md` — identity, tenancy,
+   data classification, failure direction, irreversibility — in one round, each
+   with your recommended secure default. Look facts up yourself; only decisions
+   go to the user. Skip this for bug fixes, refactors, docs and tests.
 1. Read `SKILL.md` and apply matching design groups and templates (`templates/<language>.md`).
 2. When architecting systems, review `checks/secure-by-design.md`, `checks/memory-safety.md`, `checks/cryptography.md`, `checks/iot-security.md`, `checks/deployment-safety.md`, or `checks/sbom.md`.
 3. When building AI/LLM workflows or RAG pipelines, review `checks/llm-top10.md`.

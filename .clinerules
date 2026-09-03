@@ -1,6 +1,9 @@
 # Secure Coding Instructions
 Always write secure code from the start. Never defer security fixes.
 - Before coding, read SKILL.md and templates/<language>.md.
+- Before writing a route, auth, data model, upload, outbound call or LLM tool,
+  ask the five security frontiers in checks/secure-grilling.md with your
+  recommended secure default for each. Do not guess these silently.
 - When handling LLM tools or RAG, review checks/llm-top10.md.
 - After writing code, run `node hooks/scan.js --staged` and fix any reported findings immediately.
 - Before declaring done, run `node hooks/gate.js --check`. It exits 2 until you

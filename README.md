@@ -10,7 +10,7 @@
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-415%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-419%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -33,7 +33,7 @@ carry findings. What static analysis genuinely cannot see — a missing ownershi
 check, an absent guard, a fail-open `catch` — it asks as four written questions
 before the change lands.
 
-13 language templates · 376 patterns mapped to CWE and OWASP Top 10:2025 · 415
+13 language templates · 376 patterns mapped to CWE and OWASP Top 10:2025 · 419
 self-tests · zero dependencies.
 
 ## 💡 The Inverted Architecture
@@ -149,6 +149,7 @@ questions that only make sense once a change is complete.
 
 | You do this | This runs | What happens |
 |---|---|---|
+| Ask an agent for a route, auth change, data model, upload or LLM tool | The agent asks the **five security frontiers** first (`checks/secure-grilling.md`) | It puts the decisions to you with a recommended secure default each, instead of guessing silently |
 | Ask an agent to write code touching input, auth, secrets, files, or network calls | The agent loads `SKILL.md` | It reads the rules for that topic before writing, not all 376 patterns |
 | The agent finishes writing a file | `scan.js`, via the PostToolUse hook `install.js` sets up | ~1ms. Silent when clean, so it costs no tokens. Otherwise prints the finding and how to fix it, immediately — no commit needed |
 | `git commit` | `scan.js --staged`, then `gate.js --check` | Blocks the commit if the staged code has findings, or if it handles requests and the review is unanswered |
@@ -234,7 +235,7 @@ Each layer answers a different question:
 
 | Layer | Question it answers | When it runs |
 |---|---|---|
-| **0** Design | How should this be built? | Before any code exists |
+| **0** Design | How should this be built? **Ask, don't guess.** | Before any code exists |
 | **1** Templates | What does the secure version look like? | While writing |
 | **2** Scanner | Did anything unsafe get written? | After each write, in ~1ms |
 | **3** Verification | Are the dependencies and the whole file clean? | Before commit |
@@ -245,6 +246,7 @@ Each layer answers a different question:
 
 Read before writing code, when you are still deciding how a system fits together.
 Each file is loaded only when its topic comes up:
+- **Secure Grilling** ([`checks/secure-grilling.md`](checks/secure-grilling.md)): Before any code exists, the agent asks the five frontiers — identity, tenancy, data classification, failure direction, irreversibility — one round, each with a recommended secure default. Each frontier pre-answers a Done Gate question, so the decision made at the start is the same sentence checked at the end.
 - **STRIDE & DREAD Threat Modeling** ([`checks/threat-model.md`](checks/threat-model.md)): Structured threat categorization and quantitative risk scoring.
 - **OWASP SbD 36-Control Review & ACSC Defensible Architecture** ([`checks/secure-by-design.md`](checks/secure-by-design.md)): Edge Gateway, mTLS service meshes, Postgres Row-Level Security (RLS), Fail-Closed authorization, and Cross-Domain Solutions (CDS) ingress normalization.
 - **Memory Safety Roadmaps & C/C++ Hardening** ([`checks/memory-safety.md`](checks/memory-safety.md)): Memory-Safe Language decision matrix, Safe Intermediary Wrappers, and compiler hardening (`-fstack-protector-strong`, ASan/UBSan, PIE, CFI).
@@ -326,7 +328,7 @@ node install.js --agent all --mcp
 ### 2. Verify it works
 
 ```bash
-node hooks/test.js     # expect: pass=415 fail=0
+node hooks/test.js     # expect: pass=419 fail=0
 node hooks/sync.js     # expect: 0 errors, 0 warnings
 ```
 
@@ -446,6 +448,7 @@ pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js
 | **🔌 MCP Server** | `node mcp/server.js` | Launches native Model Context Protocol stdio server. |
 | **✅ Done Gate** | `node hooks/gate.js --check` | Exits `2` if the staged code needs review and it is unanswered. |
 | | `node hooks/gate.js --answer <q> "<a>"` | Records one answer: `ownership`, `authorization`, `taint`, `failure-direction`. |
+| | `node hooks/gate.js --grill [domain]` | Prints the questions to ask **before** coding. Domain: `api`, `auth`, `storage`, `llm`. |
 | | `node hooks/gate.js --status` | Shows which questions remain. |
 | | `node hooks/gate.js --check --all` | Force a full review even for a docs-only change. |
 | | `git config secure-coding.gate false` | Turn commit blocking off for this repository. |
@@ -453,7 +456,7 @@ pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js
 | | `node hooks/coverage.js` | Verifies all 213 OWASP SCP items are accounted for. |
 | | `node hooks/detect.js` | Reports which languages a project uses. |
 | | `node hooks/reset.js` | Clears findings state for a new session. |
-| | `node hooks/test.js` | Executes the full 415-test self-check suite. |
+| | `node hooks/test.js` | Executes the full 419-test self-check suite. |
 
 ---
 
@@ -641,6 +644,7 @@ agent can act on.
 | `security_dependency_audit` | Scans lockfiles across 9 package ecosystems for CVEs. | *"Check package.json and requirements.txt for vulnerabilities."* |
 | `clean_code_lint` | Lints source code against 14 universal Clean Code quality standards. | *"Lint my recent changes for clean code issues."* |
 | `generate_ai_sbom` | Exports CycloneDX v1.5 / SPDX v2.3 SBOM with BSI 7 AI clusters & VEX data. | *"Generate a CycloneDX AI-SBOM with VEX exploitability."* |
+| `get_security_frontier` | Returns the questions to put to the user **before** writing a route, auth change, data model or LLM tool. | *"What should I ask before building this endpoint?"* |
 | `security_summary` | Returns a one-line status of open vs resolved security findings. | *"Give me a security status summary of the workspace."* |
 
 ---
@@ -730,7 +734,7 @@ trust a change:
 | `node hooks/sync.js` | Patterns, templates and remediation blocks agree with each other. |
 | `node hooks/coverage.js` | All 213 OWASP SCP items are accounted for. |
 
-Verify all 415 test assertions, pattern compilation, secret masking, and MCP tools:
+Verify all 419 test assertions, pattern compilation, secret masking, and MCP tools:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js

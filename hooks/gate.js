@@ -135,6 +135,8 @@ function main() {
   node hooks/gate.js --status
   node hooks/gate.js --check     exit 2 if any question is unanswered
   node hooks/gate.js --reset     clear answers (start a new review)
+  node hooks/gate.js --grill [domain]   preview the questions to ask BEFORE coding
+                                 domain: api | auth | storage | llm (default: all)
 
 Questions:
 ${Object.entries(QUESTIONS).map(([k, v]) => `  ${k.padEnd(18)} ${v}`).join('\n')}
@@ -150,6 +152,19 @@ An answer of "yes"/"ok"/"done" is rejected — name the actual check.
   // Answers from an earlier commit do not carry forward.
   if (data.ref && data.ref !== ref) data = { ref, answers: {} };
   data.ref = ref;
+
+  if (cmd === '--grill') {
+    // Preview the architecture questions for a planned feature, before any
+    // code exists. Settling them here pre-answers this gate at commit time.
+    const { render, DOMAINS } = require('./frontiers.js');
+    const domain = args[1];
+    if (domain && domain !== 'all' && !DOMAINS.includes(domain)) {
+      process.stderr.write(`gate: unknown domain '${domain}'. One of: ${DOMAINS.join(', ')}, all\n`);
+      process.exit(64);
+    }
+    process.stdout.write(render(domain) + '\n');
+    return;
+  }
 
   if (cmd === '--reset') {
     save({ ref, answers: {} });

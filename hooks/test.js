@@ -817,6 +817,83 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
 })();
 
+// --- frontier surfaces: CLI and MCP ---
+(function frontierSurfaces() {
+  const { FRONTIERS, DOMAINS, forDomain, render } = require('./frontiers.js');
+
+  uniq('frontiers-five');
+  if (FRONTIERS.length === 5) pass++;
+  else { fail++; console.log(`MISS  frontiers-five: ${FRONTIERS.length}`); }
+
+  // Four of the five must pre-answer a Done Gate question, or the loop is open.
+  uniq('frontiers-map-to-gate');
+  const gates = FRONTIERS.map(f => f.gate).filter(Boolean).sort();
+  const want = ['authorization', 'failure-direction', 'ownership', 'taint'];
+  if (JSON.stringify(gates) === JSON.stringify(want)) pass++;
+  else { fail++; console.log(`MISS  frontiers-map-to-gate: ${gates}`); }
+
+  uniq('frontiers-domain-filter');
+  const llm = forDomain('llm').map(f => f.id);
+  if (llm.includes('agency') && !llm.includes('tenancy') && forDomain('all').length === 5) pass++;
+  else { fail++; console.log(`MISS  frontiers-domain-filter: ${llm}`); }
+
+  uniq('gate-grill-cli');
+  const g = spawnSync('node', [path.join(DIR, 'hooks', 'gate.js'), '--grill', 'api'], { encoding: 'utf8' });
+  const bad = spawnSync('node', [path.join(DIR, 'hooks', 'gate.js'), '--grill', 'nope'], { encoding: 'utf8' });
+  if (g.status === 0 && /Q1/.test(g.stdout) && bad.status === 64) pass++;
+  else { fail++; console.log(`MISS  gate-grill-cli: ok=${g.status} bad=${bad.status}`); }
+
+  // The MCP tool must return the same text as the CLI — one source, two doors.
+  uniq('mcp-frontier-tool');
+  const req = [
+    JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize',
+      params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 't', version: '1' } } }),
+    JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call',
+      params: { name: 'get_security_frontier', arguments: { domain: 'storage' } } }),
+  ].join('\n') + '\n';
+  const m = spawnSync('node', [path.join(DIR, 'mcp', 'server.js')], { input: req, encoding: 'utf8' });
+  let text = '';
+  try {
+    const last = m.stdout.trim().split('\n').pop();
+    text = JSON.parse(last).result.content[0].text;
+  } catch {}
+  if (text && text === render('storage')) pass++;
+  else { fail++; console.log('MISS  mcp-frontier-tool: output missing or differs from the CLI'); }
+})();
+
+// --- secure grilling is reachable and wired in ---
+// The gate catches a missing ownership check at commit time; grilling is what
+// stops it being written. If the routing or the agent rules lose the reference,
+// the agent never asks and the loop is open again.
+(function grilling() {
+  uniq('grilling-doc-exists');
+  const doc = path.join(DIR, 'checks', 'secure-grilling.md');
+  if (fs.existsSync(doc)) pass++;
+  else { fail++; console.log('MISS  grilling-doc-exists'); }
+
+  // Every frontier must name the gate question it pre-answers, or the loop
+  // does not actually close.
+  uniq('grilling-maps-to-gate');
+  const text = fs.existsSync(doc) ? fs.readFileSync(doc, 'utf8') : '';
+  const qs = ['ownership', 'authorization', 'taint', 'failure-direction'];
+  const absent = qs.filter(q => !text.includes(`gate: ${q}`));
+  if (absent.length === 0) pass++;
+  else { fail++; console.log(`MISS  grilling-maps-to-gate: ${absent.join(', ')}`); }
+
+  uniq('grilling-in-skill-md');
+  const skill = fs.readFileSync(path.join(DIR, 'SKILL.md'), 'utf8');
+  if (skill.includes('secure-grilling.md') && /Step 0/.test(skill)) pass++;
+  else { fail++; console.log('MISS  grilling-in-skill-md'); }
+
+  // The agent rule files are what actually make an agent do this.
+  uniq('grilling-in-agent-rules');
+  const rules = ['AGENTS.md', '.clinerules', '.windsurfrules',
+                 path.join('.cursor', 'rules', 'secure-coding.mdc')];
+  const missing = rules.filter(r => !fs.readFileSync(path.join(DIR, r), 'utf8').includes('secure-grilling'));
+  if (missing.length === 0) pass++;
+  else { fail++; console.log(`MISS  grilling-in-agent-rules: ${missing.join(', ')}`); }
+})();
+
 // --- second-review findings ---
 (function secondReview() {
   const repo = path.join(TMP, 'srrepo');

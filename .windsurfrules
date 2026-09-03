@@ -1,5 +1,8 @@
 When writing code that handles user input, auth, secrets, databases, files, or LLM pipelines:
 - Read SKILL.md and apply matching templates from templates/.
+- Before writing a route, auth, data model, upload, outbound call or LLM tool,
+  ask the five security frontiers in checks/secure-grilling.md with your
+  recommended secure default for each. Do not guess these silently.
 - When designing architecture, refer to checks/secure-by-design.md and checks/memory-safety.md.
 - After writing, verify using: node hooks/scan.js --staged
 - Before declaring done: node hooks/gate.js --check (exits 2 until the manual
