@@ -16,7 +16,8 @@
     "fixtures/**",
     "scripts/seed/**",
     "e2e/**",
-    "hooks/test.js"
+    "hooks/test.js",
+    "reports/**"
   ],
   "ignorePatterns": [],
   "audit": {

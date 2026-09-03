@@ -13,7 +13,7 @@ weak-rng	rb	(token|key|secret|nonce|salt|otp|reset)[^;]*\brand\s*\(|SecureRandom
 weak-rng	php	(token|key|secret|nonce|salt|otp|reset)[^;]*\b(rand|mt_rand)\s*\(			medium
 weak-rng	cs	(token|key|secret|nonce|salt|otp|reset)[^;]*new\s+Random\s*\(|Random\.Next\s*\([^)]*(token|key|secret|nonce|salt|otp|reset)	use RandomNumberGenerator		medium
 weak-rng	rs	(token|key|secret|nonce|salt|otp|reset)[^;]*rand::(thread_rng|random|Rng)	use rand::rngs::OsRng		medium
-secret	*	(password|passwd|api_?key|secret|token)\s*[:=]\s*["'][A-Za-z0-9/+_-]{12,}["']	move to env or secret manager, never commit	move to env or secret manager, never commit	critical
+secret	*	(password|passwd|api_?key|secret|token)\s*[:=]\s*["'][A-Za-z0-9/+_-]{12,}["']	!(?:[Yy][Oo][Uu][Rr]|[Ee][Xx][Aa][Mm][Pp][Ll][Ee]|[Pp][Ll][Aa][Cc][Ee][Hh][Oo][Ll][Dd][Ee][Rr]|[Cc][Hh][Aa][Nn][Gg][Ee][Mm][Ee]|[Dd][Uu][Mm][Mm][Yy]|[Mm][Oo][Cc][Kk]|[Ff][Aa][Kk][Ee]|[Ss][Aa][Mm][Pp][Ll][Ee]|[Tt][Oo][Dd][Oo]|[Rr][Ee][Pp][Ll][Aa][Cc][Ee]|[Ii][Nn][Ss][Ee][Rr][Tt]|[Xx][Xx][Xx][Xx])	move to env or secret manager, never commit	critical
 secret	*	-----BEGIN\s+(RSA|DSA|EC|OPENSSH|PRIVATE)			critical
 secret	*	AKIA[0-9A-Z]{16}			critical
 secret	*	\bghp_[A-Za-z0-9]{30,}			critical

@@ -10,7 +10,7 @@
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-434%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-446%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -33,7 +33,7 @@ carry findings. What static analysis genuinely cannot see — a missing ownershi
 check, an absent guard, a fail-open `catch` — it asks as four written questions
 before the change lands.
 
-13 language templates · 376 patterns mapped to CWE and OWASP Top 10:2025 · 434
+13 language templates · 376 patterns mapped to CWE and OWASP Top 10:2025 · 446
 self-tests · zero dependencies.
 
 ## 💡 The Inverted Architecture
@@ -264,7 +264,7 @@ Each file is loaded only when its topic comes up:
 ### ⚡ Layer 2: Reactive Mechanical Scanner (`hooks/scan.js`)
 - **Fast Execution**: Pure Node.js standard library, zero dependencies. ~1ms for a typical file; ~20ms for a 2,000-line one, since multi-line taint tracking adds a per-line pass.
 - **Precise Extraction**: Pinpoints exact line numbers and code snippets (`Line 42: const key = ...`).
-- **Multi-Line Taint Tracking**: Regex alone only matches when untrusted input sits *inside* the sink call. The scanner also follows `var = req.query.x` into a later file, HTTP, process, or query call — reported as `taint-*` — within one function and one hop through interpolation. Sanitizers (`basename`, `validate`, `parseInt`, allowlist checks, parameterized queries) clear the taint. Disable with `"taintTracking": false`.
+- **Multi-Line Taint Tracking**: Regex alone only matches when untrusted input sits *inside* the sink call. The scanner also follows `var = req.query.x` — and `const { x } = req.query` — into a later file, HTTP, process, or query call — reported as `taint-*` — within one function and one hop through interpolation. Sanitizers (`basename`, `validate`, `parseInt`, allowlist checks, parameterized queries) clear the taint. Disable with `"taintTracking": false`.
 - **Per-Occurrence Findings**: Three SQL injections in one file are three findings, tracked by `(file, id, line)`. Fixing one closes only that one, so a partial fix can never silently clear a live vulnerability.
 - **Absence-of-Control Detection**: Some defects are the *lack* of something. `logging-disabled` catches `LOG_LEVEL=off` and `Level.OFF`; `auth-no-log` catches a 401/403 returned with no logging call nearby; `fail-open-catch` catches a `catch` block that returns success. What remains genuinely undetectable — a codebase that simply never logs, or an IDOR — routes to the Done Gate.
 - **Shannon Entropy Secret Detection**:
@@ -328,7 +328,7 @@ node install.js --agent all --mcp
 ### 2. Verify it works
 
 ```bash
-node hooks/test.js     # expect: pass=434 fail=0
+node hooks/test.js     # expect: pass=446 fail=0
 node hooks/sync.js     # expect: 0 errors, 0 warnings
 ```
 
@@ -425,6 +425,7 @@ pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js
 | | `node hooks/scan.js --staged` | Scans only Git staged files (~1ms each). |
 | | `node hooks/scan.js --diff` | Scans modified working tree files. |
 | | `node hooks/scan.js --files <paths...>` | Scans an explicit list of files. |
+| | `node hooks/scan.js --all` | Baseline scan of every tracked file (`npm run scan`). |
 | | `node hooks/scan.js --file <f> --json` | Outputs findings as structured JSON. |
 | **📦 Audit & SBOM** | `node hooks/audit.js` | Audits dependencies across 9 ecosystems. |
 | | `node hooks/sbom.js --format cyclonedx` | Generates CycloneDX v1.5 JSON SBOM (9 ecosystems). |
@@ -457,7 +458,7 @@ pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js
 | | `node hooks/coverage.js` | Verifies all 213 OWASP SCP items are accounted for. |
 | | `node hooks/detect.js` | Reports which languages a project uses. |
 | | `node hooks/reset.js` | Clears findings state for a new session. |
-| | `node hooks/test.js` | Executes the full 434-test self-check suite. |
+| | `node hooks/test.js` | Executes the full 446-test self-check suite. |
 
 ---
 

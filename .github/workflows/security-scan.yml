@@ -34,8 +34,19 @@ jobs:
       - name: Scan PR Changes for Security Smells
         if: github.event_name == 'pull_request'
         run: |
-          git diff --name-only origin/${{ github.base_ref }}...HEAD > pr_files.txt
-          node hooks/scan.js --files $(cat pr_files.txt)
+          git diff --name-only --diff-filter=ACM origin/${{ github.base_ref }}...HEAD > pr_files.txt
+          if [ -s pr_files.txt ]; then
+            node hooks/scan.js --files $(cat pr_files.txt)
+          else
+            echo "No changed files to scan."
+          fi
+
+      # On push there is no diff base, so scan everything tracked. Without this
+      # the SARIF upload below is empty and the code-scanning dashboard goes
+      # blank on every push to a default branch.
+      - name: Scan Repository on Push
+        if: github.event_name == 'push'
+        run: node hooks/scan.js --all
 
       - name: Generate SARIF Security Report
         if: always()

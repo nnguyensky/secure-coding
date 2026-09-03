@@ -157,7 +157,7 @@ function maskSecret(snippet, id) {
 
 // Request-controlled values. Anchored to the framework accessors the pattern
 // files already treat as untrusted.
-const TAINT_SOURCE = /(?:\breq(?:uest)?\s*\.\s*(?:query|body|params|args|form|GET|POST|cookies|headers)\b|\$_(?:GET|POST|REQUEST|COOKIE)\s*\[|\br\s*\.\s*(?:FormValue|PostFormValue)\s*\(|\bparams\s*\[|getParameter\s*\()/;
+const TAINT_SOURCE = /(?:\breq(?:uest)?\s*\.\s*(?:query|body|params|args|form|json|get_json|values|GET|POST|cookies|headers)\b|\$_(?:GET|POST|REQUEST|COOKIE)\s*\[|\br\s*\.\s*(?:FormValue|PostFormValue)\s*\(|\bparams\s*\[|getParameter\s*\()/;
 
 // Sinks where request data causes a named vulnerability, and what to call it.
 const TAINT_SINKS = [
@@ -191,6 +191,18 @@ function findTaintFlows(fileLines) {
 
     // A new function resets what we know.
     if (TAINT_BOUNDARY.test(line)) tainted = new Map();
+
+    // Destructuring is the dominant idiom in modern JS/TS:
+    // `const { file } = req.query`. Handles renames (`{ a: b }`) and
+    // defaults (`{ a = 1 }`); rest (`...r`) is skipped as it is not a scalar.
+    const destructured = line.match(/(?:const|let|var)\s*\{\s*([^}]+?)\s*\}\s*=\s*(.+)$/);
+    if (destructured && TAINT_SOURCE.test(destructured[2]) && !TAINT_SANITIZED.test(destructured[2])) {
+      for (const part of destructured[1].split(',')) {
+        const name = part.split(':').pop().split('=')[0].trim();
+        if (/^[A-Za-z_$][\w$]*$/.test(name)) tainted.set(name, i + 1);
+      }
+      continue;
+    }
 
     // Assignment from an untrusted source: `const x = req.query.y`
     const assign = line.match(/(?:const|let|var|my)?\s*\$?([A-Za-z_]\w*)\s*(?::=|=)\s*(.+)$/);
@@ -325,6 +337,9 @@ function matchContent(content, filenameOrExt, patterns) {
       if (m && m[2]) {
         if (isSuppressed(line, 'secret-entropy') || isSuppressed(line, 'secret')) continue;
         const secretStr = m[2];
+        // A placeholder in .env.example is high-entropy but is not a secret.
+        // Flagging it as critical trains people to ignore the whole rule.
+        if (/(?:^|[-_])(?:[Yy][Oo][Uu][Rr]|[Ee][Xx][Aa][Mm][Pp][Ll][Ee]|[Pp][Ll][Aa][Cc][Ee][Hh][Oo][Ll][Dd][Ee][Rr]|[Cc][Hh][Aa][Nn][Gg][Ee][Mm][Ee]|[Dd][Uu][Mm][Mm][Yy]|[Mm][Oo][Cc][Kk]|[Ff][Aa][Kk][Ee]|[Ss][Aa][Mm][Pp][Ll][Ee]|[Tt][Oo][Dd][Oo]|[Rr][Ee][Pp][Ll][Aa][Cc][Ee]|[Ii][Nn][Ss][Ee][Rr][Tt]|[Xx]{3,})(?:[-_]|$)/.test(secretStr)) continue;
         const entropy = calculateShannonEntropy(secretStr);
         if (entropy >= 3.5) {
           seen.add('secret-entropy');
@@ -441,6 +456,7 @@ Usage:
   node hooks/scan.js --diff                scan modified working-tree files
   node hooks/scan.js --file <path>         scan one file
   node hooks/scan.js --files <p> [p...]    scan specific files
+  node hooks/scan.js --all                 scan every tracked file (baseline)
   node hooks/scan.js --find <id> <file>    record a manual finding
   node hooks/scan.js                       hook mode (PostToolUse JSON on stdin)
 
@@ -479,7 +495,7 @@ function main() {
   }
 
   // CLI Mode: --staged or --diff or --files
-  if (args[0] === '--staged' || args[0] === '--diff' || args[0] === '--files' || args[0] === '--file') {
+  if (args[0] === '--staged' || args[0] === '--diff' || args[0] === '--files' || args[0] === '--file' || args[0] === '--all') {
     let filesToScan = [];
     const { execFileSync } = require('child_process');
 
@@ -493,6 +509,14 @@ function main() {
       try {
         const out = execFileSync('git', ['diff', '--name-only', '--diff-filter=ACM'], { encoding: 'utf8' });
         const root = repoRoot();
+        filesToScan = out.split(/\r?\n/).filter(Boolean).map(f => path.resolve(root, f));
+      } catch { filesToScan = []; }
+    } else if (args[0] === '--all') {
+      // Baseline scan of everything tracked. git ls-files respects .gitignore,
+      // so build output and node_modules stay out without a second filter.
+      try {
+        const root = repoRoot();
+        const out = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' });
         filesToScan = out.split(/\r?\n/).filter(Boolean).map(f => path.resolve(root, f));
       } catch { filesToScan = []; }
     } else if (args[0] === '--file' && args[1]) {

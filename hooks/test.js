@@ -817,6 +817,82 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
 })();
 
+// --- taint: destructuring and Python request.json ---
+// `const { file } = req.query` is the dominant idiom in modern JS/TS, and
+// request.json is standard Flask/FastAPI. Both were invisible.
+(function taintIdioms() {
+  const { loadPatterns, matchContent } = require('./scan.js');
+  const pats = loadPatterns();
+  const ids = (code, ext) => matchContent(code, 'ti.' + ext, pats)
+    .filter(h => h.id.startsWith('taint-')).map(h => h.id);
+
+  const yes = (name, code, ext, id) => {
+    uniq('taint-' + name);
+    if (ids(code, ext).includes(id)) pass++;
+    else { fail++; console.log(`MISS  taint-${name} (want ${id})`); }
+  };
+  const clean = (name, code, ext) => {
+    uniq('taint-' + name);
+    const got = ids(code, ext);
+    if (got.length === 0) pass++;
+    else { fail++; console.log(`FALSE+ taint-${name}: ${got}`); }
+  };
+
+  yes('destructured', 'const { file } = req.query;\nfs.readFileSync(file);', 'js', 'taint-path-traversal');
+  yes('destructuredRenamed', 'const { file: f } = req.query;\nfs.readFileSync(f);', 'js', 'taint-path-traversal');
+  yes('destructuredDefault', 'const { file = "a" } = req.query;\nfs.readFileSync(file);', 'js', 'taint-path-traversal');
+  yes('destructuredMulti', 'const { a, url } = req.body;\nawait fetch(url);', 'js', 'taint-ssrf');
+  yes('pyRequestJson', 'url = request.json.get("url")\nrequests.get(url)', 'py', 'taint-ssrf');
+  yes('pyGetJson', 'url = request.get_json()["u"]\nrequests.get(url)', 'py', 'taint-ssrf');
+
+  clean('destructureNonRequest', 'const { readFile } = require("fs");\nreadFile(p);', 'js');
+  clean('destructureSanitized', 'const { file } = req.query;\nfs.readFileSync(path.basename(file));', 'js');
+  clean('destructureParameterized', 'const { id } = req.params;\ndb.query("SELECT * WHERE i=?", [id]);', 'js');
+})();
+
+// --- placeholder secrets ---
+// A high-entropy placeholder in .env.example is not a secret; flagging it
+// critical teaches people to ignore the rule that finds the real ones.
+(function placeholderSecrets() {
+  const { loadPatterns, matchContent } = require('./scan.js');
+  const pats = loadPatterns();
+  const secretIds = (v) => matchContent(`api_key = "${v}"`, 'ph.py', pats)
+    .filter(h => h.id.includes('secret')).map(h => h.id);
+
+  uniq('placeholders-ignored');
+  const placeholders = ['placeholder-secret-for-development-only', 'changeme-token-1234567890-test',
+                        'your-api-key-goes-here-xxxx', 'REPLACE-WITH-YOUR-REAL-TOKEN-1234',
+                        'EXAMPLE_TOKEN_ABCDEFGHIJKLMNOP'];
+  const flagged = placeholders.filter(v => secretIds(v).length > 0);
+  if (flagged.length === 0) pass++;
+  else { fail++; console.log(`MISS  placeholders-ignored: flagged ${flagged.length}`); }
+
+  uniq('real-secrets-still-flagged');
+  const real = ['sk_live_51H8xQ2eZvKYlo2CabcdefghijklmnopQ', 'ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7'];
+  const missed = real.filter(v => secretIds(v).length === 0);
+  if (missed.length === 0) pass++;
+  else { fail++; console.log(`MISS  real-secrets-still-flagged: missed ${missed.length}`); }
+})();
+
+// --- scan --all ---
+(function scanAll() {
+  const repo = path.join(TMP, 'allrepo');
+  fs.rmSync(repo, { recursive: true, force: true });
+  fs.mkdirSync(repo, { recursive: true });
+  spawnSync('git', ['init', '-q'], { cwd: repo });
+  fs.writeFileSync(path.join(repo, 'bad.js'), 'eval(req.body.x);\n');
+  fs.writeFileSync(path.join(repo, '.gitignore'), 'skipme.js\n');
+  fs.writeFileSync(path.join(repo, 'skipme.js'), 'eval(req.body.y);\n');
+  spawnSync('git', ['add', 'bad.js', '.gitignore'], { cwd: repo });
+
+  uniq('scan-all-tracked-only');
+  const r = spawnSync('node', [SCAN, '--all'], { cwd: repo, encoding: 'utf8',
+    env: { ...process.env, SECURE_CODING_STATE: path.join(TMP, 'all.jsonl'), SECURE_CODING_REPORT: 'off' } });
+  // finds the tracked file, ignores the gitignored one
+  if (r.status === 2 && /bad\.js/.test(r.stdout) && !/skipme/.test(r.stdout)) pass++;
+  else { fail++; console.log(`MISS  scan-all-tracked-only: status=${r.status}`); }
+})();
+
 // --- Done Gate over MCP ---
 // An agent in a sandboxed IDE has no shell, so the whole loop has to be
 // reachable as tools. These delegate to gate.js rather than reimplementing it.

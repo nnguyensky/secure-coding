@@ -36,6 +36,7 @@
   "bin": {
     "secure-coding": "./install.js",
     "secure-coding-scan": "./hooks/scan.js",
+    "secure-coding-gate": "./hooks/gate.js",
     "secure-coding-mcp": "./mcp/server.js"
   },
   "files": [
@@ -54,7 +55,7 @@
   ],
   "scripts": {
     "test": "node hooks/sync.js && node hooks/test.js",
-    "scan": "node hooks/scan.js",
+    "scan": "node hooks/scan.js --all",
     "staged": "node hooks/scan.js --staged",
     "grill": "node hooks/gate.js --grill",
     "gate": "node hooks/gate.js --check",
