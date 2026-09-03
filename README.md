@@ -128,6 +128,48 @@ flowchart TD
 
 ---
 
+## ⏱️ What Runs, and When
+
+Nothing here runs on a schedule or in the background. Each check is attached to
+something you already do.
+
+| You do this | This runs | What happens |
+|---|---|---|
+| Ask an agent to write code touching input, auth, secrets, files, or network calls | The agent loads `SKILL.md` | It reads the rules for that topic before writing, not all 376 patterns |
+| The agent finishes writing a file | `scan.js` — needs a PostToolUse hook in `~/.claude/settings.json`, see [INSTALLATION.md](INSTALLATION.md) | ~1ms. Silent when clean, so it costs no tokens. Otherwise prints the finding and how to fix it |
+| `git commit` | `scan.js --staged`, then `gate.js --check` | Blocks the commit if the staged code has findings, or if it handles requests and the review is unanswered |
+| `git push` | `audit.js` | Blocks the push on a known-vulnerable dependency |
+| Open a PR or push to `main` | GitHub Actions | Re-runs the checks, uploads SARIF so findings appear on the PR diff |
+| Weekly, on GitHub | Dependabot | Opens a PR when a pinned GitHub Action has an update |
+
+### When the Done Gate asks, and when it stays quiet
+
+It only asks about code it has questions for. Everything else passes through:
+
+| Change | Gate |
+|---|---|
+| README, docs, comments | **Skipped** |
+| `package.json`, config, YAML | **Skipped** |
+| CSS, images | **Skipped** |
+| Tests and fixtures | **Skipped** |
+| A utility function with no request handling | **Skipped** |
+| A route or endpoint | **Asks** |
+| Reading `req.query`, `req.body`, `$_GET`, form values | **Asks** |
+| Fetching a record — `findById`, `findFirst`, a `SELECT` | **Asks** |
+| An auth check, or returning 401/403 | **Asks** |
+
+### Turning things off
+
+| To do this | Run |
+|---|---|
+| Skip every check for one commit | `git commit --no-verify` |
+| Skip every check for one commit (no git flag) | `SECURE_CODING_SKIP=1 git commit` |
+| Turn the Done Gate off for a repository | `git config secure-coding.gate false` |
+| Never scan a path | Add it to `ignorePaths` in `.securecodingrc.json` |
+| Silence one finding on one line | `// secure-coding-ignore: <pattern-id>` |
+
+---
+
 ## 🔄 End-to-End Developer Lifecycle Flow
 
 One change, start to finish — what runs automatically and what asks for you.
