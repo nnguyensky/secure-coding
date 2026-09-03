@@ -10,7 +10,7 @@
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-393%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-401%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -32,7 +32,14 @@
 > [!IMPORTANT]
 > **Traditional security checklists fail with AI agents.** Dumping 200+ rules into LLM context burns 30,000+ tokens, dilutes focus, and generates noisy post-write errors.
 
-`secure-coding` inverts this paradigm into an **Inverted 5-Layer Defense-in-Depth Model**:
+**The idea:** don't give the agent every rule. Give it the few that match what it
+is writing right now, then check the result mechanically.
+
+Security guidance is loaded on demand, not up front. A scan runs after the write
+and costs nothing when the code is clean. What a scanner cannot judge — a missing
+ownership check, an absent guard — is asked as a question at the end.
+
+Five layers, from design to remediation:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -63,6 +70,9 @@
 ---
 
 ## 🏛️ System Architecture
+
+How the pieces fit: guidance files the agent reads on demand, pattern files the
+scanner matches against, and hooks that run at write, commit and CI time.
 
 ```mermaid
 flowchart TD
@@ -120,6 +130,8 @@ flowchart TD
 
 ## 🔄 End-to-End Developer Lifecycle Flow
 
+One change, start to finish — what runs automatically and what asks for you.
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -162,8 +174,21 @@ sequenceDiagram
 
 ## 🔍 How Each Layer Works
 
+Each layer answers a different question:
+
+| Layer | Question it answers | When it runs |
+|---|---|---|
+| **0** Design | How should this be built? | Before any code exists |
+| **1** Templates | What does the secure version look like? | While writing |
+| **2** Scanner | Did anything unsafe get written? | After each write, in ~1ms |
+| **3** Verification | Are the dependencies and the whole file clean? | Before commit |
+| **4** Policy & CI | Is the result recorded and shareable? | On commit and in CI |
+| **5** Remediation | How do I fix what was found? | When a finding appears |
+
 ### 🏛️ Layer 0: Planning, Architecture & Secure by Design
-Applied during system design and boundary definition:
+
+Read before writing code, when you are still deciding how a system fits together.
+Each file is loaded only when its topic comes up:
 - **STRIDE & DREAD Threat Modeling** ([`checks/threat-model.md`](checks/threat-model.md)): Structured threat categorization and quantitative risk scoring.
 - **OWASP SbD 36-Control Review & ACSC Defensible Architecture** ([`checks/secure-by-design.md`](checks/secure-by-design.md)): Edge Gateway, mTLS service meshes, Postgres Row-Level Security (RLS), Fail-Closed authorization, and Cross-Domain Solutions (CDS) ingress normalization.
 - **Memory Safety Roadmaps & C/C++ Hardening** ([`checks/memory-safety.md`](checks/memory-safety.md)): Memory-Safe Language decision matrix, Safe Intermediary Wrappers, and compiler hardening (`-fstack-protector-strong`, ASan/UBSan, PIE, CFI).
@@ -206,7 +231,7 @@ Applied during system design and boundary definition:
 - **SARIF v2.1.0 Export** (`hooks/report.js --sarif`): Emits OASIS standard SARIF for GitHub Code Scanning, tagged with `external/cwe/cwe-N`, `OWASP-Annn:2025`, and `security-severity` so alerts land correctly classified rather than untyped.
 - **Software Bill of Materials (SBOM & AI-SBOM)** ([`hooks/sbom.js`](hooks/sbom.js)): Generates CycloneDX v1.5 and SPDX v2.3 manifests with BSI AI-SBOM 7 clusters and ACSC/CISA VEX data.
 - **Git Pre-commit & Pre-push Hooks** (`install.sh` / `hooks/install.js`): Automates staged and repository-wide protection.
-- **Enforced Done Gate** ([`hooks/gate.js`](hooks/gate.js)): IDOR, missing authorization and fail-open error paths cannot be pattern-matched — they are about what is *absent*. The gate records a written answer for each and exits `2` until all four are present. Answers are tied to the current commit, so new work needs a new review, and `"yes"`/`"ok"`/`"done"` are rejected: name the check or say `N/A`.
+- **Done Gate** ([`hooks/gate.js`](hooks/gate.js)): see the section below.
 
 ### 🔧 Layer 5: Automated In-Place Remediation & MCP Server
 - **Interactive Guidance**: `node hooks/fix.js --suggest <id>` prints the `When / Wrong / Right / Watch` block for a finding, sourced from [`checks/fixes.md`](checks/fixes.md) — 135 blocks, every one tagged with its CWE and OWASP 2025 category.
@@ -216,6 +241,9 @@ Applied during system design and boundary definition:
 ---
 
 ## ⚡ Quick Start
+
+Five steps: get the files, check they work, install into a project, wire it
+into your workflow, confirm the agent is using it.
 
 **Requirements:** Node.js 18+ and nothing else. No dependencies are installed — every tool uses the Node standard library only.
 
@@ -297,6 +325,10 @@ Ask your agent to read `SKILL.md`, then have it write something insecure — a q
 
 ## 🛠️ CLI Reference Cookbook
 
+Every command is plain Node with no dependencies. Exit codes are consistent:
+**0** means clean, **2** means findings were reported, **64** means the command
+was used wrongly.
+
 | Category | Command | Description |
 |---|---|---|
 | **🔍 Scanning** | `node hooks/scan.js` | Scans post-write payload on stdin. |
@@ -324,10 +356,11 @@ Ask your agent to read `SKILL.md`, then have it write something insecure — a q
 | | `node hooks/summary.js` | One-line status check (`3 open, 5 fixed`). |
 | | `node hooks/stats.js` | Displays pattern metrics and false-positive rates. |
 | **🔌 MCP Server** | `node mcp/server.js` | Launches native Model Context Protocol stdio server. |
-| **✅ Done Gate** | `node hooks/gate.js --check` | Exits `2` until the manual review is answered. |
+| **✅ Done Gate** | `node hooks/gate.js --check` | Exits `2` if the staged code needs review and it is unanswered. |
 | | `node hooks/gate.js --answer <q> "<a>"` | Records one answer: `ownership`, `authorization`, `taint`, `failure-direction`. |
 | | `node hooks/gate.js --status` | Shows which questions remain. |
-| | `git config secure-coding.gate true` | Opt in to blocking commits on an incomplete review (per-repo; `SECURE_CODING_GATE_REQUIRED=1` also works, but an env var is invisible to IDE and GUI commits). |
+| | `node hooks/gate.js --check --all` | Force a full review even for a docs-only change. |
+| | `git config secure-coding.gate false` | Turn commit blocking off for this repository. |
 | **🧪 Testing** | `node hooks/sync.js` | Validates pattern regexes and template coverage. |
 | | `node hooks/coverage.js` | Verifies all 213 OWASP SCP items are accounted for. |
 | | `node hooks/detect.js` | Reports which languages a project uses. |
@@ -336,9 +369,60 @@ Ask your agent to read `SKILL.md`, then have it write something insecure — a q
 
 ---
 
+## ✅ The Done Gate
+
+**The problem:** the most common API breach is IDOR — fetching a record by an ID
+from the request without checking the caller owns it. A scanner cannot see it.
+`db.findById(req.params.id)` is correct code in one app and a data breach in
+another; the difference is a check that *isn't there*. The same is true of a
+route with no guard, and a `catch` block that lets the request through.
+
+**The answer:** ask. Before a commit lands, four questions have to be answered in
+writing:
+
+| Question | What it asks |
+|---|---|
+| `ownership` | For each record fetched by an ID from the request, what scopes it to the caller? |
+| `authorization` | For each new route, which guard denies an unauthenticated caller? |
+| `taint` | Where does each request value end up — query, file path, shell, URL, template? |
+| `failure-direction` | If the auth check throws, does the request end up denied? |
+
+```bash
+node hooks/gate.js --answer ownership "scoped by db.order.findFirst({where:{id, userId}})"
+node hooks/gate.js --status     # what is still unanswered
+node hooks/gate.js --check      # exits 2 until all four are answered
+```
+
+**It only asks when it matters.** A gate that fires on every commit teaches people
+to reach for `--no-verify`, which would disable the scanner too — they share a
+hook. So it inspects the staged files first, and stays silent unless one of them
+handles a request, accesses data, or makes an authorization decision:
+
+```
+$ git commit -m "fix typo in README"
+gate: skipped — no staged file handles requests, data access, or authorization
+
+$ git commit -m "add order endpoint"
+gate: review required — 1 staged file(s) handle requests or access data:
+  routes/orders.js
+```
+
+**Answers have to say something.** `"yes"`, `"ok"`, `"x"` and a bare `"N/A"` are
+rejected. Name the guard, the predicate, or the test — or write `N/A — <why it
+does not apply>`. Answers are tied to the current commit, so the next change
+needs its own review.
+
+**On by default.** Disable per repository with `git config secure-coding.gate false`,
+bypass one commit with `git commit --no-verify`, or force a full review of any
+change with `node hooks/gate.js --check --all`.
+
+---
+
 ## 🌐 Language Template Matrix
 
-Every template in [`templates/`](templates/) implements concrete, copy-pasteable patterns for all 25 core security controls:
+Each template shows the *correct* implementation of 25 controls in one language —
+the version to copy when you are about to write that code. `N/A` marks a control
+that does not apply to the language: shell scripts have no cookies, C has no CORS.
 
 | # | Security Control | TS | JS | Py | Go | Rs | Java | Kt | Swift | C# | C | PHP | Rb | Sh |
 |:--|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -371,6 +455,10 @@ Every template in [`templates/`](templates/) implements concrete, copy-pasteable
 ---
 
 ## 🤖 AI Agent Integrations
+
+Each agent reads a different file to learn how to behave. `node install.js`
+writes them all. They say the same thing: read `SKILL.md` before writing, scan
+after, and answer the Done Gate before declaring the work done.
 
 <details>
 <summary><b>1. Google Antigravity</b> (Click to expand)</summary>
@@ -449,6 +537,10 @@ Always write secure code from the start. Never defer security fixes.
 </details>
 
 ## 🔌 How to Use Model Context Protocol (MCP) Properly
+
+MCP lets an IDE or agent call the scanner directly instead of shelling out to
+the CLI. Same engine, same results — it returns findings as structured data the
+agent can act on.
 
 `secure-coding` includes a native, zero-dependency JSON-RPC 2.0 MCP server ([`mcp/server.js`](mcp/server.js)). It gives AI agents direct access to 6 security tools without running subshells or polluting chat context.
 
@@ -541,7 +633,16 @@ echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"secure_cod
 
 ## 🧪 Validation & Test Suite
 
-Verify all 393 test assertions, pattern compilation, secret masking, and MCP tools:
+The skill checks itself. Three commands, all of which should pass before you
+trust a change:
+
+| Command | What it proves |
+|---|---|
+| `node hooks/test.js` | Every pattern still catches what it should, and still ignores safe code. |
+| `node hooks/sync.js` | Patterns, templates and remediation blocks agree with each other. |
+| `node hooks/coverage.js` | All 213 OWASP SCP items are accounted for. |
+
+Verify all 401 test assertions, pattern compilation, secret masking, and MCP tools:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js

@@ -810,6 +810,95 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
 })();
 
+// --- ignorePaths is enforced ---
+// It was documented in .securecodingrc.json but scan.js never read it, so
+// fixture directories were scanned anyway.
+(function ignorePaths() {
+  const { scanSingleFile, loadPatterns } = require('./scan.js');
+  uniq('ignore-paths-enforced');
+  // hooks/test.js is listed in ignorePaths and is full of deliberate fixtures.
+  const self = scanSingleFile(path.join(DIR, 'hooks', 'test.js'), loadPatterns());
+  // A file that is not ignored must still report.
+  const live = path.join(TMP, 'notignored.js');
+  fs.writeFileSync(live, 'eval(req.body.x);\n');
+  const other = scanSingleFile(live, loadPatterns());
+  if (self.length === 0 && other.length > 0) pass++;
+  else { fail++; console.log(`MISS  ignore-paths-enforced: ignored=${self.length} live=${other.length}`); }
+})();
+
+// --- gate relevance ---
+// A gate that fires on every commit teaches people to bypass the hook, which
+// would disable the scanner too. It must ask only when the staged code
+// contains what the four questions are about.
+(function gateRelevance() {
+  const repo = path.join(TMP, 'relrepo');
+  fs.rmSync(repo, { recursive: true, force: true });
+  fs.mkdirSync(repo, { recursive: true });
+  const git = (...a) => spawnSync('git', a, { cwd: repo, encoding: 'utf8' });
+  git('init', '-q');
+  const GATE = path.join(TMP, 'rel-gate.json');
+  const check = () => {
+    try { fs.unlinkSync(GATE); } catch {}
+    git('add', '-A');
+    return spawnSync('node', [path.join(DIR, 'hooks', 'gate.js'), '--check'],
+      { cwd: repo, env: { ...process.env, SECURE_CODING_GATE: GATE }, encoding: 'utf8' });
+  };
+  const write = (name, body) => {
+    for (const f of fs.readdirSync(repo)) if (f !== '.git') fs.rmSync(path.join(repo, f), { recursive: true, force: true });
+    fs.writeFileSync(path.join(repo, name), body);
+  };
+
+  // Changes that cannot answer the questions must pass straight through.
+  const skips = [
+    ['README.md', '# docs\n'],
+    ['cfg.json', '{"a":1}\n'],
+    ['math.js', 'export function add(a,b){return a+b}\n'],
+    ['sum.test.js', 'test("adds", () => expect(add(1,2)).toBe(3));\n'],
+  ];
+  uniq('gate-skips-irrelevant');
+  const wrongly = skips.filter(([n, b]) => { write(n, b); return check().status !== 0; });
+  if (wrongly.length === 0) pass++;
+  else { fail++; console.log(`MISS  gate-skips-irrelevant: required review for ${wrongly.map(w => w[0])}`); }
+
+  // Request handling, data access and authorization must all trigger it.
+  const requires = [
+    ['api.js', "app.get('/u/:id', (req,res) => res.json(db.findById(req.params.id)));\n"],
+    ['view.py', '@app.route("/x")\ndef h():\n    return q(request.args["a"])\n'],
+    ['repo.ts', 'const u = await db.user.findFirst({where:{id}});\n'],
+    ['authz.js', 'if (!isAdmin(user)) return res.sendStatus(403);\n'],
+  ];
+  uniq('gate-requires-relevant');
+  const missed = requires.filter(([n, b]) => { write(n, b); return check().status === 0; });
+  if (missed.length === 0) pass++;
+  else { fail++; console.log(`MISS  gate-requires-relevant: skipped ${missed.map(m => m[0])}`); }
+
+  // A docs change alongside a route still needs the review.
+  uniq('gate-mixed-commit');
+  for (const f of fs.readdirSync(repo)) if (f !== '.git') fs.rmSync(path.join(repo, f), { recursive: true, force: true });
+  fs.writeFileSync(path.join(repo, 'README.md'), '# hi\n');
+  fs.writeFileSync(path.join(repo, 'pay.js'), "app.post('/pay', (req,res) => charge(req.body.amt));\n");
+  const mixed = check();
+  if (mixed.status === 2 && /pay\.js/.test(mixed.stderr) && !/README/.test(mixed.stderr)) pass++;
+  else { fail++; console.log(`MISS  gate-mixed-commit: status=${mixed.status}`); }
+
+  // --all forces the review for a deliberate audit.
+  uniq('gate-all-forces');
+  write('README.md', '# docs\n');
+  try { fs.unlinkSync(GATE); } catch {}
+  git('add', '-A');
+  const forced = spawnSync('node', [path.join(DIR, 'hooks', 'gate.js'), '--check', '--all'],
+    { cwd: repo, env: { ...process.env, SECURE_CODING_GATE: GATE }, encoding: 'utf8' });
+  if (forced.status === 2) pass++;
+  else { fail++; console.log(`MISS  gate-all-forces: status=${forced.status}`); }
+
+  // Answers belong to the repo, not the skill install.
+  uniq('gate-state-per-repo');
+  const st = spawnSync('node', [path.join(DIR, 'hooks', 'gate.js'), '--answer', 'ownership', 'scoped by a userId predicate'],
+    { cwd: repo, env: { ...process.env, SECURE_CODING_GATE: '' }, encoding: 'utf8' });
+  if (st.status === 0 && fs.existsSync(path.join(repo, '.git', 'secure-coding-gate.json'))) pass++;
+  else { fail++; console.log('MISS  gate-state-per-repo: answers not stored in the repo'); }
+})();
+
 // --- template roster & README matrix ---
 // sync.js validates the templates that exist; it could not see that shell.md
 // was absent while the README's matrix claimed a Sh column.

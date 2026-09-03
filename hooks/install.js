@@ -124,9 +124,10 @@ if [ -f "$SCAN_SCRIPT" ]; then
   fi
 fi
 
-# Done Gate: the manual review no pattern can perform. Opt in by setting
-# SECURE_CODING_GATE_REQUIRED=1 — off by default so it never surprises a
-# first-time user.
+# Done Gate: the manual review no pattern can perform. On by default, but it
+# only asks when a staged file actually handles requests, data access, or
+# authorization — a docs or config commit passes straight through.
+# Turn it off with: git config secure-coding.gate false
 GATE_SCRIPT="$ROOT_DIR/hooks/gate.js"
 if [ ! -f "$GATE_SCRIPT" ] && [ -f "$HOME/.secure-coding/hooks/gate.js" ]; then
   GATE_SCRIPT="$HOME/.secure-coding/hooks/gate.js"
@@ -135,7 +136,9 @@ GATE_REQUIRED="$SECURE_CODING_GATE_REQUIRED"
 if [ -z "$GATE_REQUIRED" ]; then
   GATE_REQUIRED="$(git config --get secure-coding.gate 2>/dev/null)"
 fi
-case "$GATE_REQUIRED" in 0|false|no|off|"") GATE_REQUIRED="" ;; esac
+# Default on. Only an explicit off value disables it.
+if [ -z "$GATE_REQUIRED" ]; then GATE_REQUIRED="1"; fi
+case "$GATE_REQUIRED" in 0|false|no|off) GATE_REQUIRED="" ;; esac
 
 if [ -n "$GATE_REQUIRED" ] && [ -f "$GATE_SCRIPT" ]; then
   node "$GATE_SCRIPT" --check

@@ -370,6 +370,21 @@ function matchFile(file, patterns) {
   return matchContent(content, file, patterns);
 }
 
+// Match a file against the config's ignorePaths globs (** and * only).
+function isIgnoredPath(file) {
+  const cfg = loadConfig();
+  const globs = cfg && Array.isArray(cfg.ignorePaths) ? cfg.ignorePaths : [];
+  if (globs.length === 0) return false;
+  const rel = path.relative(DIR, path.resolve(file)).split(path.sep).join('/');
+  if (rel.startsWith('..')) return false; // outside the project
+  return globs.some(g => {
+    const re = new RegExp('^' + g.split('/').map(part =>
+      part === '**' ? '.*' : part.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')
+    ).join('/').replace(/\.\*\//g, '(?:.*/)?') + '$');
+    return re.test(rel);
+  });
+}
+
 function scanSingleFile(file, patterns) {
   if (!fs.existsSync(file)) return [];
   // git can list directories (submodules, extensionless dirs); never read one.
@@ -378,6 +393,8 @@ function scanSingleFile(file, patterns) {
   if (SKIP_EXT.has(ext)) return [];
   const segs = file.split(path.sep);
   if (segs.some(s => SKIP_SEG.includes(s))) return [];
+  // .securecodingrc.json ignorePaths — documented but previously unenforced.
+  if (isIgnoredPath(file)) return [];
 
   const hits = matchFile(file, patterns);
   updateState(file, hits);

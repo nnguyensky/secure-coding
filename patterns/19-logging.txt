@@ -26,4 +26,4 @@ logging-disabled	*	\.(setLevel|set_level|level)\s*[=(]\s*["']?(OFF|NONE|SILENT|s
 logging-disabled	java,kt	<root\s+level\s*=\s*"(OFF|NONE)"|Level\.OFF		root logger disabled — no security events will be recorded	high
 logging-disabled	py	logging\.disable\s*\(|logging\.CRITICAL\s*\+\s*1		logging.disable() suppresses records globally — security events are lost	high
 auth-no-log	*	(catch|except)[^)]*\)?\s*[:{][^}]{0,80}(return|res\.)\s*(status\s*\(\s*)?(401|403)	!(log|Log|audit|trace|warn|error)	auth failure returned without logging — an attacker probes silently	medium
-log-truncated	*	\.(slice|substring|substr|Substring)\s*\(\s*0\s*,\s*([0-9]|[1-4][0-9])\s*\)[^;\n]*\)\s*;?\s*$	!(preview|display|ui|render|title)	truncating a log field to a few characters destroys the evidence it was written to preserve	low
+log-truncated	*	(log|logger|Log|Logger|console|syslog|audit)\w*\.\w+\s*\([^\n]*\.(slice|substring|substr|Substring)\s*\(\s*0\s*,\s*([0-9]|[1-4][0-9])\s*\)	!(preview|display|ui|render|title|debug)	truncating a log field to a few characters destroys the evidence it was written to preserve	low

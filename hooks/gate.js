@@ -18,7 +18,71 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const DIR = path.join(__dirname, '..');
-const STATE = process.env.SECURE_CODING_GATE || path.join(DIR, 'checks', 'gate.json');
+function defaultState() {
+  try {
+    const top = execFileSync('git', ['rev-parse', '--show-toplevel'],
+      { cwd: process.cwd(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (top) return path.join(top, '.git', 'secure-coding-gate.json');
+  } catch { /* not a repo */ }
+  return path.join(DIR, 'checks', 'gate.json');
+}
+const STATE = process.env.SECURE_CODING_GATE || defaultState();
+
+// --- relevance ---
+// The four questions are about request handling. A docs, config, or test-only
+// change cannot answer them meaningfully, and a gate that fires on every commit
+// trains people to bypass the hook — which would disable the scanner too, since
+// they share it. So the gate asks only when the staged code actually contains
+// the shapes the questions are about.
+
+// Files that cannot contain a route or a data access.
+const IRRELEVANT_EXT = new Set(['md', 'txt', 'json', 'yml', 'yaml', 'toml', 'lock',
+  'csv', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'ico', 'pdf', 'html', 'css', 'scss']);
+const IRRELEVANT_SEG = ['node_modules', 'dist', 'build', 'vendor', '.git', 'docs',
+  '__tests__', '__snapshots__', 'fixtures'];
+
+// Code shapes the questions are actually about.
+const RELEVANT_CODE = [
+  // a route or handler is declared
+  /\b(app|router|server|api)\s*\.\s*(get|post|put|patch|delete|use|all)\s*\(/i,
+  /@(app|router|bp|blueprint)\.(route|get|post|put|patch|delete)\s*\(/,
+  /@(Get|Post|Put|Patch|Delete|Request)Mapping\b/,
+  /\b(http\.HandleFunc|mux\.Handle|r\.(Get|Post|Put|Delete)\s*\()/,
+  /\[(HttpGet|HttpPost|HttpPut|HttpDelete|Route)\b/,
+  /\b(def|fn|func|function|async)\b[^\n]{0,60}\b(handler|handle_request|controller)\b/i,
+  // a request value is read
+  /\breq(uest)?\s*\.\s*(query|body|params|args|form|cookies|headers|GET|POST)\b/,
+  /\$_(GET|POST|REQUEST|COOKIE|FILES)\b/,
+  /\bgetParameter\s*\(|\bFormValue\s*\(/,
+  // a record is fetched, or a query runs
+  /\.(find|findOne|findById|findFirst|findUnique|get|fetch|load|select)\s*\(/i,
+  /\b(SELECT|INSERT|UPDATE|DELETE)\b[^\n]{0,40}\b(FROM|INTO|SET|WHERE)\b/i,
+  // an authorization or authentication decision
+  /\b(authorize|authorise|authenticate|requireAuth|require_auth|isAdmin|is_admin|hasPermission|has_permission|checkAccess|check_access|canAccess|@login_required|@requires_auth)\b/i,
+  /\b(401|403)\b/,
+];
+
+function relevantFiles(files) {
+  const hits = [];
+  for (const f of files) {
+    const ext = path.extname(f).slice(1).toLowerCase();
+    if (IRRELEVANT_EXT.has(ext)) continue;
+    if (f.split(path.sep).some(seg => IRRELEVANT_SEG.includes(seg))) continue;
+    if (/(^|[.\/])(test|spec)[.\/]|\.(test|spec)\.[a-z]+$|_test\.[a-z]+$/i.test(f)) continue;
+    let text = '';
+    try { text = fs.readFileSync(f, 'utf8'); } catch { continue; }
+    if (RELEVANT_CODE.some(re => re.test(text))) hits.push(f);
+  }
+  return hits;
+}
+
+function stagedFiles() {
+  try {
+    return execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACM'],
+      { cwd: process.cwd(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+      .split(/\r?\n/).filter(Boolean);
+  } catch { return []; }
+}
 
 const QUESTIONS = {
   ownership: 'For each record fetched by an ID from the request, what scopes it to the caller?',
@@ -135,6 +199,23 @@ An answer of "yes"/"ok"/"done" is rejected — name the actual check.
   }
 
   if (cmd === '--check') {
+    // Only ask when the staged code contains what the questions are about.
+    // --all forces the review regardless, for a deliberate audit.
+    if (!args.includes('--all')) {
+      const staged = stagedFiles();
+      if (staged.length > 0) {
+        const relevant = relevantFiles(staged);
+        if (relevant.length === 0) {
+          process.stdout.write(`gate: skipped — no staged file handles requests, data access, or authorization (${staged.length} file(s) checked)\n`);
+          process.exit(0);
+        }
+        if (missing.length > 0) {
+          process.stderr.write(`gate: review required — ${relevant.length} staged file(s) handle requests or access data:\n`);
+          for (const f of relevant.slice(0, 5)) process.stderr.write(`  ${f}\n`);
+          if (relevant.length > 5) process.stderr.write(`  ... and ${relevant.length - 5} more\n`);
+        }
+      }
+    }
     if (missing.length === 0) {
       process.stdout.write(`gate: complete (${Object.keys(QUESTIONS).length}/${Object.keys(QUESTIONS).length} answered @ ${ref})\n`);
       process.exit(0);
