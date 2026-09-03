@@ -106,7 +106,9 @@ function writeHookSafely(hookPath, script) {
     fs.copyFileSync(hookPath, backup);
     chained = script.replace(/\nexit 0\n?$/,
       `\n# Run the hook that was here before secure-coding was installed.\n` +
-      `if [ -x "${backup}" ]; then\n  "${backup}" "$@" || exit $?\nfi\nexit 0\n`);
+      `# Resolved from $0 so it survives the repo being moved or cloned.\n` +
+      `PREV_HOOK="$(dirname "$0")/${name}.pre-secure-coding"\n` +
+      `if [ -x "$PREV_HOOK" ]; then\n  "$PREV_HOOK" "$@" || exit $?\nfi\nexit 0\n`);
     console.log(`${YELLOW}ℹ️  Existing ${name} preserved and chained:${NC} ${backup}`);
   }
   fs.writeFileSync(hookPath, chained, { mode: 0o755 });

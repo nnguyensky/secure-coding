@@ -163,67 +163,11 @@ fi
 if [ "$INSTALL_GIT_HOOKS" = true ]; then
   printf "\n${BOLD}[3/5] Configuring Git hooks...${NC}\n"
   if [ -d "$TARGET_DIR/.git" ]; then
-    HOOKS_DIR="$TARGET_DIR/.git/hooks"
-    mkdir -p "$HOOKS_DIR"
-
-    # Pre-commit hook
-    PRE_COMMIT="$HOOKS_DIR/pre-commit"
-    cat << 'EOF' > "$PRE_COMMIT"
-#!/usr/bin/env sh
-# secure-coding: fast staged scan before commit
-if [ -n "$SECURE_CODING_SKIP" ]; then
-  exit 0
-fi
-
-# Determine script location
-ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-SCAN_SCRIPT="$ROOT_DIR/hooks/scan.js"
-if [ ! -f "$SCAN_SCRIPT" ] && [ -f "$HOME/.secure-coding/hooks/scan.js" ]; then
-  SCAN_SCRIPT="$HOME/.secure-coding/hooks/scan.js"
-fi
-
-if [ -f "$SCAN_SCRIPT" ]; then
-  node "$SCAN_SCRIPT" --staged
-  EXIT_CODE=$?
-  if [ "$EXIT_CODE" -ne 0 ]; then
-    echo ""
-    echo "❌ Commit rejected due to open security findings."
-    echo "💡 Fix the highlighted code or bypass with: git commit --no-verify (or SECURE_CODING_SKIP=1)"
-    exit $EXIT_CODE
-  fi
-fi
-exit 0
-EOF
-    chmod +x "$PRE_COMMIT"
-    printf "${GREEN}✅ Git pre-commit hook installed:${NC} %s\n" "$PRE_COMMIT"
-
-    # Pre-push hook
-    PRE_PUSH="$HOOKS_DIR/pre-push"
-    cat << 'EOF' > "$PRE_PUSH"
-#!/usr/bin/env sh
-# secure-coding: dependency audit and pattern validation before push
-if [ -n "$SECURE_CODING_SKIP" ]; then
-  exit 0
-fi
-
-ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-AUDIT_SCRIPT="$ROOT_DIR/hooks/audit.js"
-if [ ! -f "$AUDIT_SCRIPT" ] && [ -f "$HOME/.secure-coding/hooks/audit.js" ]; then
-  AUDIT_SCRIPT="$HOME/.secure-coding/hooks/audit.js"
-fi
-
-if [ -f "$AUDIT_SCRIPT" ]; then
-  node "$AUDIT_SCRIPT"
-  EXIT_CODE=$?
-  if [ "$EXIT_CODE" -ne 0 ]; then
-    echo "❌ Push rejected: dependency vulnerabilities found by hooks/audit.js"
-    exit $EXIT_CODE
-  fi
-fi
-exit 0
-EOF
-    chmod +x "$PRE_PUSH"
-    printf "${GREEN}✅ Git pre-push hook installed:${NC} %s\n" "$PRE_PUSH"
+      # Delegate to install.js rather than keeping a second copy of the hook
+      # scripts here. The duplicate had already drifted: it overwrote existing
+      # hooks with no backup and never ran the Done Gate.
+      SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+      node "$SCRIPT_DIR/hooks/install.js" --target "$TARGET_DIR" --no-vscode --no-config --yes
   else
     printf "${YELLOW}⚠️  No .git directory found at %s. Skipping git hooks.${NC}\n" "$TARGET_DIR"
   fi

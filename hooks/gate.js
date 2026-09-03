@@ -78,9 +78,16 @@ function relevantFiles(files) {
 
 function stagedFiles() {
   try {
+    // git prints paths relative to the repo root; resolve against it so this
+    // works when run from a subdirectory, not just from the root.
+    let root = process.cwd();
+    try {
+      root = execFileSync('git', ['rev-parse', '--show-toplevel'],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || process.cwd();
+    } catch { /* not a repo */ }
     return execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACM'],
-      { cwd: process.cwd(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-      .split(/\r?\n/).filter(Boolean);
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+      .split(/\r?\n/).filter(Boolean).map(f => path.resolve(root, f));
   } catch { return []; }
 }
 
@@ -203,7 +210,13 @@ An answer of "yes"/"ok"/"done" is rejected — name the actual check.
     // --all forces the review regardless, for a deliberate audit.
     if (!args.includes('--all')) {
       const staged = stagedFiles();
-      if (staged.length > 0) {
+      // Nothing staged means nothing to review. Falling through here made the
+      // gate block on an idle tree, which is the state it is most often run in.
+      if (staged.length === 0) {
+        process.stdout.write('gate: skipped — nothing staged to review\n');
+        process.exit(0);
+      }
+      {
         const relevant = relevantFiles(staged);
         if (relevant.length === 0) {
           process.stdout.write(`gate: skipped — no staged file handles requests, data access, or authorization (${staged.length} file(s) checked)\n`);

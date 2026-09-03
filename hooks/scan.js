@@ -386,6 +386,16 @@ function isIgnoredPath(file) {
   });
 }
 
+// git prints staged paths relative to the repo root, not to cwd. Resolving
+// them against cwd silently produces paths that do not exist when run from a
+// subdirectory, so every staged file gets skipped.
+function repoRoot() {
+  try {
+    return execFileSync('git', ['rev-parse', '--show-toplevel'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || process.cwd();
+  } catch { return process.cwd(); }
+}
+
 // Scan the index copy of a file rather than the working tree, so `--staged`
 // reflects the commit. Falls back to the worktree if the blob cannot be read.
 function scanStagedBlob(file, patterns) {
@@ -395,9 +405,11 @@ function scanStagedBlob(file, patterns) {
   if (isIgnoredPath(file)) return [];
   let content;
   try {
-    const rel = path.relative(process.cwd(), file) || path.basename(file);
+    const root = repoRoot();
+    // git show wants a repo-root-relative path with forward slashes.
+    const rel = (path.relative(root, file) || path.basename(file)).split(path.sep).join('/');
     content = execFileSync('git', ['show', `:${rel}`],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   } catch {
     return scanSingleFile(file, patterns);
   }
@@ -474,12 +486,14 @@ function main() {
     if (args[0] === '--staged') {
       try {
         const out = execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACM'], { encoding: 'utf8' });
-        filesToScan = out.split(/\r?\n/).filter(Boolean).map(f => path.resolve(f));
+        const root = repoRoot();
+        filesToScan = out.split(/\r?\n/).filter(Boolean).map(f => path.resolve(root, f));
       } catch { filesToScan = []; }
     } else if (args[0] === '--diff') {
       try {
         const out = execFileSync('git', ['diff', '--name-only', '--diff-filter=ACM'], { encoding: 'utf8' });
-        filesToScan = out.split(/\r?\n/).filter(Boolean).map(f => path.resolve(f));
+        const root = repoRoot();
+        filesToScan = out.split(/\r?\n/).filter(Boolean).map(f => path.resolve(root, f));
       } catch { filesToScan = []; }
     } else if (args[0] === '--file' && args[1]) {
       filesToScan = [path.resolve(args[1])];

@@ -759,7 +759,7 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   try { fs.unlinkSync(GATE); } catch {}
 
   uniq('gate-empty-fails');
-  if (run('--check').status === 2) pass++;
+  if (run('--check', '--all').status === 2) pass++;
   else { fail++; console.log('MISS  gate-empty-fails: an unanswered gate must exit 2'); }
 
   // A non-answer looks reviewed and is not — worse than silence.
@@ -793,7 +793,7 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   run('--answer', 'authorization', 'requireAdmin middleware');
   run('--answer', 'taint', 'N/A — no request values in this change');
   run('--answer', 'failure-direction', 'catch denies with 403');
-  if (run('--check').status === 0) pass++;
+  if (run('--check', '--all').status === 0) pass++;
   else { fail++; console.log('MISS  gate-complete-passes'); }
 
   // The ref must follow the repo being reviewed, not wherever gate.js lives —
@@ -813,8 +813,53 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   const d = JSON.parse(fs.readFileSync(GATE, 'utf8'));
   d.ref = 'stale000000';
   fs.writeFileSync(GATE, JSON.stringify(d));
-  if (run('--check').status === 2) pass++;
+  if (run('--check', '--all').status === 2) pass++;
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
+})();
+
+// --- second-review findings ---
+(function secondReview() {
+  const repo = path.join(TMP, 'srrepo');
+  fs.rmSync(repo, { recursive: true, force: true });
+  fs.mkdirSync(path.join(repo, 'src'), { recursive: true });
+  spawnSync('git', ['init', '-q'], { cwd: repo });
+  const gateAt = (cwd, state) => spawnSync('node', [path.join(DIR, 'hooks', 'gate.js'), '--check'],
+    { cwd, encoding: 'utf8', env: { ...process.env, SECURE_CODING_GATE: path.join(TMP, state) } });
+
+  // An idle tree has nothing to review; blocking there made the gate fire in
+  // the state it is most often run in.
+  uniq('gate-idle-tree-passes');
+  if (gateAt(repo, 'sr1.json').status === 0) pass++;
+  else { fail++; console.log('MISS  gate-idle-tree-passes: blocked with nothing staged'); }
+
+  // git prints repo-root-relative paths; resolving against cwd made a run from
+  // a subdirectory see no files at all.
+  fs.writeFileSync(path.join(repo, 'src', 'api.js'), 'eval(req.body.x);\n');
+  spawnSync('git', ['add', '-A'], { cwd: repo });
+
+  uniq('scan-staged-from-subdir');
+  const scanAt = (cwd, state) => spawnSync('node', [SCAN, '--staged'], {
+    cwd, encoding: 'utf8',
+    env: { ...process.env, SECURE_CODING_STATE: path.join(TMP, state), SECURE_CODING_REPORT: 'off' } });
+  const root = scanAt(repo, 'sr2.jsonl');
+  const sub = scanAt(path.join(repo, 'src'), 'sr3.jsonl');
+  if (root.status === 2 && sub.status === 2 && /eval/.test(sub.stdout)) pass++;
+  else { fail++; console.log(`MISS  scan-staged-from-subdir: root=${root.status} sub=${sub.status}`); }
+
+  uniq('gate-from-subdir');
+  if (gateAt(path.join(repo, 'src'), 'sr4.json').status === 2) pass++;
+  else { fail++; console.log('MISS  gate-from-subdir: did not see the staged route'); }
+
+  // The chained hook must not embed an absolute path, or moving the repo
+  // breaks it.
+  uniq('hook-chain-relative');
+  const hp = path.join(repo, '.git', 'hooks', 'pre-commit');
+  fs.writeFileSync(hp, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  spawnSync('node', [path.join(DIR, 'install.js'), '--target', repo, '--yes'],
+    { env: { ...process.env, HOME: path.join(TMP, 'srhome') }, encoding: 'utf8' });
+  const hook = fs.readFileSync(hp, 'utf8');
+  if (hook.includes('PREV_HOOK') && !hook.includes(repo)) pass++;
+  else { fail++; console.log('MISS  hook-chain-relative: absolute path embedded'); }
 })();
 
 // --- review findings: state isolation, staged blobs, hook chaining ---
