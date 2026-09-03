@@ -59,6 +59,11 @@ function fixesRaw() {
 
 // Read "OWASP: ... | CWE-89 | A05:2025" off a fixes.md block. SARIF consumers
 // (GitHub code scanning included) key on CWE, so surface it as a real taxonomy.
+// Read the version from package.json rather than hardcoding it; the literal
+// had already drifted to 2.0.0 while the package was 2.1.0.
+let PKG_VERSION = '0.0.0';
+try { PKG_VERSION = require(path.join(DIR, 'package.json')).version || PKG_VERSION; } catch {}
+
 function cweFor(id) {
   const text = fixesRaw();
   if (!text) return null;
@@ -141,7 +146,9 @@ function generateSarif(rows) {
         id: r.id,
         name: r.id,
         shortDescription: { text: `OWASP rule violation: ${r.id}` },
-        fullDescription: { text: r.fix || `Remediation for ${r.id}` },
+        // The remediation block, not r.fix — that is the matched line, which
+        // belongs in the result message, not in the rule's description.
+        fullDescription: { text: fixText(r.id) || `Remediation for ${r.id}` },
         defaultConfiguration: { level: levelMap[r.severity] || 'warning' },
         helpUri: meta ? `https://cwe.mitre.org/data/definitions/${meta.cwe}.html` : 'https://owasp.org',
       };
@@ -190,7 +197,7 @@ function generateSarif(rows) {
         tool: {
           driver: {
             name: 'secure-coding',
-            semanticVersion: '2.0.0',
+            semanticVersion: PKG_VERSION,
             informationUri: 'https://github.com/OWASP',
             rules: Array.from(ruleMap.values()),
           },

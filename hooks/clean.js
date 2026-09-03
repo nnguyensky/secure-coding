@@ -361,39 +361,55 @@ function main() {
     return;
   }
 
-  // CLI mode: --file <path>
+  // CLI mode. Accepts --file <path> or bare paths: the pre-commit framework
+  // sets pass_filenames, so it invokes this as `clean.js a.js b.js`.
   const fileIdx = args.indexOf('--file');
   const jsonMode = args.includes('--json');
   const countMode = args.includes('--count');
 
-  if (fileIdx === -1) {
-    process.stderr.write('Usage: node hooks/clean.js --file <path> [--json] [--count]\n');
-    process.exit(1);
+  const files = [];
+  if (fileIdx !== -1 && args[fileIdx + 1]) {
+    files.push(args[fileIdx + 1]);
+  } else {
+    for (const a of args) {
+      if (!a.startsWith('-') && fs.existsSync(a)) files.push(a);
+    }
   }
 
-  const file = args[fileIdx + 1];
-  if (!file || !fs.existsSync(file)) {
-    process.stderr.write(`File not found: ${file}\n`);
-    process.exit(1);
+  if (files.length === 0) {
+    process.stderr.write('Usage: node hooks/clean.js [--file] <path...> [--json] [--count]\n');
+    process.exit(64);
   }
 
-  if (shouldSkip(file)) {
-    if (jsonMode) console.log('[]');
-    return;
+  const results = [];
+  let total = 0;
+  for (const file of files) {
+    if (!fs.existsSync(file)) {
+      process.stderr.write(`File not found: ${file}\n`);
+      process.exit(1);
+    }
+    if (shouldSkip(file)) continue;
+    const hits = checkFile(file);
+    total += hits.length;
+    results.push({ file, hits });
   }
-
-  const hits = checkFile(file);
 
   if (countMode) {
-    console.log(hits.length);
+    console.log(total);
     return;
   }
 
   if (jsonMode) {
-    console.log(formatOutput(file, hits, true));
-  } else if (hits.length > 0) {
-    console.log(formatOutput(file, hits, false));
+    console.log(JSON.stringify(results.flatMap(r =>
+      JSON.parse(formatOutput(r.file, r.hits, true))), null, 2));
+    return;
   }
+
+  for (const r of results) {
+    if (r.hits.length > 0) console.log(formatOutput(r.file, r.hits, false));
+  }
+  // Exit non-zero so a pre-commit hook actually blocks on violations.
+  if (total > 0) process.exit(2);
 }
 
 main();

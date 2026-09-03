@@ -817,6 +817,114 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
 })();
 
+// --- gate relevance matches the scanner's sources ---
+// scan.js gained request.json/get_json/values; if gate.js does not, staging a
+// Flask handler that reads request.json skips the review it needs.
+(function gateSourceParity() {
+  const repo = path.join(TMP, 'srcparity');
+  fs.rmSync(repo, { recursive: true, force: true });
+  fs.mkdirSync(repo, { recursive: true });
+  spawnSync('git', ['init', '-q'], { cwd: repo });
+  fs.writeFileSync(path.join(repo, 'api.py'), 'url = request.json.get("u")\nrequests.get(url)\n');
+  spawnSync('git', ['add', '-A'], { cwd: repo });
+
+  uniq('gate-sees-request-json');
+  const r = spawnSync('node', [path.join(DIR, 'hooks', 'gate.js'), '--check'],
+    { cwd: repo, encoding: 'utf8', env: { ...process.env, SECURE_CODING_GATE: path.join(TMP, 'sp.json') } });
+  if (r.status === 2) pass++;
+  else { fail++; console.log(`MISS  gate-sees-request-json: status=${r.status}`); }
+})();
+
+// --- clean.js CLI contract ---
+// pass_filenames in .pre-commit-hooks.yaml means positional paths, and a
+// linter that exits 0 on violations cannot block a commit. Both were broken,
+// which made the shipped secure-coding-clean hook a no-op.
+(function cleanCli() {
+  const CLEAN = path.join(DIR, 'hooks', 'clean.js');
+  const dir = path.join(TMP, 'cleancli');
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  const bad = path.join(dir, 'bad.js');
+  const ok = path.join(dir, 'ok.js');
+  fs.writeFileSync(bad, 'function f(a,b,c,d,e){ setTimeout(x, 86400000); }\n');
+  fs.writeFileSync(ok, 'export const add = (a, b) => a + b;\n');
+  const run = (...a) => spawnSync('node', [CLEAN, ...a], { encoding: 'utf8', input: '' });
+
+  uniq('clean-positional-args');
+  const pos = run(bad);
+  if (pos.status === 2 && /Clean code issues/.test(pos.stdout)) pass++;
+  else { fail++; console.log(`MISS  clean-positional-args: status=${pos.status}`); }
+
+  uniq('clean-exits-nonzero');
+  if (run('--file', bad).status === 2) pass++;
+  else { fail++; console.log('MISS  clean-exits-nonzero: violations exited 0'); }
+
+  uniq('clean-clean-file-passes');
+  if (run(ok).status === 0) pass++;
+  else { fail++; console.log('MISS  clean-clean-file-passes'); }
+
+  uniq('clean-multi-file');
+  const multi = run(bad, ok);
+  if (multi.status === 2 && /bad\.js/.test(multi.stdout)) pass++;
+  else { fail++; console.log(`MISS  clean-multi-file: status=${multi.status}`); }
+
+  uniq('clean-json-valid');
+  try {
+    const parsed = JSON.parse(run('--json', bad).stdout);
+    if (Array.isArray(parsed) && parsed.length > 0) pass++;
+    else { fail++; console.log('MISS  clean-json-valid: empty'); }
+  } catch { fail++; console.log('MISS  clean-json-valid: not JSON'); }
+})();
+
+// --- SARIF quality ---
+(function sarifQuality() {
+  const dir = path.join(TMP, 'sarifq');
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  const f = path.join(dir, 'a.js');
+  fs.writeFileSync(f, 'const x=1;\nconst y=2;\neval(req.body.z);\n');
+  const state = path.join(TMP, 'sarifq.jsonl');
+  const env = { ...process.env, SECURE_CODING_STATE: state, SECURE_CODING_REPORT: 'off' };
+  spawnSync('node', [SCAN, '--files', f], { encoding: 'utf8', env });
+  const out = spawnSync('node', [path.join(DIR, 'hooks', 'report.js'), '--sarif'], { encoding: 'utf8', env });
+
+  uniq('sarif-quality');
+  try {
+    const d = JSON.parse(out.stdout);
+    const driver = d.runs[0].tool.driver;
+    const rule = driver.rules.find(r => r.id === 'eval');
+    const res = d.runs[0].results.find(r => r.ruleId === 'eval');
+    const pkg = JSON.parse(fs.readFileSync(path.join(DIR, 'package.json'), 'utf8')).version;
+    const versionOk = driver.semanticVersion === pkg;
+    // fullDescription must be remediation advice, not the matched line.
+    const descOk = rule && !/^Line \d+:/.test(rule.fullDescription.text);
+    const lineOk = res && res.locations[0].physicalLocation.region.startLine === 3;
+    if (versionOk && descOk && lineOk) pass++;
+    else { fail++; console.log(`MISS  sarif-quality: version=${versionOk} desc=${descOk} line=${lineOk}`); }
+  } catch (e) { fail++; console.log(`MISS  sarif-quality: ${e.message}`); }
+})();
+
+// --- installed config matches the repo's own ---
+(function configParity() {
+  const repo = path.join(TMP, 'cfgrepo');
+  fs.rmSync(repo, { recursive: true, force: true });
+  fs.mkdirSync(repo, { recursive: true });
+  spawnSync('git', ['init', '-q'], { cwd: repo });
+  spawnSync('node', [path.join(DIR, 'install.js'), '--target', repo, '--yes'],
+    { env: { ...process.env, HOME: path.join(TMP, 'cfghome') }, encoding: 'utf8' });
+
+  uniq('installed-config-parity');
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(repo, '.securecodingrc.json'), 'utf8'));
+    if (cfg.taintTracking === true && (cfg.ignorePaths || []).includes('reports/**')) pass++;
+    else { fail++; console.log('MISS  installed-config-parity: template drifted from the repo config'); }
+  } catch { fail++; console.log('MISS  installed-config-parity: no config written'); }
+
+  uniq('installed-pr-template');
+  if (fs.existsSync(path.join(repo, '.github', 'pull_request_template.md'))) pass++;
+  else { fail++; console.log('MISS  installed-pr-template'); }
+})();
+
 // --- taint: destructuring and Python request.json ---
 // `const { file } = req.query` is the dominant idiom in modern JS/TS, and
 // request.json is standard Flask/FastAPI. Both were invisible.

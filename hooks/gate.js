@@ -54,7 +54,7 @@ const RELEVANT_CODE = [
   /\[(HttpGet|HttpPost|HttpPut|HttpDelete|Route)\b/,
   /\b(def|fn|func|function|async)\b[^\n]{0,60}\b(handler|handle_request|controller)\b/i,
   // a request value is read
-  /\breq(uest)?\s*\.\s*(query|body|params|args|form|cookies|headers|GET|POST)\b/,
+  /\breq(uest)?\s*\.\s*(query|body|params|args|form|json|get_json|values|cookies|headers|GET|POST)\b/,
   /\$_(GET|POST|REQUEST|COOKIE|FILES)\b/,
   /\bgetParameter\s*\(|\bFormValue\s*\(/,
   // a record is fetched, or a query runs

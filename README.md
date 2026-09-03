@@ -10,7 +10,7 @@
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-446%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-455%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -33,7 +33,7 @@ carry findings. What static analysis genuinely cannot see — a missing ownershi
 check, an absent guard, a fail-open `catch` — it asks as four written questions
 before the change lands.
 
-13 language templates · 376 patterns mapped to CWE and OWASP Top 10:2025 · 446
+13 language templates · 376 patterns mapped to CWE and OWASP Top 10:2025 · 455
 self-tests · zero dependencies.
 
 ## 💡 The Inverted Architecture
@@ -328,7 +328,7 @@ node install.js --agent all --mcp
 ### 2. Verify it works
 
 ```bash
-node hooks/test.js     # expect: pass=446 fail=0
+node hooks/test.js     # expect: pass=455 fail=0
 node hooks/sync.js     # expect: 0 errors, 0 warnings
 ```
 
@@ -443,7 +443,7 @@ pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js
 | | `node hooks/fix.js --suggest <id>` | Shows Wrong vs Right guide for any pattern ID. |
 | | `node hooks/fix.js --apply` | Applies in-place automated code refactoring. |
 | | `node hooks/fix.js --dry-run` | Previews autofix diff without writing files. |
-| **🧹 Quality** | `node hooks/clean.js` | Lints against 14 clean code standards. |
+| **🧹 Quality** | `node hooks/clean.js <paths...>` | Lints against 14 clean code standards; exits 2 on violations. |
 | | `node hooks/summary.js` | One-line status check (`3 open, 5 fixed`). |
 | | `node hooks/stats.js` | Displays pattern metrics and false-positive rates. |
 | **🔌 MCP Server** | `node mcp/server.js` | Launches native Model Context Protocol stdio server. |
@@ -458,7 +458,7 @@ pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js
 | | `node hooks/coverage.js` | Verifies all 213 OWASP SCP items are accounted for. |
 | | `node hooks/detect.js` | Reports which languages a project uses. |
 | | `node hooks/reset.js` | Clears findings state for a new session. |
-| | `node hooks/test.js` | Executes the full 446-test self-check suite. |
+| | `node hooks/test.js` | Executes the full 455-test self-check suite. |
 
 ---
 

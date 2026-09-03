@@ -239,6 +239,26 @@ exit 0
   console.log(`${GREEN}✅ Git pre-push hook installed:${NC} ${prePushPath}`);
 }
 
+// Carry the Done Gate questions into code review. The local gate blocks a
+// commit; this is what preserves the answers for a human reviewer.
+function installPrTemplate(targetDir) {
+  const src = path.join(DIR, '.github', 'pull_request_template.md');
+  if (!fs.existsSync(src)) return;
+  const destDir = path.join(targetDir, '.github');
+  const dest = path.join(destDir, 'pull_request_template.md');
+  if (fs.existsSync(dest)) {
+    console.log(`${YELLOW}ℹ️  PR template already exists:${NC} ${dest}`);
+    return;
+  }
+  try {
+    fs.mkdirSync(destDir, { recursive: true });
+    fs.copyFileSync(src, dest);
+    console.log(`${GREEN}✅ PR template installed:${NC} ${dest}`);
+  } catch (e) {
+    console.log(`${YELLOW}ℹ️  PR template skipped (${e.message})${NC}`);
+  }
+}
+
 function installVsCodeTasks(targetDir) {
   const vscodeDir = path.join(targetDir, '.vscode');
   fs.mkdirSync(vscodeDir, { recursive: true });
@@ -296,6 +316,7 @@ function installConfig(targetDir, severity = 'high') {
     const configContent = {
       failOn: severity,
       entropyDetection: true,
+      taintTracking: true,
       generateMarkdownPR: true,
       modules: {
         llm: true,
@@ -305,7 +326,7 @@ function installConfig(targetDir, severity = 'high') {
         sbd: true,
         iot: true,
       },
-      ignorePaths: ['tests/**', 'fixtures/**', 'scripts/seed/**', 'e2e/**'],
+      ignorePaths: ['tests/**', 'fixtures/**', 'scripts/seed/**', 'e2e/**', 'reports/**'],
       ignorePatterns: [],
       audit: {
         ecosystems: ['npm', 'pnpm', 'pip', 'cargo', 'go', 'dotnet'],
@@ -654,6 +675,7 @@ async function runInteractive() {
   if (installMcp) installMcpConfig(targetDir);
   if (installHooks) installGitHooks(targetDir);
   if (installVscode) installVsCodeTasks(targetDir);
+  installPrTemplate(targetDir);
   installConfig(targetDir, selectedSev);
   configureAgent(targetDir, agentSelected);
 
@@ -727,6 +749,7 @@ function runNonInteractive(args) {
   if (isMcp) installMcpConfig(targetDir);
   if (installHooks) installGitHooks(targetDir);
   if (installVscode) installVsCodeTasks(targetDir);
+  installPrTemplate(targetDir);
   if (installCfg) installConfig(targetDir, 'high');
   if (agentName) configureAgent(targetDir, agentName);
 
