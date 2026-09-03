@@ -381,7 +381,7 @@ Right: set requests and limits for both CPU and memory on every container.
 Watch: start with requests equal to limits, then tune based on actual usage.
 
 ## log-inject
-OWASP: Logging CS, CWE-117
+OWASP: Logging CS | CWE-117 | A09:2025
 User input in log messages can inject CR/LF characters, forging log entries or exploiting log viewers.
 Wrong: console.log(`User ${req.body.name} logged in`), logger.info("Input: " + userInput)
 Right: Use structured logging with parameterized fields. Sanitize input by stripping control characters.

@@ -375,7 +375,7 @@ function installGlobal() {
       fs.writeFileSync(manifestPath, JSON.stringify({
         name: 'secure-coding',
         version: '2.1.0',
-        description: 'OWASP Secure Coding Practices, ACSC/CISA Secure by Design, Clean Code, and LLM Safety Engine.',
+        description: 'Catches insecure code as it is written, then asks the questions a scanner cannot.',
         author: { name: 'OWASP' },
         license: 'MIT',
       }, null, 2) + '\n');
@@ -420,7 +420,7 @@ When writing code that handles user input, authentication, sessions, permissions
           fs.writeFileSync(manifestPath, JSON.stringify({
             name: 'secure-coding',
             version: '2.1.0',
-            description: 'OWASP Secure Coding Practices, ACSC/CISA Secure by Design, Clean Code, and LLM Safety Engine.',
+            description: 'Catches insecure code as it is written, then asks the questions a scanner cannot.',
             author: { name: 'OWASP' },
             license: 'MIT',
           }, null, 2) + '\n');

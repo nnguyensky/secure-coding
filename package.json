@@ -1,7 +1,7 @@
 {
   "name": "secure-coding",
   "version": "2.1.0",
-  "description": "Proactive OWASP Secure Coding, ACSC/CISA Secure-by-Design, Clean Code & AI Safety Engine for AI Agents & Developers.",
+  "description": "Scans every file an AI agent writes against 376 OWASP, Secure-by-Design and CWE patterns in ~1ms. Blocks commits on findings, and on the ownership and authorization questions no pattern can answer.",
   "keywords": [
     "security",
     "secure-coding",

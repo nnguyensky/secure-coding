@@ -2,7 +2,7 @@
 
 # 🛡️ secure-coding
 
-**Proactive OWASP Secure Coding, ACSC/CISA Secure-by-Design, Clean Code & AI Safety Engine**
+**Catches insecure code as it is written, then asks the questions a scanner cannot.**
 
 [![OWASP Coverage](https://img.shields.io/badge/OWASP%20SCP-213%2F213%20Controls-blue?style=for-the-badge&logo=owasp&logoColor=white)](checks/review.md)
 [![Secure by Design](https://img.shields.io/badge/ACSC%20%2F%20CISA-Secure%20by%20Design-orange?style=for-the-badge&logo=shield&logoColor=white)](checks/secure-by-design.md)
@@ -10,7 +10,7 @@
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-401%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-406%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -26,6 +26,15 @@
 ---
 
 </div>
+
+A security skill for AI coding agents. It loads only the rules that match what is
+being written, scans each file the moment it is saved, and blocks commits that
+carry findings. What static analysis genuinely cannot see — a missing ownership
+check, an absent guard, a fail-open `catch` — it asks as four written questions
+before the change lands.
+
+13 language templates · 376 patterns mapped to CWE and OWASP Top 10:2025 · 406
+self-tests · zero dependencies.
 
 ## 💡 The Inverted Architecture
 
@@ -429,7 +438,7 @@ pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js
 | | `node hooks/coverage.js` | Verifies all 213 OWASP SCP items are accounted for. |
 | | `node hooks/detect.js` | Reports which languages a project uses. |
 | | `node hooks/reset.js` | Clears findings state for a new session. |
-| | `node hooks/test.js` | Executes the full 402-test self-check suite. |
+| | `node hooks/test.js` | Executes the full 406-test self-check suite. |
 
 ---
 
@@ -706,7 +715,7 @@ trust a change:
 | `node hooks/sync.js` | Patterns, templates and remediation blocks agree with each other. |
 | `node hooks/coverage.js` | All 213 OWASP SCP items are accounted for. |
 
-Verify all 401 test assertions, pattern compilation, secret masking, and MCP tools:
+Verify all 406 test assertions, pattern compilation, secret masking, and MCP tools:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js
