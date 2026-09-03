@@ -371,6 +371,23 @@ Every command is plain Node with no dependencies. Exit codes are consistent:
 **0** means clean, **2** means findings were reported, **64** means the command
 was used wrongly.
 
+**Most of these are manual.** Only six run on their own, and each is attached to
+a git or CI event — the ⚡ column below marks them. Everything unmarked runs only
+when you type it.
+
+| ⚡ | Command | Runs automatically when |
+|---|---|---|
+| ⚡ | `scan.js --staged` | `git commit` — blocks on findings |
+| ⚡ | `gate.js --check` | `git commit`, after the scan — blocks if the staged code needs review |
+| ⚡ | `audit.js` | `git push` — blocks on a vulnerable dependency |
+| ⚡ | `report.js` | Any scan that finds something, writing `reports/security-<date>.html`. Set `SECURE_CODING_REPORT=off` to stop it |
+| ⚡ | `sync.js`, `test.js`, `audit.js`, `scan.js --files`, `report.js --sarif`, `sbom.js` | A push or PR to `main`/`master`/`develop`, via GitHub Actions |
+| ⚡ | `scan.js` (stdin) | An agent finishes writing a file — only if you add the PostToolUse hook to `~/.claude/settings.json` |
+
+`clean.js` runs automatically only if you enable the `secure-coding-clean`
+pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js`,
+`coverage.js`, `reset.js`, `sbom.js` locally, and the MCP server — is manual.
+
 | Category | Command | Description |
 |---|---|---|
 | **🔍 Scanning** | `node hooks/scan.js` | Scans post-write payload on stdin. |
@@ -407,7 +424,7 @@ was used wrongly.
 | | `node hooks/coverage.js` | Verifies all 213 OWASP SCP items are accounted for. |
 | | `node hooks/detect.js` | Reports which languages a project uses. |
 | | `node hooks/reset.js` | Clears findings state for a new session. |
-| | `node hooks/test.js` | Executes full 298-test self-check suite. |
+| | `node hooks/test.js` | Executes the full 402-test self-check suite. |
 
 ---
 
