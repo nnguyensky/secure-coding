@@ -810,6 +810,36 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
 })();
 
+// --- --global actually installs the skill ---
+// The generated git hooks fall back to $HOME/.secure-coding/hooks/*.js. That
+// directory used to be created empty, so after an npx install every hook was a
+// silent no-op — a commit with eval() in it sailed through.
+(function globalInstall() {
+  const home = path.join(TMP, 'globalhome');
+  const proj = path.join(TMP, 'globalproj');
+  fs.rmSync(home, { recursive: true, force: true });
+  fs.rmSync(proj, { recursive: true, force: true });
+  fs.mkdirSync(proj, { recursive: true });
+  spawnSync('git', ['init', '-q'], { cwd: proj });
+  spawnSync('node', [path.join(DIR, 'install.js'), '--global', '--target', proj, '--yes'],
+    { env: { ...process.env, HOME: home }, encoding: 'utf8' });
+
+  uniq('global-copies-skill');
+  const needed = ['hooks/scan.js', 'hooks/gate.js', 'patterns', 'checks'];
+  const absent = needed.filter(f => !fs.existsSync(path.join(home, '.secure-coding', f)));
+  if (absent.length === 0) pass++;
+  else { fail++; console.log(`MISS  global-copies-skill: ${absent.join(', ')} not copied`); }
+
+  // The fallback must produce a hook that actually blocks.
+  uniq('global-hook-blocks');
+  fs.writeFileSync(path.join(proj, 'bad.js'), 'eval(req.body.x);\n');
+  spawnSync('git', ['add', '-A'], { cwd: proj });
+  const c = spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-m', 't'],
+    { cwd: proj, env: { ...process.env, HOME: home }, encoding: 'utf8' });
+  if (c.status !== 0) pass++;
+  else { fail++; console.log('MISS  global-hook-blocks: eval() was committed'); }
+})();
+
 // --- PostToolUse auto-configuration ---
 // Write-time scanning is the trigger that does not need git. install.js used
 // to only print a hint, so most installs never had it.

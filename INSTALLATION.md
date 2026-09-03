@@ -28,10 +28,10 @@ Run the interactive terminal wizard directly via npm/npx:
 
 ```bash
 # Launch interactive setup wizard
-npx secure-coding
+npx github:nnguyensky/secure-coding --global
 
 # Or install with MCP server and Antigravity rules non-interactively
-npx secure-coding --agent antigravity --mcp --yes
+npx github:nnguyensky/secure-coding --global --agent antigravity --mcp --yes
 ```
 
 ---
@@ -296,8 +296,8 @@ If your project uses [pre-commit](https://pre-commit.com/), add to your reposito
 
 ```yaml
 repos:
-  - repo: https://github.com/owasp/secure-coding
-    rev: v2.1.0
+  - repo: https://github.com/nnguyensky/secure-coding
+    rev: main          # pin to a commit sha once you have one you trust
     hooks:
       - id: secure-coding-scan
       - id: secure-coding-clean

@@ -114,6 +114,13 @@ if [ ! -f "$SCAN_SCRIPT" ] && [ -f "$HOME/.secure-coding/hooks/scan.js" ]; then
   SCAN_SCRIPT="$HOME/.secure-coding/hooks/scan.js"
 fi
 
+if [ ! -f "$SCAN_SCRIPT" ]; then
+  # Say so rather than passing silently: a hook that cannot find the scanner
+  # looks identical to a clean scan.
+  echo "⚠️  secure-coding: scanner not found — this commit was NOT scanned."
+  echo "   Reinstall with: npx github:nnguyensky/secure-coding --global"
+fi
+
 if [ -f "$SCAN_SCRIPT" ]; then
   node "$SCAN_SCRIPT" --staged
   EXIT_CODE=$?
@@ -330,7 +337,19 @@ function installGlobal() {
   const globalDir = path.join(homeDir, '.secure-coding');
   try {
     fs.mkdirSync(globalDir, { recursive: true });
-    console.log(`${GREEN}✅ Global skill directory configured:${NC} ${globalDir}`);
+      // Copy the skill in. The generated git hooks fall back to
+      // $HOME/.secure-coding/hooks/*.js, so an empty directory here leaves
+      // every hook a silent no-op — which is what happens after `npx`, whose
+      // cache is deleted the moment the command exits.
+      if (path.resolve(globalDir) !== path.resolve(DIR)) {
+        for (const item of ['hooks', 'patterns', 'checks', 'templates', 'mcp',
+                            'SKILL.md', 'AGENTS.md', 'install.js', '.securecodingrc.json']) {
+          const from = path.join(DIR, item);
+          if (!fs.existsSync(from)) continue;
+          fs.cpSync(from, path.join(globalDir, item), { recursive: true, force: true });
+        }
+      }
+    console.log(`${GREEN}✅ Global skill installed:${NC} ${globalDir}`);
   } catch (e) {
     console.log(`${YELLOW}ℹ️  Global directory write skipped (${e.message})${NC}`);
   }
