@@ -327,7 +327,7 @@ Ask your agent to read `SKILL.md`, then have it write something insecure — a q
 | **✅ Done Gate** | `node hooks/gate.js --check` | Exits `2` until the manual review is answered. |
 | | `node hooks/gate.js --answer <q> "<a>"` | Records one answer: `ownership`, `authorization`, `taint`, `failure-direction`. |
 | | `node hooks/gate.js --status` | Shows which questions remain. |
-| | `SECURE_CODING_GATE_REQUIRED=1` | Opt in to blocking commits on an incomplete review. |
+| | `git config secure-coding.gate true` | Opt in to blocking commits on an incomplete review (per-repo; `SECURE_CODING_GATE_REQUIRED=1` also works, but an env var is invisible to IDE and GUI commits). |
 | **🧪 Testing** | `node hooks/sync.js` | Validates pattern regexes and template coverage. |
 | | `node hooks/coverage.js` | Verifies all 213 OWASP SCP items are accounted for. |
 | | `node hooks/detect.js` | Reports which languages a project uses. |

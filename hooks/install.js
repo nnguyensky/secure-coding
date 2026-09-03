@@ -131,7 +131,13 @@ GATE_SCRIPT="$ROOT_DIR/hooks/gate.js"
 if [ ! -f "$GATE_SCRIPT" ] && [ -f "$HOME/.secure-coding/hooks/gate.js" ]; then
   GATE_SCRIPT="$HOME/.secure-coding/hooks/gate.js"
 fi
-if [ -n "$SECURE_CODING_GATE_REQUIRED" ] && [ -f "$GATE_SCRIPT" ]; then
+GATE_REQUIRED="$SECURE_CODING_GATE_REQUIRED"
+if [ -z "$GATE_REQUIRED" ]; then
+  GATE_REQUIRED="$(git config --get secure-coding.gate 2>/dev/null)"
+fi
+case "$GATE_REQUIRED" in 0|false|no|off|"") GATE_REQUIRED="" ;; esac
+
+if [ -n "$GATE_REQUIRED" ] && [ -f "$GATE_SCRIPT" ]; then
   node "$GATE_SCRIPT" --check
   GATE_CODE=$?
   if [ "$GATE_CODE" -ne 0 ]; then

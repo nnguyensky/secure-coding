@@ -103,7 +103,8 @@ node hooks/gate.js --answer taint "N/A — no new request values"
 node hooks/gate.js --answer failure-direction "catch returns 403; covered by test"
 ```
 
-"N/A" is valid when a question does not apply. `"yes"`, `"ok"` and `"done"` are
+Enable commit-time blocking with `git config secure-coding.gate true` once the
+git hooks are installed. "N/A" is valid when a question does not apply. `"yes"`, `"ok"` and `"done"` are
 rejected — name the check. Answers are tied to the current commit, so new work
 needs a new review. For every route, handler, or data access you added or
 changed:
