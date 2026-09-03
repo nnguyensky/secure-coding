@@ -810,6 +810,62 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
 })();
 
+// --- PostToolUse auto-configuration ---
+// Write-time scanning is the trigger that does not need git. install.js used
+// to only print a hint, so most installs never had it.
+(function postToolUse() {
+  const home = path.join(TMP, 'fakehome');
+  const proj = path.join(TMP, 'ptuproj');
+  fs.rmSync(home, { recursive: true, force: true });
+  fs.rmSync(proj, { recursive: true, force: true });
+  fs.mkdirSync(proj, { recursive: true });
+  spawnSync('git', ['init', '-q'], { cwd: proj });
+  const install = () => spawnSync('node', [path.join(DIR, 'install.js'),
+    '--target', proj, '--agent', 'claude', '--yes'],
+    { env: { ...process.env, HOME: home }, encoding: 'utf8' });
+  const settingsPath = path.join(home, '.claude', 'settings.json');
+
+  uniq('ptu-configured');
+  install();
+  let ok = false;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    ok = JSON.stringify(cfg.hooks.PostToolUse).includes('scan.js');
+  } catch {}
+  if (ok) pass++;
+  else { fail++; console.log('MISS  ptu-configured: PostToolUse hook not written'); }
+
+  // Running install twice must not stack duplicate hooks.
+  uniq('ptu-idempotent');
+  install();
+  let count = 0;
+  try { count = JSON.parse(fs.readFileSync(settingsPath, 'utf8')).hooks.PostToolUse.length; } catch {}
+  if (count === 1) pass++;
+  else { fail++; console.log(`MISS  ptu-idempotent: ${count} entries after two installs`); }
+
+  // Existing settings must survive untouched.
+  uniq('ptu-preserves-settings');
+  fs.rmSync(home, { recursive: true, force: true });
+  fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify({ model: 'opus', hooks: { PreToolUse: [{ matcher: 'Bash' }] } }));
+  install();
+  let kept = false;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    kept = cfg.model === 'opus' && !!cfg.hooks.PreToolUse && !!cfg.hooks.PostToolUse;
+  } catch {}
+  if (kept) pass++;
+  else { fail++; console.log('MISS  ptu-preserves-settings: existing keys lost'); }
+
+  // A malformed settings.json must be left alone, not overwritten.
+  uniq('ptu-safe-on-bad-json');
+  fs.writeFileSync(settingsPath, '{ "model": "opus", BROKEN');
+  const before = fs.readFileSync(settingsPath, 'utf8');
+  install();
+  if (fs.readFileSync(settingsPath, 'utf8') === before) pass++;
+  else { fail++; console.log('MISS  ptu-safe-on-bad-json: clobbered an unparseable file'); }
+})();
+
 // --- ignorePaths is enforced ---
 // It was documented in .securecodingrc.json but scan.js never read it, so
 // fixture directories were scanned anyway.

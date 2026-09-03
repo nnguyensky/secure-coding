@@ -133,10 +133,15 @@ flowchart TD
 Nothing here runs on a schedule or in the background. Each check is attached to
 something you already do.
 
+**The main check does not involve git.** The scanner runs the moment the agent
+writes a file, so a problem is caught while the code is still being written. The
+git hooks are a second net, for code the agent did not write and for the review
+questions that only make sense once a change is complete.
+
 | You do this | This runs | What happens |
 |---|---|---|
 | Ask an agent to write code touching input, auth, secrets, files, or network calls | The agent loads `SKILL.md` | It reads the rules for that topic before writing, not all 376 patterns |
-| The agent finishes writing a file | `scan.js` — needs a PostToolUse hook in `~/.claude/settings.json`, see [INSTALLATION.md](INSTALLATION.md) | ~1ms. Silent when clean, so it costs no tokens. Otherwise prints the finding and how to fix it |
+| The agent finishes writing a file | `scan.js`, via the PostToolUse hook `install.js` sets up | ~1ms. Silent when clean, so it costs no tokens. Otherwise prints the finding and how to fix it, immediately — no commit needed |
 | `git commit` | `scan.js --staged`, then `gate.js --check` | Blocks the commit if the staged code has findings, or if it handles requests and the review is unanswered |
 | `git push` | `audit.js` | Blocks the push on a known-vulnerable dependency |
 | Open a PR or push to `main` | GitHub Actions | Re-runs the checks, uploads SARIF so findings appear on the PR diff |
@@ -382,7 +387,7 @@ when you type it.
 | ⚡ | `audit.js` | `git push` — blocks on a vulnerable dependency |
 | ⚡ | `report.js` | Any scan that finds something, writing `reports/security-<date>.html`. Set `SECURE_CODING_REPORT=off` to stop it |
 | ⚡ | `sync.js`, `test.js`, `audit.js`, `scan.js --files`, `report.js --sarif`, `sbom.js` | A push or PR to `main`/`master`/`develop`, via GitHub Actions |
-| ⚡ | `scan.js` (stdin) | An agent finishes writing a file — only if you add the PostToolUse hook to `~/.claude/settings.json` |
+| ⚡ | `scan.js` (stdin) | **An agent finishes writing a file.** `install.js --agent claude` configures this, so scanning happens at write time and never waits for a commit |
 
 `clean.js` runs automatically only if you enable the `secure-coding-clean`
 pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js`,

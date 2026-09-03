@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const os = require('os');
 const { execSync, exec } = require('child_process');
 
 const DIR = path.resolve(__dirname, '..');
@@ -483,8 +484,40 @@ Always write secure code from the start. Never defer security fixes.
     } catch {}
   }
 
-  if (agentName === 'claude') {
-    console.log(`${CYAN}ℹ️  For Claude Code, add the PostToolUse hook to ~/.claude/settings.json (see INSTALLATION.md).${NC}`);
+  if (agentName === 'claude' || agentName === 'all') {
+    // Scan on every agent write, without waiting for a commit. This is the
+    // trigger that does not depend on git at all.
+    const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
+    try {
+      let settings = {};
+      if (fs.existsSync(settingsPath)) {
+        try { settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8')); }
+        catch {
+          console.log(`${YELLOW}⚠️  ~/.claude/settings.json is not valid JSON — leaving it alone.${NC}`);
+          console.log(`${CYAN}   Add the PostToolUse hook by hand (see INSTALLATION.md).${NC}`);
+          settings = null;
+        }
+      }
+      if (settings) {
+        settings.hooks = settings.hooks || {};
+        const entries = Array.isArray(settings.hooks.PostToolUse) ? settings.hooks.PostToolUse : [];
+        const cmd = `node ${path.join(DIR, 'hooks', 'scan.js')}`;
+        const already = JSON.stringify(entries).includes(path.join(DIR, 'hooks', 'scan.js'));
+        if (already) {
+          console.log(`${GREEN}✅ Claude Code write-time scan already configured${NC}`);
+        } else {
+          entries.push({ matcher: 'Write|Edit', hooks: [{ type: 'command', command: cmd }] });
+          settings.hooks.PostToolUse = entries;
+          fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+          fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+          console.log(`${GREEN}✅ Claude Code write-time scan enabled:${NC} ${settingsPath}`);
+          console.log(`${CYAN}   Every file the agent writes is scanned immediately — no commit needed.${NC}`);
+        }
+      }
+    } catch (e) {
+      console.log(`${YELLOW}⚠️  Could not update ${settingsPath}: ${e.message}${NC}`);
+      console.log(`${CYAN}   Add the PostToolUse hook by hand (see INSTALLATION.md).${NC}`);
+    }
   }
 }
 
