@@ -20,7 +20,7 @@ No finding is marked as accepted, deferred, or ignored without an explicit revie
 If the task creates or changes a **route, auth, tenancy, a data model, an
 upload, an outbound call, or an LLM tool**, the security-relevant decisions are
 not yours to assume. Run the interview in
-[`checks/secure-grilling.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/secure-grilling.md):
+[`checks/secure-grilling.md`](checks/secure-grilling.md):
 ask the whole frontier in one round, recommend the secure default for each, and
 wait for the answer.
 
@@ -34,19 +34,19 @@ tests. Look facts up yourself — only unsettled *decisions* go to the user.
 ### Step 1: Before Writing — Pick Rules & Architecture
 
 1. **Check if your task touches a specialized domain:**
-   - **System Architecture & Zero Trust** → [`checks/secure-by-design.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/secure-by-design.md) (OWASP SbD 36-control checklist, ACSC Modern Defensible Architecture, Ingress Normalization)
-   - **Memory Safety & C/C++ Hardening** → [`checks/memory-safety.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/memory-safety.md) (Memory safe roadmap, language selection matrix, Safe Intermediary Wrappers, compiler flags)
-   - **Keys & Cryptography** → [`checks/cryptography.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/cryptography.md) (FIPS 140-3 KMS, envelope encryption, chain of trust & revocation, positions of trust, PQC)
-   - **IoT & Embedded Systems** → [`checks/iot-security.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/iot-security.md) (AS ETSI EN 303 645 13 principles, Secure Boot, JTAG lockout)
-   - **Release & Deployment Safety** → [`checks/deployment-safety.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/deployment-safety.md) (Pre-mortem failure analysis, canary rollout pipeline)
-   - **Supply Chain, AI-SBOM & VEX** → [`checks/sbom.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/sbom.md) (BSI 7 AI clusters, ACSC/CISA VEX exploitability states)
-   - **Adopting a Dependency, Vendor or SaaS** → [`checks/technology-selection.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/technology-selection.md) (ACSC procurement questions, Secure by Default, supply chain & jurisdiction)
-   - **AI/LLMs & Prompts** → [`checks/llm-top10.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/llm-top10.md) (Prompt injection, output handling, excessive agency, token caps)
-   - **Settling Architecture Before Coding** → [`checks/secure-grilling.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/secure-grilling.md) (5 security frontiers, frontier rounds with secure defaults, pre-answers the Done Gate)
-   - **Threat Modeling** → [`checks/threat-model.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/threat-model.md) (STRIDE & DREAD analysis)
-   - **SSDF Attestation & Coverage** → [`checks/ssdf-mapping.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/ssdf-mapping.md) (NIST SP 800-218 PO/PS/PW/RV map, and the gaps this skill does not cover)
-   - **Dynamic Testing & Fuzzing** → [`checks/dynamic-testing.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/dynamic-testing.md) (what to fuzz based on findings, tooling per language, races and authz matrices)
-   - **OWASP Top 10 (2025) & CWE ids** → [`checks/owasp-top10-2025.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/owasp-top10-2025.md) (category → CWE → pattern map, and which categories patterns cannot cover)
+   - **System Architecture & Zero Trust** → [`checks/secure-by-design.md`](checks/secure-by-design.md) (OWASP SbD 36-control checklist, ACSC Modern Defensible Architecture, Ingress Normalization)
+   - **Memory Safety & C/C++ Hardening** → [`checks/memory-safety.md`](checks/memory-safety.md) (Memory safe roadmap, language selection matrix, Safe Intermediary Wrappers, compiler flags)
+   - **Keys & Cryptography** → [`checks/cryptography.md`](checks/cryptography.md) (FIPS 140-3 KMS, envelope encryption, chain of trust & revocation, positions of trust, PQC)
+   - **IoT & Embedded Systems** → [`checks/iot-security.md`](checks/iot-security.md) (AS ETSI EN 303 645 13 principles, Secure Boot, JTAG lockout)
+   - **Release & Deployment Safety** → [`checks/deployment-safety.md`](checks/deployment-safety.md) (Pre-mortem failure analysis, canary rollout pipeline)
+   - **Supply Chain, AI-SBOM & VEX** → [`checks/sbom.md`](checks/sbom.md) (BSI 7 AI clusters, ACSC/CISA VEX exploitability states)
+   - **Adopting a Dependency, Vendor or SaaS** → [`checks/technology-selection.md`](checks/technology-selection.md) (ACSC procurement questions, Secure by Default, supply chain & jurisdiction)
+   - **AI/LLMs & Prompts** → [`checks/llm-top10.md`](checks/llm-top10.md) (Prompt injection, output handling, excessive agency, token caps)
+   - **Settling Architecture Before Coding** → [`checks/secure-grilling.md`](checks/secure-grilling.md) (5 security frontiers, frontier rounds with secure defaults, pre-answers the Done Gate)
+   - **Threat Modeling** → [`checks/threat-model.md`](checks/threat-model.md) (STRIDE & DREAD analysis)
+   - **SSDF Attestation & Coverage** → [`checks/ssdf-mapping.md`](checks/ssdf-mapping.md) (NIST SP 800-218 PO/PS/PW/RV map, and the gaps this skill does not cover)
+   - **Dynamic Testing & Fuzzing** → [`checks/dynamic-testing.md`](checks/dynamic-testing.md) (what to fuzz based on findings, tooling per language, races and authz matrices)
+   - **OWASP Top 10 (2025) & CWE ids** → [`checks/owasp-top10-2025.md`](checks/owasp-top10-2025.md) (category → CWE → pattern map, and which categories patterns cannot cover)
 
 2. **Identify which of the 9 code groups apply:**
    - (1) Data in/out • (2) Identity & Auth • (3) Secrets & Crypto • (4) Errors & Logs • (5) Storage & Transport • (6) Files & System • (7) Deployment & Config • (8) API Security • (9) Containers & Cloud
@@ -147,7 +147,7 @@ If you cannot name the check, it does not exist — go add it.
 
 ## 🛡️ The 9 Security Code Groups
 
-Identify which apply, then write to them. Full per-group requirements: [`checks/code-groups.md`](file:///Users/nhan/Personal/My%20AI%20Workspace/My%20Skills/secure-coding/checks/code-groups.md).
+Identify which apply, then write to them. Full per-group requirements: [`checks/code-groups.md`](checks/code-groups.md).
 
 1. **Data In/Out** — validate server-side against an allowlist; parameterize every query; no unsafe deserialization; escape per output context.
 2. **Identity & Access** — deny by default; verify ownership on every request; rotate session id on login; CSRF tokens; Argon2id.

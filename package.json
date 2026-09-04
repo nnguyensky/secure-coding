@@ -22,33 +22,38 @@
   ],
   "license": "MIT",
   "author": {
-    "name": "OWASP / Secure Coding Community"
+    "name": "Stephen N.",
+    "email": "n.nguyensky@gmail.com"
   },
-  "homepage": "https://github.com/owasp/secure-coding",
+  "homepage": "https://github.com/nnguyensky/secure-coding",
   "repository": {
     "type": "git",
-    "url": "https://github.com/owasp/secure-coding.git"
+    "url": "https://github.com/nnguyensky/secure-coding.git"
   },
   "bugs": {
-    "url": "https://github.com/owasp/secure-coding/issues"
+    "url": "https://github.com/nnguyensky/secure-coding/issues"
   },
   "main": "./hooks/scan.js",
   "bin": {
     "secure-coding": "./install.js",
     "secure-coding-scan": "./hooks/scan.js",
     "secure-coding-gate": "./hooks/gate.js",
-    "secure-coding-mcp": "./mcp/server.js"
+    "secure-coding-mcp": "./mcp/server.js",
+    "secure-coding-clean": "./hooks/clean.js",
+    "secure-coding-audit": "./hooks/audit.js",
+    "secure-coding-sbom": "./hooks/sbom.js",
+    "secure-coding-fix": "./hooks/fix.js"
   },
   "files": [
     "AGENTS.md",
     "SKILL.md",
     "README.md",
     "INSTALLATION.md",
-    "checks/",
+    "checks/*.md",
     "hooks/",
     "patterns/",
     "templates/",
-    "reports/",
+    "reports/security.html",
     "mcp/",
     "install.js",
     "install.sh"
@@ -61,6 +66,7 @@
     "gate": "node hooks/gate.js --check",
     "audit": "node hooks/audit.js",
     "clean": "node hooks/clean.js --all",
+    "fix": "node hooks/fix.js",
     "sbom": "node hooks/sbom.js --format cyclonedx --ai --vex",
     "mcp": "node mcp/server.js",
     "wizard": "node hooks/config.js --ui"

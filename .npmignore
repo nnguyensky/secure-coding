@@ -1,0 +1,14 @@
+# Scan state is per-project and generated at runtime. Publishing it shipped
+# absolute paths from the maintainer's other repositories to every installer,
+# and gave users a findings list that was not theirs.
+checks/findings.jsonl
+checks/audit.json
+checks/gate.json
+reports/security-*.html
+
+# Development-only
+.github/
+.securecodingrc.json
+*.tgz
+node_modules/
+.DS_Store

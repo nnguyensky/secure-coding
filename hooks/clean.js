@@ -450,8 +450,16 @@ function main() {
     }
   }
 
+  // An explicit --help is a request that succeeded, not a usage error: exit 0
+  // so `secure-coding-clean --help && ...` works. Missing arguments stay 64.
+  const USAGE = 'Usage: node hooks/clean.js [--file] <path...> | --all [--json] [--count]\n';
+  if (args.includes('--help') || args.includes('-h')) {
+    process.stdout.write(USAGE);
+    process.exit(0);
+  }
+
   if (files.length === 0) {
-    process.stderr.write('Usage: node hooks/clean.js [--file] <path...> [--json] [--count]\n');
+    process.stderr.write(USAGE);
     process.exit(64);
   }
 
