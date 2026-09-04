@@ -1,8 +1,0 @@
----
-globs: ["**/*.{py,js,ts,go,java,kt,swift,rb,php,cs,rs,c,cpp,h,sh,tf,yaml,yml}"]
-alwaysApply: false
----
-Before writing a route, auth, data model, upload, outbound call or LLM tool, ask the five security frontiers in checks/secure-grilling.md with a recommended secure default for each — do not guess them silently.
-Apply OWASP Secure Coding Practices, ACSC Modern Defensible Architecture, and Clean Code rules while writing code.
-Refer to SKILL.md, templates/, and checks/secure-by-design.md for secure patterns.
-After writing, run `node hooks/scan.js --staged`, then `node hooks/gate.js --check` before declaring the task complete.
