@@ -11,6 +11,15 @@
 
 const fs = require('fs');
 const path = require('path');
+const { helpRequested } = require('./config');
+
+// --help prints usage and exits, without running the tool.
+const USAGE = `Usage: node hooks/grep.js <pattern-id> [path]
+
+Searches the project for occurrences of one pattern id.
+  <pattern-id>  a rule id such as sql-concat or weak-rng
+  [path]        limit the search to a path (default: whole project)`;
+if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 const DIR = path.resolve(__dirname, '..');
 const PATTERNS_DIR = path.join(DIR, 'patterns');

@@ -5,7 +5,7 @@
 # id	exts	regex	!exclude	hint  (ONE regex: !a|b|c, never !a|!b|!c)
 docker-copy-secrets	Dockerfile	(COPY|ADD)\s+\.\s+\.|COPY\s+\*\s+\.|ADD\s+\*\s+\.	docker: COPY/ADD . copies everything into image — use .dockerignore, copy only needed files		critical
 docker-copy-secrets	Dockerfile	(COPY|ADD)\s+[.](env|secret|key|pem|crt|env\.local|\.env\.production)	docker: secrets copied into image — use build secrets or runtime env vars		critical
-docker-copy-secrets	Dockerfile	(COPY|ADD)\s+\.\s+/app/docker: copying entire context into image — use .dockerignore to exclude secrets, .git, node_modules			critical
+docker-copy-secrets	Dockerfile	(COPY|ADD)\s+\.\s+/app	docker: copying entire context into image — use .dockerignore to exclude secrets, .git, node_modules		critical
 
 dockerfile-latest	Dockerfile	^FROM\s+\S+:latest\s*$	docker: unpinned :latest tag — pin to specific version (e.g., node:20-slim)		high
 dockerfile-latest	Dockerfile	^FROM\s+\S+\s+(as|AS)\s+\S+\s*$	!scratch	!localhost	high

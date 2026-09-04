@@ -37,7 +37,7 @@ function reportPath() {
 
 const SECTION_NAMES = {
   '2': 'Output Encoding', '3': 'Authentication & Password', '4': 'Session Management',
-  '5': 'Access Control', '6': 'Cryptographic Practices', '8': 'Data Protection',
+  '5': 'Access Control', '6': 'Cryptographic Practices', '7': 'Error Handling', '8': 'Data Protection',
   '9': 'Communication Security', '10': 'System Configuration', '11': 'Database Security',
   '12': 'File Management', '13': 'Memory Management', '14': 'General Coding',
   '15': 'API Security', '16': 'Container Security', '19': 'Logging Security',

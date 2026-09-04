@@ -7,6 +7,15 @@
 
 const fs = require('fs');
 const path = require('path');
+const { helpRequested } = require('./config');
+
+// --help prints usage and exits, without running the tool.
+const USAGE = `Usage: node hooks/coverage.js
+
+Verifies every OWASP SCP item (1-213) is either checked in review.md or
+recorded in reference/out-of-scope.md. Exits non-zero if any is unaccounted
+for, and reports OWASP ids on fixes.md blocks that have drifted.`;
+if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 const DIR = path.resolve(__dirname, '..');
 const REVIEW = path.join(DIR, 'checks', 'review.md');

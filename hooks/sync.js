@@ -6,6 +6,16 @@
 
 const fs = require('fs');
 const path = require('path');
+const { helpRequested } = require('./config');
+
+// --help prints usage and exits, without running the tool.
+const USAGE = `Usage: node hooks/sync.js [--fix]
+
+Validates consistency across patterns, templates, review.md and fixes.md,
+checks pattern column integrity and alternation safety, and verifies the
+counts documented in README.md and INSTALLATION.md.
+  --fix   attempt to auto-fix missing entries`;
+if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 const DIR = path.resolve(__dirname, '..');
 const PATTERNS_DIR = path.join(DIR, 'patterns');
@@ -267,6 +277,43 @@ function checkDocCounts() {
   }
 }
 
+
+// --- Pattern column integrity ---
+// A missing tab merges the remediation hint into the regex column. The rule
+// still loads and still compiles, so nothing complains -- it just silently
+// stops matching. docker-copy-secrets was dead this way, and the corrupted
+// tail of k8s-readonly killed its `VOLUME /var` branch while `/etc` kept
+// working, which is why the failure went unnoticed.
+function checkPatternColumns() {
+  console.log('\npattern column integrity:');
+  let bad = 0;
+  const files = fs.existsSync(PATTERNS_DIR)
+    ? fs.readdirSync(PATTERNS_DIR).filter(f => f.endsWith('.txt')) : [];
+  for (const f of files) {
+    const lines = fs.readFileSync(path.join(PATTERNS_DIR, f), 'utf8').split(/\r?\n/);
+    lines.forEach((line, i) => {
+      if (!line.trim() || line.startsWith('#')) return;
+      const cols = line.split('\t');
+      const at = `${f}:${i + 1}`;
+      if (cols.length < 4) {
+        bad++; err(`${at} has ${cols.length} tab-separated columns, needs at least 4`);
+        return;
+      }
+      const rx = cols[2] || '';
+      // Prose markers that cannot appear in any regex we write. An em-dash is
+      // the giveaway: every hint uses one, no pattern does.
+      if (/[—–]/.test(rx)) {
+        bad++; err(`${at} "${cols[0]}" has hint prose in the regex column (em-dash): ${rx.slice(0, 60)}`);
+        return;
+      }
+      try { new RegExp(rx); } catch (e) {
+        bad++; err(`${at} "${cols[0]}" regex does not compile: ${e.message.slice(0, 60)}`);
+      }
+    });
+  }
+  if (bad === 0) ok('every pattern line has its columns intact');
+}
+
 // --- Main ---
 function main() {
   console.log('--- sync check ---\n');
@@ -402,6 +449,7 @@ function main() {
     ok('no cross-file pattern duplicates');
   }
 
+  checkPatternColumns();
   checkAlternations();
   checkDocCounts();
 

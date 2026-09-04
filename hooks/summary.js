@@ -46,7 +46,7 @@ open.forEach(f => {
 
 const secLabels = {
   '2': 'output', '3': 'auth', '4': 'session', '5': 'access',
-  '6': 'crypto', '8': 'data', '9': 'tls', '10': 'config',
+  '6': 'crypto', '7': 'errors', '8': 'data', '9': 'tls', '10': 'config',
   '11': 'db', '12': 'files', '13': 'memory', '14': 'general',
   '15': 'api', '16': 'container', '19': 'logging', '20': 'password',
   '21': 'ssrf', '22': 'upload', '23': 'nosql', '24': 'oauth2',
@@ -55,8 +55,11 @@ const secLabels = {
   '33': 'llm', '34': 'sbd', '35': 'iot',
 };
 
+// Section ids come from the pattern filenames and are zero-padded ("07"),
+// while these keys are not, so every single-digit section fell through to the
+// raw number: "07:1" instead of "errors:1". Strip the pad before looking up.
 const openBySection = Object.entries(bySec)
-  .map(([k, v]) => `${secLabels[k] || k}:${v}`)
+  .map(([k, v]) => `${secLabels[String(k).replace(/^0+/, '')] || k}:${v}`)
   .join(' ');
 
 // Severity breakdown

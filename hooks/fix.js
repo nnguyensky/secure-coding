@@ -18,7 +18,9 @@ const { statePath, helpRequested } = require('./config');
 const USAGE = `Usage: node hooks/fix.js [--print] [--id <id>] [--file <file>] [--count]
 
 Prints remediation guidance for open findings, from checks/fixes.md.
-  --print      show fix blocks in full
+  --print      show what would change, without writing (display only)
+  --apply      rewrite files in place
+  --dry-run    same as --print
   --id <id>    guidance for one pattern id
   --file <f>   guidance for findings in one file
   --count      print the number of open findings only`;
@@ -29,7 +31,11 @@ const STATE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
 const FIXES = path.join(DIR, 'checks', 'fixes.md');
 
 const args = process.argv.slice(2);
-const APPLY = args.includes('--apply') || args.includes('--print');
+// --print is display-only, as its name and the usage text say. It used to be
+// OR-ed into APPLY, so asking to see the guidance rewrote the source files on
+// disk -- and printed "Autofix Applied" while doing it.
+const APPLY = args.includes('--apply');
+const PRINT = args.includes('--print');
 const COUNT = args.includes('--count');
 const JSON_OUT = args.includes('--json');
 const idIdx = args.indexOf('--id');
@@ -207,7 +213,8 @@ function main() {
     return true;
   });
 
-  const isDryRun = args.includes('--dry-run');
+  // --print and --dry-run both show what would change without writing.
+  const isDryRun = args.includes('--dry-run') || PRINT;
   if (APPLY || isDryRun) {
     console.log(`--- Applying autofixes (${unique.length} finding(s)) ---`);
     let autofixedCount = 0;

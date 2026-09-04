@@ -23,4 +23,4 @@ k8s-np	yml,yaml	networkPolicy\s*:\s*\{\}|kind:\s*NetworkPolicy	docker: no networ
 k8s-psa	yml,yaml	podSecurityAdmission\s*:\s*\{\}|pod-security.kubernetes.io/enforce\s*:\s*privileged	docker: permissive pod security standard — enforce restricted or baseline profile		high
 
 k8s-seccomp	yml,yaml	seccompProfile\s*:\s*\{\}|seccompProfile:\s*\{\}	docker: missing seccomp profile — set RuntimeDefault or custom seccomp profile		medium
-k8s-readonly	Dockerfile	^VOLUME\s+/etc|^VOLUME\s+/var/docker: mounting sensitive host paths — mount only what's needed, use read-only where possible			medium
+k8s-readonly	Dockerfile	^VOLUME\s+/etc|^VOLUME\s+/var	docker: mounting sensitive host paths — mount only what's needed, use read-only where possible		medium

@@ -149,7 +149,7 @@ if [ "$INSTALL_GLOBAL" = true ]; then
   "name": "secure-coding",
   "version": "2.1.0",
   "description": "OWASP Secure Coding Practices, ACSC/CISA Secure by Design, Clean Code, and LLM Safety Engine.",
-  "author": { "name": "OWASP" },
+  "author": { "name": "Stephen N." },
   "license": "MIT"
 }
 PEOF

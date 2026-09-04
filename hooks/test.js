@@ -6,6 +6,17 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+
+// --help must not execute the suite. Placed before the state redirect below,
+// so asking for help touches nothing.
+const { helpRequested } = require('./config');
+if (helpRequested(process.argv.slice(2), `Usage: node hooks/test.js
+
+Runs the self-check suite: bad fixtures must trigger, good fixtures must stay
+silent. Prints "pass=N fail=N" and exits non-zero on any failure. Records the
+assertion count to checks/.test-count for sync.js to verify documented counts.`)) {
+  process.exit(0);
+}
 const { spawnSync } = require('child_process');
 
 const DIR = path.resolve(__dirname, '..');
@@ -1234,6 +1245,139 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   const blk = i === -1 ? '' : src.slice(i, i + 400);
   if (blk && !/version: '\d/.test(blk) && !/name: 'OWASP'/.test(blk)) pass++;
   else { fail++; console.log('plugin-manifest-reads-package-json: still hardcoded'); }
+})();
+
+// --- pattern column corruption ---
+// A missing tab merged the hint into the regex column. The rule still loaded
+// and still compiled, so it failed silently: docker-copy-secrets matched
+// nothing at all, and k8s-readonly lost its `VOLUME /var` branch while /etc
+// kept working.
+(function patternColumnsIntact() {
+  const { loadPatterns, matchContent } = require('./scan.js');
+  const pats = loadPatterns();
+  const hit = (code, file, id) => matchContent(code, file, pats).some(h => h.id === id);
+
+  uniq('corrupted-rules-match-again');
+  const musts = [
+    ['VOLUME /var/run/docker.sock', 'Dockerfile', 'k8s-readonly'],
+    ['VOLUME /etc/secrets', 'Dockerfile', 'k8s-readonly'],
+    ['COPY . /app', 'Dockerfile', 'docker-copy-secrets'],
+    ['ADD . /app', 'Dockerfile', 'docker-copy-secrets'],
+    ['const bb = busboy({ headers });', 'up.js', 'file-upload'],
+    ['const f = formidable({});', 'up.js', 'file-upload'],
+  ];
+  const missed = musts.filter(([c, f, id]) => !hit(c, f, id));
+  if (missed.length === 0) pass++;
+  else { fail++; console.log(`corrupted-rules-match-again: ${missed.map(m => m[2] + ' <- ' + m[0]).join('; ')}`); }
+
+  uniq('corrupted-rules-no-false-positives');
+  const nots = [
+    ['COPY package.json /app/', 'Dockerfile', 'docker-copy-secrets'],
+    ['VOLUME /data', 'Dockerfile', 'k8s-readonly'],
+  ];
+  const wrong = nots.filter(([c, f, id]) => hit(c, f, id));
+  if (wrong.length === 0) pass++;
+  else { fail++; console.log(`corrupted-rules-no-false-positives: ${wrong.length}`); }
+
+  // No regex we write contains an em-dash; every hint does.
+  uniq('no-hint-prose-in-regex-column');
+  const dir = path.join(DIR, 'patterns');
+  const offenders = [];
+  for (const f of fs.readdirSync(dir).filter(x => x.endsWith('.txt'))) {
+    fs.readFileSync(path.join(dir, f), 'utf8').split('\n').forEach((line, i) => {
+      if (!line.trim() || line.startsWith('#')) return;
+      const cols = line.split('\t');
+      if (cols.length < 4) offenders.push(`${f}:${i + 1} (${cols.length} cols)`);
+      else if (/[—–]/.test(cols[2])) offenders.push(`${f}:${i + 1} (em-dash)`);
+    });
+  }
+  if (offenders.length === 0) pass++;
+  else { fail++; console.log(`no-hint-prose-in-regex-column: ${offenders.join(', ')}`); }
+})();
+
+// --- fix.js --print must not write ---
+// --print was OR-ed into APPLY, so asking to see the guidance rewrote the
+// source files and printed "Autofix Applied" while doing it.
+(function printIsReadOnly() {
+  uniq('fix-print-does-not-mutate');
+  const os = require('os');
+  const cp = require('child_process');
+  const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-fix-')));
+  const src = 'function t() {\n  const token = Math.random().toString(36);\n  return token;\n}\n';
+  let verdict = '';
+  try {
+    cp.execFileSync('git', ['init', '-q'], { cwd: d, stdio: 'ignore' });
+    fs.writeFileSync(path.join(d, 'token.js'), src);
+    cp.execFileSync('git', ['add', '-A'], { cwd: d, stdio: 'ignore' });
+    cp.execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'i'],
+      { cwd: d, stdio: 'ignore' });
+    // The suite sets SECURE_CODING_STATE globally; clear it so this scratch
+    // project records findings into its own checks/ where fix.js will look.
+    const env = { ...process.env };
+    delete env.SECURE_CODING_STATE;
+    delete env.SECURE_CODING_AUDIT;
+    cp.spawnSync('node', [path.join(DIR, 'hooks', 'scan.js'), '--all'], { cwd: d, encoding: 'utf8', env });
+    const found = fs.existsSync(path.join(d, 'checks', 'findings.jsonl'))
+      && /weak-rng/.test(fs.readFileSync(path.join(d, 'checks', 'findings.jsonl'), 'utf8'));
+    if (!found) verdict = 'fixture produced no weak-rng finding';
+    else {
+      cp.spawnSync('node', [path.join(DIR, 'hooks', 'fix.js'), '--print'], { cwd: d, encoding: 'utf8', env });
+      if (fs.readFileSync(path.join(d, 'token.js'), 'utf8') !== src) verdict = '--print rewrote the file';
+      else {
+        cp.spawnSync('node', [path.join(DIR, 'hooks', 'fix.js'), '--apply'], { cwd: d, encoding: 'utf8', env });
+        if (fs.readFileSync(path.join(d, 'token.js'), 'utf8') === src) verdict = '--apply did not write';
+      }
+    }
+  } catch (e) { verdict = `harness failed: ${e.message.slice(0, 50)}`; }
+  finally { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ } }
+  if (!verdict) pass++;
+  else { fail++; console.log(`fix-print-does-not-mutate: ${verdict}`); }
+})();
+
+// --- section 07 and other zero-padded sections are labelled ---
+// Section ids are zero-padded from the filenames ("07"), but the label maps
+// were keyed unpadded, so every single-digit section printed as a raw number.
+(function sectionLabels() {
+  uniq('padded-section-ids-resolve-to-labels');
+  const rep = fs.readFileSync(path.join(DIR, 'hooks', 'report.js'), 'utf8');
+  const sum = fs.readFileSync(path.join(DIR, 'hooks', 'summary.js'), 'utf8');
+  const bad = [];
+  if (!/'7': 'Error Handling'/.test(rep)) bad.push('report.js missing section 7');
+  if (!/'7': 'errors'/.test(sum)) bad.push('summary.js missing section 7');
+  // Both lookups must strip the zero pad, or the map entries never match.
+  if (!/replace\(\/\^0\+\/, ''\)/.test(rep)) bad.push('report.js does not strip zero pad');
+  if (!/replace\(\/\^0\+\/, ''\)/.test(sum)) bad.push('summary.js does not strip zero pad');
+  if (bad.length === 0) pass++;
+  else { fail++; console.log(`padded-section-ids-resolve-to-labels: ${bad.join(', ')}`); }
+})();
+
+// --- the config wizard is actually shipped ---
+(function wizardShipped() {
+  uniq('config-wizard-in-package-files');
+  const pkg = require(path.join(DIR, 'package.json'));
+  const listed = (pkg.files || []).includes('reports/config-wizard.html');
+  const exists = fs.existsSync(path.join(DIR, 'reports', 'config-wizard.html'));
+  if (listed && exists) pass++;
+  else { fail++; console.log(`config-wizard-in-package-files: listed=${listed} exists=${exists}`); }
+})();
+
+// --- every CLI answers --help without doing its work ---
+(function allToolsAnswerHelp() {
+  uniq('all-clis-answer-help');
+  const cp = require('child_process');
+  const tools = ['grep.js', 'detect.js', 'coverage.js', 'sync.js', 'frontiers.js',
+    'scan.js', 'clean.js', 'gate.js', 'test.js'];
+  const bad = [];
+  for (const t of tools) {
+    const r = cp.spawnSync('node', [path.join(DIR, 'hooks', t), '--help'],
+      { encoding: 'utf8', timeout: 30000 });
+    const out = (r.stdout || '') + (r.stderr || '');
+    if (r.status !== 0) bad.push(`${t} (exit ${r.status})`);
+    // gate.js leads with its own title line rather than "Usage:".
+    else if (!/^(Usage|secure-coding|Done Gate)/m.test(out)) bad.push(`${t} (no usage)`);
+  }
+  if (bad.length === 0) pass++;
+  else { fail++; console.log(`all-clis-answer-help: ${bad.join(', ')}`); }
 })();
 
 // --- no hardcoded test counts ---

@@ -7,7 +7,7 @@
 # id	exts	regex	!exclude	hint
 file-upload	py	multer\s*\(|upload\.single\s*\(|upload\.array\s*\(|request\.files\[	file upload: validate MIME type server-side, check magic bytes, enforce size limit		high
 file-upload	js,ts	multer\s*\(|upload\.single\s*\(|upload\.array\s*\(|req\.files|req\.file	file upload: validate MIME type server-side, check magic bytes, enforce size limit		high
-file-upload	js,ts	busboy\s*\(|formidable\s*\(|multiparty\s*\(|parse\s*\(\s*\{.*uploadFile upload: validate MIME type and size before writing to disk			high
+file-upload	js,ts	busboy\s*\(|formidable\s*\(|multiparty\s*\(|parse\s*\(\s*\{.*upload	File upload: validate MIME type and size before writing to disk		high
 file-upload	java,kt	MultipartRequest|getPart\s*\(|getParts\s*\(|@MultipartConfig	file upload: validate Content-Type, check magic bytes, enforce size limit		high
 file-upload	rb	Rack::Multipart|ActionDispatch::Http::UploadedFile|request\.files\[	file upload: validate MIME type, enforce size limit		high
 file-upload	php	\$_FILES\[|move_uploaded_file\s*\(|\['tmp_name'\]|\["tmp_name"\]	file upload: validate MIME type, check magic bytes, enforce size limit		high

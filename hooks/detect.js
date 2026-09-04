@@ -7,6 +7,14 @@
 
 const fs = require('fs');
 const path = require('path');
+const { helpRequested } = require('./config');
+
+// --help prints usage and exits, without running the tool.
+const USAGE = `Usage: node hooks/detect.js [dir]
+
+Detects project languages and frameworks from file extensions and config
+files. Prints a JSON array of language names, or [] when nothing matches.`;
+if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 const DIR = process.argv[2] || process.cwd();
 const OUT = process.env.DETECT_OUT || 'json';

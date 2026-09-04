@@ -144,3 +144,28 @@ function render(domain) {
 }
 
 module.exports = { FRONTIERS, DOMAINS, forDomain, render };
+
+// The file has a shebang and is executable, so it has to work when run
+// directly rather than exiting silently. `gate.js --grill` and the MCP tool
+// both render the same data through render()/forDomain().
+if (require.main === module) {
+  const { helpRequested } = require('./config');
+  const args = process.argv.slice(2);
+  const USAGE = `Usage: node hooks/frontiers.js [domain] [--json]
+
+Prints the security questions to settle before writing a route, auth change,
+data model, upload, outbound call or LLM tool.
+  [domain]  one of: ${DOMAINS.join(', ')} (default: all five)
+  --json    machine-readable output`;
+  if (helpRequested(args, USAGE)) process.exit(0);
+
+  const domain = args.find(a => !a.startsWith('-'));
+  if (domain && !DOMAINS.includes(domain)) {
+    process.stderr.write(`frontiers.js: unknown domain '${domain}'\n\n${USAGE}\n`);
+    process.exit(64); // EX_USAGE
+  }
+  // render() takes the domain label and resolves it itself; passing the
+  // resolved array made the heading read "[object Object],[object Object]".
+  if (args.includes('--json')) console.log(JSON.stringify(forDomain(domain), null, 2));
+  else console.log(render(domain));
+}

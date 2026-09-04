@@ -54,6 +54,7 @@
     "patterns/",
     "templates/",
     "reports/security.html",
+    "reports/config-wizard.html",
     "mcp/",
     "install.js",
     "install.sh"
