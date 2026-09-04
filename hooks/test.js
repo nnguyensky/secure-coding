@@ -1617,6 +1617,56 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log(`config-cli-exposed-as-bin: bin=${target} executable=${executable}`); }
 })();
 
+// --- every command the docs name actually exists ---
+// sync.js guards the counts, but a documented flag or a renamed script is
+// invisible to it. README claimed 135 fix blocks against 138 and listed a
+// 'poetry' ecosystem that was never implemented.
+(function documentedCommandsExist() {
+  uniq('documented-commands-resolve');
+  const docs = ['README.md', 'SKILL.md', 'INSTALLATION.md'];
+  const scripts = new Set();
+  for (const d of docs) {
+    const p2 = path.join(DIR, d);
+    if (!fs.existsSync(p2)) continue;
+    const text = fs.readFileSync(p2, 'utf8');
+    for (const m of text.matchAll(/node (hooks\/[a-z]+\.js|mcp\/server\.js)/g)) {
+      scripts.add(m[1]);
+    }
+  }
+  const missing = [...scripts].filter(sc => !fs.existsSync(path.join(DIR, sc)));
+  if (missing.length === 0 && scripts.size > 5) pass++;
+  else { fail++; console.log(`documented-commands-resolve: found ${scripts.size}, missing ${missing.join(', ')}`); }
+
+  // The audit ecosystem list in README must name what audit.js implements.
+  uniq('documented-ecosystems-match-code');
+  const auditSrc = fs.readFileSync(path.join(DIR, 'hooks', 'audit.js'), 'utf8');
+  const implemented = [...auditSrc.matchAll(/^    name: '([^']+)'/gm)].map(m => m[1]);
+  const readme = fs.readFileSync(path.join(DIR, 'README.md'), 'utf8');
+  const claim = readme.match(/(\d+) ecosystems \(([^)]+)\)/);
+  const bad = [];
+  if (!claim) bad.push('no ecosystem list in README');
+  else {
+    const listed = claim[2].split(',').map(x => x.replace(/[`\s]/g, ''));
+    if (Number(claim[1]) !== implemented.length) bad.push(`claims ${claim[1]}, implements ${implemented.length}`);
+    if (listed.length !== implemented.length) bad.push(`lists ${listed.length} names`);
+    // 'go' is the user-facing alias for the 'gomod' entry.
+    const norm = (x) => (x === 'gomod' ? 'go' : x);
+    const impl = new Set(implemented.map(norm));
+    const unknown = listed.filter(x => !impl.has(norm(x)));
+    if (unknown.length) bad.push(`not implemented: ${unknown.join(', ')}`);
+  }
+  if (bad.length === 0) pass++;
+  else { fail++; console.log(`documented-ecosystems-match-code: ${bad.join('; ')}`); }
+
+  // fixes.md block count appears in prose, which no count guard covers.
+  uniq('documented-fix-block-count');
+  const blocks = (fs.readFileSync(path.join(DIR, 'checks', 'fixes.md'), 'utf8')
+    .match(/^## /gm) || []).length;
+  const m2 = readme.match(/— (\d+) blocks, every one tagged/);
+  if (m2 && Number(m2[1]) === blocks) pass++;
+  else { fail++; console.log(`documented-fix-block-count: README says ${m2 ? m2[1] : 'nothing'}, fixes.md has ${blocks}`); }
+})();
+
 // --- no hardcoded test counts ---
 // Four stale-number bugs this session all came from literals. The installer
 // banners claimed 298 and 292 while the suite was at 469, and a banner that
