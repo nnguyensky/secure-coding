@@ -210,7 +210,17 @@ function isSuppressed(line, ruleId) {
   if (!m) return false;
   const ids = m[1].split(/[,\s]+/).map(x => x.trim().toLowerCase()).filter(Boolean);
   const id = ruleId.toLowerCase();
-  return ids.includes(id) || ids.includes(id.replace(/^cc-/, '')) || ids.includes('all');
+  const short = id.replace(/^cc-/, '');
+  // scan.js and clean.js name the same defect differently. A reader writing
+  // one id means the defect, not the tool, so accept either spelling.
+  const ALIASES = {
+    'swallowed-error': ['swallowed-exception'],
+    'swallowed-error-comment': ['swallowed-exception'],
+    'empty-throw': ['swallowed-exception'],
+    'dead-code': ['unreachable'],
+  };
+  const alts = ALIASES[short] || [];
+  return ids.includes(id) || ids.includes(short) || alts.some(a => ids.includes(a)) || ids.includes('all');
 }
 
 function shouldSkip(filePath) {
@@ -472,8 +482,21 @@ function main() {
   for (const r of results) {
     if (r.hits.length > 0) console.log(formatOutput(r.file, r.hits, false));
   }
-  // Exit non-zero so a pre-commit hook actually blocks on violations.
-  if (total > 0) process.exit(2);
+  // Report everything, but only block on what .securecodingrc.json says is
+  // blocking. scan.js already honours failOn; a linter that fails a commit
+  // over a single-letter variable name gets bypassed, and then it catches
+  // nothing at all.
+  const SEV_WEIGHT = { critical: 4, high: 3, medium: 2, low: 1 };
+  let failOn = 'high';
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(DIR, '.securecodingrc.json'), 'utf8'));
+    if (cfg.failOn) failOn = String(cfg.failOn).toLowerCase();
+  } catch { /* default */ }
+  const minWeight = SEV_WEIGHT[failOn] || SEV_WEIGHT.high;
+  const blocking = results.reduce((n, r) =>
+    n + r.hits.filter(h => (SEV_WEIGHT[h.severity] || SEV_WEIGHT.medium) >= minWeight).length, 0);
+
+  if (blocking > 0) process.exit(2);
 }
 
 if (require.main === module) {

@@ -47,13 +47,20 @@
     {
       "label": "Security: Clean Code Linter",
       "type": "shell",
-      "command": "node hooks/clean.js",
+      "command": "node hooks/clean.js --all",
       "group": "build",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
         "panel": "shared"
       }
+    },
+    {
+      "label": "Security: Check Done Gate",
+      "type": "shell",
+      "command": "node hooks/gate.js --check",
+      "group": "test",
+      "problemMatcher": []
     }
   ]
 }

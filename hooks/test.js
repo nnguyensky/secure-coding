@@ -817,6 +817,45 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
 })();
 
+// --- clean.js severity threshold and id aliases ---
+(function cleanThreshold() {
+  const CLEAN = path.join(DIR, 'hooks', 'clean.js');
+  const dir = path.join(TMP, 'cleanthr');
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  const run = (name, body) => {
+    const f = path.join(dir, name);
+    fs.writeFileSync(f, body);
+    return spawnSync('node', [CLEAN, f], { encoding: 'utf8', input: '' });
+  };
+
+  // A linter that fails a commit over a single-letter variable gets bypassed,
+  // and then it catches nothing. failOn is 'high', so low must report not block.
+  uniq('clean-low-reports-not-blocks');
+  const low = run('low.js', 'let counter = 0;\n');
+  if (low.status === 0 && /cc-/.test(low.stdout)) pass++;
+  else { fail++; console.log(`MISS  clean-low-reports-not-blocks: status=${low.status}`); }
+
+  uniq('clean-high-blocks');
+  const high = run('high.js', 'try { x(); } catch (e) {}\n');
+  if (high.status === 2) pass++;
+  else { fail++; console.log(`MISS  clean-high-blocks: status=${high.status}`); }
+
+  // scan.js and clean.js name the same defect differently; a reader writing
+  // either spelling means the defect, so both must be honoured.
+  uniq('clean-suppression-alias');
+  const alias = run('alias.js', 'try { x(); } catch (e) {} // secure-coding-ignore: swallowed-exception -- deliberate\n');
+  if (!/cc-swallowed/.test(alias.stdout)) pass++;
+  else { fail++; console.log('MISS  clean-suppression-alias: scan.js id not accepted'); }
+
+  // The repo's own deliberate suppressions must be respected.
+  uniq('clean-repo-suppressions-honoured');
+  const own = spawnSync('node', [CLEAN, path.join(DIR, 'hooks', 'scan.js'), path.join(DIR, 'hooks', 'install.js')],
+    { encoding: 'utf8', input: '' });
+  if (!/cc-swallowed/.test(own.stdout || '')) pass++;
+  else { fail++; console.log('MISS  clean-repo-suppressions-honoured'); }
+})();
+
 // --- clean.js precision ---
 // Clean-code rules describe executable code. Flagging a YAML version pin or a
 // number inside a log message is noise, and noise is how a linter gets muted.
@@ -958,7 +997,7 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   fs.mkdirSync(dir, { recursive: true });
   const bad = path.join(dir, 'bad.js');
   const ok = path.join(dir, 'ok.js');
-  fs.writeFileSync(bad, 'function f(a,b,c,d,e){ setTimeout(x, 86400000); }\n');
+  fs.writeFileSync(bad, 'function f(a,b,c,d,e){ setTimeout(x, 86400000); }\ntry { g(); } catch (e) {}\n');
   fs.writeFileSync(ok, 'export const add = (a, b) => a + b;\n');
   const run = (...a) => spawnSync('node', [CLEAN, ...a], { encoding: 'utf8', input: '' });
 

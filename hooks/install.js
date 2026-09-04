@@ -285,7 +285,14 @@ function installVsCodeTasks(targetDir) {
         {
           label: 'Security: Clean Code Quality Linter',
           type: 'shell',
-          command: 'node hooks/clean.js',
+          command: 'node hooks/clean.js --all',
+          group: 'test',
+          problemMatcher: [],
+        },
+        {
+          label: 'Security: Check Done Gate',
+          type: 'shell',
+          command: 'node hooks/gate.js --check',
           group: 'test',
           problemMatcher: [],
         },
