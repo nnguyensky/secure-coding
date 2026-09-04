@@ -28,6 +28,15 @@ jobs:
       - name: Run Security Pattern Tests
         run: node hooks/test.js
 
+      # sync.js above ran before test.js had written checks/.test-count, so the
+      # documented-count guard was inert on a fresh checkout. Re-run it now that
+      # the real assertion count exists, or a stale badge ships unnoticed.
+      - name: Verify Documented Counts
+        run: node hooks/sync.js
+
+      - name: Run Clean Code Quality Linter
+        run: node hooks/clean.js --all
+
       - name: Run Dependency Vulnerability Audit
         run: node hooks/audit.js
 

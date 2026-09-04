@@ -686,11 +686,14 @@ async function runInteractive() {
   installConfig(targetDir, selectedSev);
   configureAgent(targetDir, agentSelected);
 
-  // Run self-check validation
+  // Run self-check validation. The suite's installer-parity test runs this
+  // installer; without the env guard that recurses forever.
   try {
     const syncScript = path.join(DIR, 'hooks', 'sync.js');
     const testScript = path.join(DIR, 'hooks', 'test.js');
-    if (fs.existsSync(syncScript) && fs.existsSync(testScript)) {
+    if (process.env.SECURE_CODING_NO_SELFTEST) {
+      console.log(`\n${YELLOW}ℹ️  Self-check skipped (SECURE_CODING_NO_SELFTEST).${NC}`);
+    } else if (fs.existsSync(syncScript) && fs.existsSync(testScript)) {
       execSync(`node "${syncScript}"`, { stdio: 'ignore' });
         // Report the real count and only claim PASSED when it is. execSync
         // throws on a non-zero exit, so a broken suite reaches the catch.

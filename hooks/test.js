@@ -1071,6 +1071,67 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log(`mcp-tool-count-is-exact: serves ${listed}, declares ${declared}`); }
 })();
 
+// --- install.sh and install.js write the same agent rules ---
+// install.sh had drifted badly: no Secure Grilling step, no Done Gate, and it
+// told Windsurf and Cline to run bare `node hooks/scan.js`, the form that
+// blocks on stdin. Shell installs were materially weaker than npm installs.
+(function installerParity() {
+  uniq('installers-write-identical-agent-rules');
+  const os = require('os');
+  const cp = require('child_process');
+  const mk = () => {
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-inst-'));
+    cp.execFileSync('git', ['init', '-q'], { cwd: d, stdio: 'ignore' });
+    fs.writeFileSync(path.join(d, 'package.json'), '{}\n');
+    cp.execFileSync('git', ['add', '-A'], { cwd: d, stdio: 'ignore' });
+    cp.execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'i'],
+      { cwd: d, stdio: 'ignore' });
+    return d;
+  };
+  const shDir = mk(); const jsDir = mk();
+  const differ = [];
+  // install.sh ends with a self-check that runs this suite. Without a re-entry
+  // guard that recurses forever: install.sh -> test.js -> install.sh -> ...
+  // SECURE_CODING_NO_SELFTEST makes the installer skip that final step.
+  const env = { ...process.env, SECURE_CODING_NO_SELFTEST: '1' };
+  try {
+    cp.execFileSync('bash', [path.join(DIR, 'install.sh'), '--agent', 'all'],
+      { cwd: shDir, stdio: 'ignore', env, timeout: 60000 });
+    cp.execFileSync('node', [path.join(DIR, 'hooks', 'install.js'), '--agent', 'all'],
+      { cwd: jsDir, stdio: 'ignore', env, timeout: 60000 });
+    for (const f of ['AGENTS.md', '.windsurfrules', '.clinerules',
+      path.join('.cursor', 'rules', 'secure-coding.mdc')]) {
+      const a = path.join(shDir, f); const b = path.join(jsDir, f);
+      if (!fs.existsSync(a) || !fs.existsSync(b)) { differ.push(`${f} (missing)`); continue; }
+      if (fs.readFileSync(a, 'utf8') !== fs.readFileSync(b, 'utf8')) differ.push(f);
+    }
+  } catch (e) { differ.push(`installer failed: ${e.message.slice(0, 60)}`); }
+  finally {
+    for (const d of [shDir, jsDir]) { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ } }
+  }
+  if (differ.length === 0) pass++;
+  else { fail++; console.log(`installers-write-identical-agent-rules: ${differ.join(', ')}`); }
+})();
+
+// --- no shipped instruction tells an agent to run the blocking scan form ---
+// Bare `node hooks/scan.js` falls through to stdin hook mode and hangs.
+(function noBlockingScanInstruction() {
+  uniq('no-blocking-scan-in-instructions');
+  const offenders = [];
+  for (const f of ['install.sh', 'hooks/install.js', 'AGENTS.md', 'SKILL.md', '.vscode/tasks.json']) {
+    const p2 = path.join(DIR, f);
+    if (!fs.existsSync(p2)) continue;
+    fs.readFileSync(p2, 'utf8').split('\n').forEach((line, i) => {
+      // scan.js or clean.js with no flag following, inside a command context.
+      if (/node hooks\/(scan|clean)\.js(?![\w.-])\s*(?![-\w])(?:[`"'\\]|$|\s*$)/.test(line)) {
+        offenders.push(`${f}:${i + 1}`);
+      }
+    });
+  }
+  if (offenders.length === 0) pass++;
+  else { fail++; console.log(`no-blocking-scan-in-instructions: ${offenders.join(', ')}`); }
+})();
+
 // --- no hardcoded test counts ---
 // Four stale-number bugs this session all came from literals. The installer
 // banners claimed 298 and 292 while the suite was at 469, and a banner that

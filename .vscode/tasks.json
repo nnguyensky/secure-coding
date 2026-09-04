@@ -61,6 +61,17 @@
       "command": "node hooks/gate.js --check",
       "group": "test",
       "problemMatcher": []
+    },
+    {
+      "label": "Security: Generate CycloneDX SBOM (with AI & VEX)",
+      "type": "shell",
+      "command": "node hooks/sbom.js --format cyclonedx --ai --vex --out sbom.json",
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
     }
   ]
 }

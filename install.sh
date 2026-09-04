@@ -205,7 +205,14 @@ if [ "$INSTALL_VSCODE" = true ]; then
     {
       "label": "Security: Clean Code Quality Linter",
       "type": "shell",
-      "command": "node hooks/clean.js",
+      "command": "node hooks/clean.js --all",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Security: Check Done Gate",
+      "type": "shell",
+      "command": "node hooks/gate.js --check",
       "group": "test",
       "problemMatcher": []
     },
@@ -218,7 +225,7 @@ if [ "$INSTALL_VSCODE" = true ]; then
     {
       "label": "Security: Generate CycloneDX SBOM",
       "type": "shell",
-      "command": "node hooks/sbom.js --format cyclonedx --out sbom.json",
+      "command": "node hooks/sbom.js --format cyclonedx --ai --vex --out sbom.json",
       "problemMatcher": []
     }
   ]
@@ -238,6 +245,7 @@ if [ "$INSTALL_CONFIG" = true ]; then
 {
   "failOn": "high",
   "entropyDetection": true,
+  "taintTracking": true,
   "generateMarkdownPR": true,
   "modules": {
     "llm": true,
@@ -251,7 +259,8 @@ if [ "$INSTALL_CONFIG" = true ]; then
     "tests/**",
     "fixtures/**",
     "scripts/seed/**",
-    "e2e/**"
+    "e2e/**",
+    "reports/**"
   ],
   "ignorePatterns": [],
   "audit": {
@@ -300,11 +309,13 @@ setup_agent_antigravity() {
 # AI Agent Instructions
 
 When writing code that handles user input, authentication, sessions, permissions, secrets, databases, files, network calls, LLM prompts/tools, or raw memory:
+0. If the task creates or changes a route, auth, tenancy, a data model, an upload, an outbound call, or an LLM tool: ask the five security frontiers in `checks/secure-grilling.md` before writing — identity, tenancy, data classification, failure direction, irreversibility — each with your recommended secure default. Skip for bug fixes, refactors, docs and tests.
 1. Read `SKILL.md` and apply matching design groups and templates (`templates/<language>.md`).
 2. When architecting systems, review `checks/secure-by-design.md`, `checks/memory-safety.md`, `checks/cryptography.md`, `checks/iot-security.md`, `checks/deployment-safety.md`, or `checks/sbom.md`.
 3. When building AI/LLM workflows or RAG pipelines, review `checks/llm-top10.md`.
 4. After writing code, run: `node hooks/scan.js --staged`
-5. Before declaring completion, verify zero open vulnerabilities with: `node hooks/summary.js && node hooks/audit.js`
+5. Before declaring completion, run the Done Gate: `node hooks/summary.js && node hooks/audit.js && node hooks/gate.js --check`
+6. `gate.js --check` exits 2 until you answer the four questions no pattern can check — ownership, authorization, taint, failure-direction. Record each with `node hooks/gate.js --answer <question> "<what enforces it>"`. A clean scan is not a pass on its own.
 EOF
     printf "${GREEN}✅ Created Antigravity AGENTS.md instructions${NC}\n"
   else
@@ -321,8 +332,10 @@ setup_agent_cursor() {
 globs: ["**/*.{py,js,ts,go,java,kt,swift,rb,php,cs,rs,c,cpp,h,sh,tf,yaml,yml}"]
 alwaysApply: false
 ---
+Before writing a route, auth, data model, upload or LLM tool, ask the five security frontiers in checks/secure-grilling.md with recommended secure defaults.
 Apply OWASP Secure Coding Practices, ACSC Modern Defensible Architecture, and Clean Code rules while writing code.
 Refer to SKILL.md, templates/, and checks/secure-by-design.md for secure patterns.
+After writing, run `node hooks/scan.js --staged`, then `node hooks/gate.js --check` before declaring the task complete.
 EOF
   printf "${GREEN}✅ Created Cursor rule: %s${NC}\n" "$CURSOR_RULE"
 }
@@ -333,8 +346,10 @@ setup_agent_windsurf() {
     cat << 'EOF' > "$WINDSURF_RULES"
 When writing code that handles user input, auth, secrets, databases, files, or LLM pipelines:
 - Read SKILL.md and apply matching templates from templates/.
+- Before writing a route, auth, data model, upload or LLM tool, ask the five security frontiers in checks/secure-grilling.md with recommended secure defaults.
 - When designing architecture, refer to checks/secure-by-design.md and checks/memory-safety.md.
-- After writing, verify using: node hooks/scan.js
+- After writing, verify using: node hooks/scan.js --staged
+- Before declaring done: node hooks/gate.js --check (exits 2 until the manual review is answered)
 EOF
     printf "${GREEN}✅ Created Windsurf rules: %s${NC}\n" "$WINDSURF_RULES"
   fi
@@ -347,8 +362,10 @@ setup_agent_cline() {
 # Secure Coding Instructions
 Always write secure code from the start. Never defer security fixes.
 - Before coding, read SKILL.md and templates/<language>.md.
+- Before writing a route, auth, data model, upload, outbound call or LLM tool, ask the five security frontiers in checks/secure-grilling.md with a recommended secure default for each.
 - When handling LLM tools or RAG, review checks/llm-top10.md.
-- After writing code, run `node hooks/scan.js` and fix any reported findings immediately.
+- After writing code, run `node hooks/scan.js --staged` and fix any reported findings immediately.
+- Before declaring done, run `node hooks/gate.js --check` and answer the four manual questions it names.
 EOF
     printf "${GREEN}✅ Created Cline rules: %s${NC}\n" "$CLINE_RULES"
   fi
@@ -383,7 +400,11 @@ esac
 
 # Verification check
 printf "\n${BOLD}Verifying installation self-test...${NC}\n"
-if [ -f "$SCRIPT_DIR/hooks/sync.js" ] && [ -f "$SCRIPT_DIR/hooks/test.js" ]; then
+# The suite's installer-parity test runs this script; without this guard that
+# recurses forever (install.sh -> test.js -> install.sh -> ...).
+if [ -n "$SECURE_CODING_NO_SELFTEST" ]; then
+  printf "${YELLOW}ℹ️  Self-check skipped (SECURE_CODING_NO_SELFTEST).${NC}\n"
+elif [ -f "$SCRIPT_DIR/hooks/sync.js" ] && [ -f "$SCRIPT_DIR/hooks/test.js" ]; then
   node "$SCRIPT_DIR/hooks/sync.js" > /dev/null 2>&1
   TEST_OUT="$(node "$SCRIPT_DIR/hooks/test.js" 2>&1 | tail -1)"
   case "$TEST_OUT" in
