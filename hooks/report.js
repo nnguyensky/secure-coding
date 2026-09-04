@@ -6,7 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath, helpRequested } = require('./config');
+const { statePath, helpRequested, projectRoot } = require('./config');
 
 // --help must print help, never run the tool. reset.js used to wipe the
 // findings file when asked for help; audit.js and sbom.js ran in full.
@@ -26,7 +26,10 @@ const SCAFFOLD = path.join(DIR, 'reports', 'security.html');
 
 function reportPath() {
   if (process.env.SECURE_CODING_REPORT_OUT) return process.env.SECURE_CODING_REPORT_OUT;
-  const dir = path.join(process.cwd(), 'reports');
+  // The report belongs to the project, not to whichever directory the command
+  // happened to run from: reports/ under src/ is not where anyone looks.
+  // Display paths further down deliberately stay relative to cwd.
+  const dir = path.join(projectRoot(), 'reports');
   const runId = process.env.SECURE_CODING_RUN_ID;
   if (runId) {
     return path.join(dir, `security-${runId}.html`);

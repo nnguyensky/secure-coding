@@ -1503,6 +1503,120 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log(`default-config-has-taint-tracking: cfg=${DEFAULT_CONFIG.taintTracking} wizard=${/cfgTaint/.test(wiz)}`); }
 })();
 
+// --- audit honours the configured ecosystem list ---
+// audit.js read cfg.audit.failOnAdvisory but never cfg.audit.ecosystems, so a
+// project that opted into npm only still got "pip-audit not installed" noise
+// about a tool it had deliberately excluded. The Go entry is also keyed
+// 'gomod' internally while users and the wizard write 'go'.
+(function auditEcosystemSelection() {
+  const os = require('os');
+  const cp = require('child_process');
+  const mk = (cfg) => {
+    const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-eco-')));
+    cp.execFileSync('git', ['init', '-q'], { cwd: d, stdio: 'ignore' });
+    fs.writeFileSync(path.join(d, 'package.json'), '{"name":"t","version":"1.0.0"}\n');
+    fs.writeFileSync(path.join(d, 'package-lock.json'), '{"lockfileVersion":3,"packages":{}}\n');
+    fs.writeFileSync(path.join(d, 'requirements.txt'), 'requests==2.0.0\n');
+    if (cfg) fs.writeFileSync(path.join(d, '.securecodingrc.json'), JSON.stringify(cfg));
+    cp.execFileSync('git', ['add', '-A'], { cwd: d, stdio: 'ignore' });
+    cp.execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'i'],
+      { cwd: d, stdio: 'ignore' });
+    return d;
+  };
+  const run = (d) => {
+    const env = { ...process.env };
+    delete env.SECURE_CODING_AUDIT;
+    const r = cp.spawnSync('node', [path.join(DIR, 'hooks', 'audit.js')],
+      { cwd: d, encoding: 'utf8', timeout: 60000, env });
+    try { return JSON.parse(r.stdout || '{}'); } catch { return {}; }
+  };
+
+  uniq('audit-skips-unselected-ecosystems');
+  const narrow = mk({ audit: { ecosystems: ['npm'] } });
+  const nOut = run(narrow);
+  const leaked = (nOut.skipped || []).some(x => x.ecosystem === 'pip');
+  try { fs.rmSync(narrow, { recursive: true, force: true }); } catch { /* ignore */ }
+  if (!leaked) pass++;
+  else { fail++; console.log('audit-skips-unselected-ecosystems: pip ran despite npm-only config'); }
+
+  // No configured list must still mean "audit everything", not "audit nothing".
+  uniq('audit-without-config-runs-all');
+  const wide = mk(null);
+  const wOut = run(wide);
+  const sawPip = (wOut.skipped || []).some(x => x.ecosystem === 'pip')
+    || (wOut.findings || []).some(x => x.ecosystem === 'pip');
+  try { fs.rmSync(wide, { recursive: true, force: true }); } catch { /* ignore */ }
+  if (sawPip) pass++;
+  else { fail++; console.log('audit-without-config-runs-all: pip was not attempted'); }
+})();
+
+// --- project-shaped paths do not follow cwd ---
+// report.js wrote into src/reports/ and sbom.js missed root lockfiles when run
+// from a subdirectory.
+(function projectPathsFromSubdirectory() {
+  uniq('report-and-sbom-resolve-project-root');
+  const os = require('os');
+  const cp = require('child_process');
+  const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-pp-')));
+  const bad = [];
+  try {
+    fs.mkdirSync(path.join(d, 'src'), { recursive: true });
+    cp.execFileSync('git', ['init', '-q'], { cwd: d, stdio: 'ignore' });
+    fs.writeFileSync(path.join(d, 'package.json'), '{"name":"t","version":"1.0.0"}\n');
+    fs.writeFileSync(path.join(d, 'package-lock.json'),
+      '{"lockfileVersion":3,"packages":{"":{"name":"t"},"node_modules/left-pad":{"version":"1.3.0"}}}\n');
+    fs.writeFileSync(path.join(d, 'src', 'a.js'), 'const x = 1;\n');
+    cp.execFileSync('git', ['add', '-A'], { cwd: d, stdio: 'ignore' });
+    cp.execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'i'],
+      { cwd: d, stdio: 'ignore' });
+
+    const sub = path.join(d, 'src');
+    const env = { ...process.env };
+    delete env.SECURE_CODING_STATE;
+    delete env.SECURE_CODING_REPORT_OUT;
+
+    cp.spawnSync('node', [path.join(DIR, 'hooks', 'report.js')],
+      { cwd: sub, encoding: 'utf8', env, timeout: 30000 });
+    if (fs.existsSync(path.join(sub, 'reports'))) bad.push('report wrote into src/reports');
+    if (!fs.existsSync(path.join(d, 'reports'))) bad.push('report did not write to project root');
+
+    const sb = cp.spawnSync('node', [path.join(DIR, 'hooks', 'sbom.js'), '--format', 'cyclonedx'],
+      { cwd: sub, encoding: 'utf8', env, timeout: 30000 });
+    let comps = -1;
+    try { comps = (JSON.parse(sb.stdout).components || []).length; } catch { comps = -1; }
+    if (comps < 1) bad.push(`sbom from subdirectory found ${comps} components`);
+  } catch (e) { bad.push(`harness failed: ${e.message.slice(0, 50)}`); }
+  finally { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ } }
+  if (bad.length === 0) pass++;
+  else { fail++; console.log(`report-and-sbom-resolve-project-root: ${bad.join(', ')}`); }
+})();
+
+// --- detect.js does not read a flag as a directory ---
+(function detectFlagNotDir() {
+  uniq('detect-ignores-flags-as-path');
+  const cp = require('child_process');
+  const plain = cp.spawnSync('node', [path.join(DIR, 'hooks', 'detect.js')],
+    { cwd: DIR, encoding: 'utf8', timeout: 30000 });
+  const flagged = cp.spawnSync('node', [path.join(DIR, 'hooks', 'detect.js'), '--json'],
+    { cwd: DIR, encoding: 'utf8', timeout: 30000 });
+  if ((plain.stdout || '').trim() === (flagged.stdout || '').trim()
+      && (plain.stdout || '').trim() !== '[]') pass++;
+  else { fail++; console.log(`detect-ignores-flags-as-path: plain=${(plain.stdout || '').trim().slice(0, 30)} flagged=${(flagged.stdout || '').trim().slice(0, 30)}`); }
+})();
+
+// --- every hook with a CLI is reachable as a bin ---
+(function configExposedAsBin() {
+  uniq('config-cli-exposed-as-bin');
+  const pkg = require(path.join(DIR, 'package.json'));
+  const target = (pkg.bin || {})['secure-coding-config'];
+  const executable = (() => {
+    try { fs.accessSync(path.join(DIR, 'hooks', 'config.js'), fs.constants.X_OK); return true; }
+    catch { return false; }
+  })();
+  if (target === './hooks/config.js' && executable) pass++;
+  else { fail++; console.log(`config-cli-exposed-as-bin: bin=${target} executable=${executable}`); }
+})();
+
 // --- no hardcoded test counts ---
 // Four stale-number bugs this session all came from literals. The installer
 // banners claimed 298 and 292 while the suite was at 469, and a banner that

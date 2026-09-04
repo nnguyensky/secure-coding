@@ -42,7 +42,8 @@
     "secure-coding-clean": "./hooks/clean.js",
     "secure-coding-audit": "./hooks/audit.js",
     "secure-coding-sbom": "./hooks/sbom.js",
-    "secure-coding-fix": "./hooks/fix.js"
+    "secure-coding-fix": "./hooks/fix.js",
+    "secure-coding-config": "./hooks/config.js"
   },
   "files": [
     "AGENTS.md",

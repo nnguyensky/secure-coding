@@ -25,7 +25,9 @@ Generates a CycloneDX v1.5 or SPDX v2.3 manifest.
   --out <f>    write to a file instead of stdout`;
 if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
-const DIR = process.cwd();
+// The project being described. Resolved from the git toplevel so lockfiles at
+// the root are found when the command runs from a subdirectory.
+const DIR = require('./config').projectRoot();
 // DIR is the project being described; the tool's own identity comes from the
 // installed package, not from whatever repository is being scanned.
 const SELF_PKG = (() => {

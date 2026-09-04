@@ -9,7 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath, helpRequested } = require('./config');
+const { statePath, helpRequested, projectRoot } = require('./config');
 
 // --help must print help, never run the tool. reset.js used to wipe the
 // findings file when asked for help; audit.js and sbom.js ran in full.
@@ -21,7 +21,8 @@ Reports which patterns fire most often across recorded findings.
 if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 const STATE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
-const FP_FILE = path.join(process.cwd(), 'false-positives.json');
+// Project-level data, so it must not depend on the caller's directory.
+const FP_FILE = path.join(projectRoot(), 'false-positives.json');
 
 const args = process.argv.slice(2);
 const topN = args.includes('--top') ? parseInt(args[args.indexOf('--top') + 1]) || 10 : 10;

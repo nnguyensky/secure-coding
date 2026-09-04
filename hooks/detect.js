@@ -16,7 +16,10 @@ Detects project languages and frameworks from file extensions and config
 files. Prints a JSON array of language names, or [] when nothing matches.`;
 if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
-const DIR = process.argv[2] || process.cwd();
+// A flag is not a directory: `detect.js --json` used to set DIR='--json',
+// find nothing, and print [] as though the project had no languages.
+const ARG = process.argv[2];
+const DIR = ARG && !ARG.startsWith('-') ? ARG : process.cwd();
 const OUT = process.env.DETECT_OUT || 'json';
 
 // Extension → language mapping

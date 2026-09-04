@@ -255,12 +255,31 @@ function parseDotnetAudit(raw) {
   } catch { return []; }
 }
 
+// Users pick ecosystems by their common name; ECOSYSTEMS keys the Go entry as
+// 'gomod' because that is the lockfile family, and the finding output already
+// says 'go'. Map between the two rather than renaming either and breaking
+// stored audit.json records.
+const ECOSYSTEM_ALIASES = { gomod: 'go', go: 'gomod' };
+
+// An ecosystem the project opted out of should not be run at all -- not run
+// and then reported as "tool not installed", which is noise about a tool the
+// user deliberately does not want. No configured list means audit everything.
+function ecosystemEnabled(name, cfg) {
+  const wanted = cfg && cfg.audit && Array.isArray(cfg.audit.ecosystems)
+    ? cfg.audit.ecosystems : null;
+  if (!wanted) return true;
+  const alias = ECOSYSTEM_ALIASES[name];
+  return wanted.includes(name) || (alias !== undefined && wanted.includes(alias));
+}
+
 function main() {
   const results = [];
   const skipped = [];
   const dirFiles = fs.existsSync(DIR) ? fs.readdirSync(DIR) : [];
+  const cfg = loadConfig();
 
   for (const eco of ECOSYSTEMS) {
+    if (!ecosystemEnabled(eco.name, cfg)) continue;
     const hasLock = eco.files.some(pattern => {
       if (pattern.startsWith('*.')) {
         const ext = pattern.slice(1);
@@ -308,7 +327,6 @@ function main() {
     console.log(JSON.stringify({ findings: results, skipped }, null, 2));
   }
 
-  const cfg = loadConfig();
   const failThreshold = (cfg && cfg.audit && cfg.audit.failOnAdvisory) || (cfg && cfg.failOn) || 'high';
   const sevRank = { critical: 4, high: 3, medium: 2, low: 1, vulnerable: 3, unknown: 1 };
   const minFailRank = sevRank[failThreshold.toLowerCase()] || 3;
