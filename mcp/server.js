@@ -22,7 +22,15 @@ const SBOM_SCRIPT = path.join(ROOT_DIR, 'hooks', 'sbom.js');
 const SUMMARY_SCRIPT = path.join(ROOT_DIR, 'hooks', 'summary.js');
 
 const SERVER_NAME = 'secure-coding-mcp';
-const SERVER_VERSION = '2.1.0';
+// Read from package.json rather than a second literal: a hardcoded copy
+// silently reports a stale version to every client after a release bump.
+const SERVER_VERSION = require(path.join(ROOT_DIR, 'package.json')).version;
+
+// JSON-RPC 2.0 reserved error codes (spec section 5.1). Only the two this
+// server actually returns are declared; the rest of the reserved range is
+// documented in the spec, and unused constants are dead code.
+const JSONRPC_PARSE_ERROR = -32700;
+const JSONRPC_METHOD_NOT_FOUND = -32601;
 const PROTOCOL_VERSION = '2024-11-05';
 
 const TOOLS = [
@@ -94,7 +102,16 @@ const TOOLS = [
       properties: {
         file: {
           type: 'string',
-          description: 'Path to the source code file to lint.',
+          description: 'Path to a single source file to lint.',
+        },
+        files: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Several file paths to lint in one pass.',
+        },
+        all: {
+          type: 'boolean',
+          description: 'Lint every tracked file in the repository.',
         },
         listRules: {
           type: 'boolean',
@@ -274,10 +291,17 @@ function handleToolCall(name, args) {
         const res = spawnSync('node', [CLEAN_SCRIPT, '--list'], { encoding: 'utf8' });
         return { content: [{ type: 'text', text: res.stdout || res.stderr }] };
       }
-      if (!args.file) {
-        return { content: [{ type: 'text', text: 'Error: file parameter is required for clean_code_lint' }], isError: true };
+      // Mirror the CLI: one file, several files, or the whole repository.
+      // The tool previously accepted only `file`, so an agent had to call it
+      // once per path to do what `--all` does in a single pass.
+      const cleanArgs = [];
+      if (args.all) cleanArgs.push('--all');
+      else if (Array.isArray(args.files) && args.files.length > 0) cleanArgs.push(...args.files.map(String));
+      else if (args.file) cleanArgs.push(String(args.file));
+      else {
+        return { content: [{ type: 'text', text: 'Error: clean_code_lint needs one of file, files or all' }], isError: true };
       }
-      const res = spawnSync('node', [CLEAN_SCRIPT, '--file', args.file], { encoding: 'utf8' });
+      const res = spawnSync('node', [CLEAN_SCRIPT, ...cleanArgs], { encoding: 'utf8' });
       return { content: [{ type: 'text', text: res.stdout || res.stderr || '✅ No clean code violations found.' }] };
     }
 
@@ -358,7 +382,7 @@ function processMessage(message) {
           jsonrpc: '2.0',
           id,
           error: {
-            code: -32601,
+            code: JSONRPC_METHOD_NOT_FOUND,
             message: `Method not found: ${method}`,
           },
         };
@@ -389,7 +413,7 @@ function startServer() {
         jsonrpc: '2.0',
         id: null,
         error: {
-          code: -32700,
+          code: JSONRPC_PARSE_ERROR,
           message: 'Parse error: invalid JSON',
         },
       };

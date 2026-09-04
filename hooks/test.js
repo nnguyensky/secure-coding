@@ -1028,6 +1028,49 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log(`sync-detects-stale-counts: not caught -> ${missed.join('; ')}`); }
 })();
 
+// --- MCP: clean_code_lint parity and version sourcing ---
+// The tool accepted only `file`, so an agent had to call it once per path to
+// do what the CLI does with --all in one pass.
+(function mcpCleanParity() {
+  const { processMessage: pm } = require('../mcp/server.js');
+  const call = (args) => pm({
+    jsonrpc: '2.0', id: 99, method: 'tools/call',
+    params: { name: 'clean_code_lint', arguments: args },
+  });
+  const textOf = (r) => (r && r.result && r.result.content && r.result.content[0].text) || '';
+
+  uniq('mcp-clean-accepts-files-array');
+  const multi = textOf(call({ files: ['hooks/config.js', 'hooks/frontiers.js'] }));
+  if (multi.includes('config.js') && multi.includes('frontiers.js')) pass++;
+  else { fail++; console.log('mcp-clean-accepts-files-array: only one file linted'); }
+
+  uniq('mcp-clean-accepts-all');
+  const all = call({ all: true });
+  if (textOf(all).length > 0 && !(all.result && all.result.isError)) pass++;
+  else { fail++; console.log('mcp-clean-accepts-all: --all rejected'); }
+
+  uniq('mcp-clean-requires-a-target');
+  const none = call({});
+  if (none && none.result && none.result.isError) pass++;
+  else { fail++; console.log('mcp-clean-requires-a-target: empty args accepted'); }
+
+  // A hardcoded version silently reports stale after a release bump.
+  uniq('mcp-version-matches-package');
+  const init = pm({ jsonrpc: '2.0', id: 98, method: 'initialize' });
+  const pkgVer = require(path.join(DIR, 'package.json')).version;
+  if (init.result.serverInfo.version === pkgVer) pass++;
+  else { fail++; console.log(`mcp-version-matches-package: ${init.result.serverInfo.version} vs ${pkgVer}`); }
+
+  // The old assertion was `>= 6`, which is why README's "6 tools" claim went
+  // unnoticed while the server grew to 9.
+  uniq('mcp-tool-count-is-exact');
+  const listed = pm({ jsonrpc: '2.0', id: 97, method: 'tools/list' }).result.tools.length;
+  const declared = (fs.readFileSync(path.join(DIR, 'mcp', 'server.js'), 'utf8')
+    .match(/^\s*name: '/gm) || []).length;
+  if (listed === declared) pass++;
+  else { fail++; console.log(`mcp-tool-count-is-exact: serves ${listed}, declares ${declared}`); }
+})();
+
 // --- no hardcoded test counts ---
 // Four stale-number bugs this session all came from literals. The installer
 // banners claimed 298 and 292 while the suite was at 469, and a banner that
