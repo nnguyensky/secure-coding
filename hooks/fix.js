@@ -11,9 +11,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const { statePath } = require('./config');
 
 const DIR = path.resolve(__dirname, '..');
-const STATE = process.env.SECURE_CODING_STATE || path.join(DIR, 'checks', 'findings.jsonl');
+const STATE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
 const FIXES = path.join(DIR, 'checks', 'fixes.md');
 
 const args = process.argv.slice(2);

@@ -6,7 +6,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A518.0.0-green?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![MCP Protocol](https://img.shields.io/badge/MCP%202024--11--05-Compatible-purple?style=for-the-badge&logo=probot&logoColor=white)](mcp/server.js)
-[![Tests](https://img.shields.io/badge/Tests-479%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-483%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 
 <p align="center">
   <a href="#-quickstart-options">⚡ Quickstart</a> •

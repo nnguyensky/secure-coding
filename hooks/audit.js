@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { statePath, writeState } = require('./config');
 const { execFileSync } = require('child_process');
 
 // argv[2] is a target directory, not a flag — a stray `--help` would otherwise
@@ -15,7 +16,7 @@ const { execFileSync } = require('child_process');
 const ARG = process.argv[2];
 const DIR = ARG && !ARG.startsWith('-') ? ARG : process.cwd();
 const OUT = process.env.AUDIT_OUT || 'json';
-const STATE = process.env.SECURE_CODING_AUDIT || path.join(DIR, 'checks', 'audit.json');
+const STATE = statePath('audit.json', 'SECURE_CODING_AUDIT');
 const TIMEOUT = 15000; // 15s per tool
 
 const ECOSYSTEMS = [
@@ -282,8 +283,7 @@ function main() {
 
   // Write state file for report
   try {
-    fs.mkdirSync(path.dirname(STATE), { recursive: true });
-    fs.writeFileSync(STATE, JSON.stringify({ findings: results, skipped, ts: new Date().toISOString() }));
+    writeState(STATE, JSON.stringify({ findings: results, skipped, ts: new Date().toISOString() }));
   } catch { /* best effort */ }
 
   if (OUT === 'summary') {

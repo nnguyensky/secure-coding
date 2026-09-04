@@ -11,11 +11,12 @@
 
 const fs = require('fs');
 const path = require('path');
+const { statePath } = require('./config');
 const { randomUUID } = require('crypto');
 
 const DIR = process.cwd();
-const FINDINGS_FILE = process.env.SECURE_CODING_STATE || path.join(__dirname, '..', 'checks', 'findings.jsonl');
-const AUDIT_FILE = process.env.SECURE_CODING_AUDIT || path.join(__dirname, '..', 'checks', 'audit.json');
+const FINDINGS_FILE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
+const AUDIT_FILE = statePath('audit.json', 'SECURE_CODING_AUDIT');
 
 // --- Ecosystem Parsers ---
 

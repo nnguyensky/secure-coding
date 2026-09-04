@@ -9,12 +9,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const { statePath, writeState } = require('./config');
 const { execFileSync } = require('child_process');
 
 const DIR = path.resolve(__dirname, '..');
 const PATTERNS_DIR = path.join(DIR, 'patterns');
 const FIXES = path.join(DIR, 'checks', 'fixes.md');
-const STATE = process.env.SECURE_CODING_STATE || path.join(DIR, 'checks', 'findings.jsonl');
+const STATE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
 const REPORT = (process.env.SECURE_CODING_REPORT || 'on') === 'on';
 const MAX_HITS = 4;
 // Occurrences reported per id per file. Beyond this the count is truncated —
@@ -480,8 +481,7 @@ function main() {
     const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
     const runId = process.env.SECURE_CODING_RUN_ID || now.slice(0, 10);
     const rec = JSON.stringify({ file, id, section: 'manual', severity: 'medium', status: 'open', run_id: runId, first_seen: now, resolved_at: '', note });
-    fs.mkdirSync(path.dirname(STATE), { recursive: true });
-    fs.appendFileSync(STATE, rec + '\n');
+    writeState(STATE, rec + '\n', { append: true });
     if (REPORT) {
       try {
         const { execFileSync } = require('child_process');
@@ -676,8 +676,7 @@ function updateState(file, hits) {
     }));
   }
 
-  fs.mkdirSync(path.dirname(STATE), { recursive: true });
-  fs.writeFileSync(STATE, out.join('\n') + (out.length ? '\n' : ''));
+  writeState(STATE, out.join('\n') + (out.length ? '\n' : ''));
 }
 
 // Extract the `## id` block from fixes.md (including the `## id` header).

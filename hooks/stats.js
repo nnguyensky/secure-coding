@@ -9,8 +9,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const { statePath } = require('./config');
 
-const STATE = process.env.SECURE_CODING_STATE || path.join(__dirname, '..', 'checks', 'findings.jsonl');
+const STATE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
 const FP_FILE = path.join(process.cwd(), 'false-positives.json');
 
 const args = process.argv.slice(2);

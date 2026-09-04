@@ -6,8 +6,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const { statePath } = require('./config');
 
-const STATE = process.env.SECURE_CODING_STATE || path.join(__dirname, '..', 'checks', 'findings.jsonl');
+const STATE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
 
 function load() {
   if (!fs.existsSync(STATE)) return [];

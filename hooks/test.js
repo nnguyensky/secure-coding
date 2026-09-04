@@ -934,6 +934,72 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log(`alternation-splits-at-depth-zero: got ${b.length} want 3`); }
 })();
 
+// --- state follows the project, not the package ---
+// Running the skill from a downstream repo wrote that project's findings into
+// the installed skill's checks/findings.jsonl, so every other project's
+// summary and report showed someone else's numbers.
+(function stateFollowsProject() {
+  const { statePath, writeState } = require('./config.js');
+  const os = require('os');
+  const cp = require('child_process');
+
+  uniq('state-path-follows-cwd');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-state-'));
+  const cwd0 = process.cwd();
+  let inProject = '';
+  try {
+    cp.execFileSync('git', ['init', '-q'], { cwd: tmp, stdio: 'ignore' });
+    process.chdir(tmp);
+    inProject = statePath('findings.jsonl');
+  } finally { process.chdir(cwd0); }
+  // fs.realpath: macOS /tmp is a symlink to /private/tmp.
+  const under = inProject.startsWith(fs.realpathSync(tmp)) || inProject.startsWith(tmp);
+  if (under && !inProject.startsWith(DIR)) pass++;
+  else { fail++; console.log(`state-path-follows-cwd: got ${inProject}`); }
+
+  uniq('state-path-env-override-wins');
+  process.env.SC_TEST_OVERRIDE = '/custom/f.jsonl';
+  const ov = statePath('findings.jsonl', 'SC_TEST_OVERRIDE');
+  delete process.env.SC_TEST_OVERRIDE;
+  if (ov === '/custom/f.jsonl') pass++;
+  else { fail++; console.log(`state-path-env-override-wins: got ${ov}`); }
+
+  // writeState owns directory creation, so resolving a path never touches the
+  // filesystem and a read-only project fails at the write, not at module load.
+  uniq('state-write-creates-checks-dir');
+  const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-state2-'));
+  let resolvedOnly = false, wrote = false;
+  try {
+    process.chdir(tmp2);
+    const f = statePath('findings.jsonl');
+    resolvedOnly = !fs.existsSync(path.dirname(f));
+    wrote = writeState(f, 'x\n') && fs.existsSync(f);
+  } finally { process.chdir(cwd0); }
+  if (resolvedOnly && wrote) pass++;
+  else { fail++; console.log(`state-write-creates-checks-dir: resolveOnly=${resolvedOnly} wrote=${wrote}`); }
+
+  // A project that cannot be written to must still report its findings.
+  uniq('state-write-fails-soft-readonly');
+  const tmp3 = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-state3-'));
+  let soft = false;
+  try {
+    fs.chmodSync(tmp3, 0o500);
+    const errs = [];
+    const orig = console.error;
+    console.error = (m) => errs.push(String(m));
+    soft = writeState(path.join(tmp3, 'checks', 'f.jsonl'), 'x') === false;
+    console.error = orig;
+  } catch { soft = false; } finally {
+    try { fs.chmodSync(tmp3, 0o700); } catch { /* ignore */ }
+  }
+  if (soft) pass++;
+  else { fail++; console.log('state-write-fails-soft-readonly: threw instead of returning false'); }
+  try { fs.rmSync(tmp3, { recursive: true, force: true }); } catch { /* ignore */ }
+
+  try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* ignore */ }
+  try { fs.rmSync(tmp2, { recursive: true, force: true }); } catch { /* ignore */ }
+})();
+
 // --- no hardcoded test counts ---
 // Four stale-number bugs this session all came from literals. The installer
 // banners claimed 298 and 292 while the suite was at 469, and a banner that

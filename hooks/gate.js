@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { writeState } = require('./config');
 const { execFileSync } = require('child_process');
 
 const DIR = path.join(__dirname, '..');
@@ -123,8 +124,7 @@ function load() {
 }
 
 function save(data) {
-  fs.mkdirSync(path.dirname(STATE), { recursive: true });
-  fs.writeFileSync(STATE, JSON.stringify(data, null, 2) + '\n');
+  writeState(STATE, JSON.stringify(data, null, 2) + '\n');
 }
 
 function main() {

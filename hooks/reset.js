@@ -5,12 +5,12 @@
 
 const fs = require('fs');
 const path = require('path');
+const { statePath, writeState } = require('./config');
 
 const DIR = path.resolve(__dirname, '..');
-const STATE = process.env.SECURE_CODING_STATE || path.join(DIR, 'checks', 'findings.jsonl');
+const STATE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
 
-fs.mkdirSync(path.dirname(STATE), { recursive: true });
-fs.writeFileSync(STATE, '');
+writeState(STATE, '');
 
 try { require(path.join(DIR, 'hooks', 'report.js')); } catch (e) { /* best-effort */ }
 process.stderr.write('secure-coding: findings reset for a new session\n');

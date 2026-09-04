@@ -111,4 +111,51 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { loadConfig, DEFAULT_CONFIG };
+// Findings, audit results and gate answers describe the project being scanned,
+// not the skill. Resolving them against the package directory made a downstream
+// scan write its findings into the installed skill, where they leaked into
+// every other project's reports. State follows the project; skill assets
+// (patterns, fixes.md) stay with the package.
+//
+// Order: explicit env override, then the project's own checks/ directory, then
+// the package -- so the skill scanning itself keeps working unchanged.
+function stateDir() {
+  let root = process.cwd();
+  try {
+    root = require('child_process')
+      .execFileSync('git', ['rev-parse', '--show-toplevel'],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || root;
+  } catch { /* not a git repo: cwd is the project */ }
+  return path.join(root, 'checks');
+}
+
+// `name` is a bare filename such as 'findings.jsonl'. `env` names an
+// environment variable that, when set, wins outright. Resolving a path never
+// touches the filesystem -- writeState creates checks/ when it actually
+// writes, so a read-only project fails at the write with a warning rather
+// than crashing at module load.
+function statePath(name, env) {
+  if (env && process.env[env]) return process.env[env];
+  return path.join(stateDir(), name);
+}
+
+// Recording a finding is bookkeeping, not the job. A project that cannot be
+// written to -- read-only checkout, CI cache, container with a mounted source
+// tree -- must still get its findings printed, so a failed write warns once
+// and the scan carries on. Returns false when the write did not happen.
+function writeState(file, data, { append = false } = {}) {
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    if (append) fs.appendFileSync(file, data);
+    else fs.writeFileSync(file, data);
+    return true;
+  } catch (e) {
+    if (!writeState._warned) {
+      writeState._warned = true;
+      console.error(`secure-coding: cannot record state at ${file} (${e.code || e.message}) — findings shown but not saved`);
+    }
+    return false;
+  }
+}
+
+module.exports = { loadConfig, DEFAULT_CONFIG, stateDir, statePath, writeState };
