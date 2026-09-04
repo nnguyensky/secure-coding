@@ -101,6 +101,71 @@ function parseTemplateSections() {
   return sections;
 }
 
+
+// --- Alternation safety ---
+// Four bugs in this repo came from a top-level `|`: a branch matches on its
+// own, with none of the anchoring its siblings carry, so the rule fires on
+// unrelated text. `a\s*\(|b` means "a(" OR bare "b" -- rarely what was meant.
+// Splits on `|` at depth 0 only, ignoring escapes and character classes.
+function topLevelBranches(re) {
+  const out = [];
+  let depth = 0, inClass = false, cur = '';
+  for (let i = 0; i < re.length; i++) {
+    const c = re[i];
+    if (c === '\\') { cur += c + (re[i + 1] || ''); i++; continue; }
+    if (inClass) { cur += c; if (c === ']') inClass = false; continue; }
+    if (c === '[') { inClass = true; cur += c; continue; }
+    if (c === '(') { depth++; cur += c; continue; }
+    if (c === ')') { depth--; cur += c; continue; }
+    if (c === '|' && depth === 0) { out.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
+// A bare branch is a plain literal with no anchor, delimiter, or call context.
+// Distinctive API names (long CamelCase symbols, namespaced paths) are
+// safe bare -- they do not occur in prose. The bug is a bare branch that is a
+// short, lowercase, ordinary identifier: those match comments, variable names
+// and unrelated text. That is the shape behind every alternation bug here.
+function isRiskyBareBranch(branch) {
+  const b = branch.trim();
+  if (!b) return false;
+  if (/[\\^$(){}\[\]*+?]/.test(b)) return false;  // has context already
+  if (!/^\w+$/.test(b)) return false;              // paths, dots, hyphens are distinctive
+  if (b.length > 18) return false;                 // long names are distinctive
+  if (/[A-Z]/.test(b)) return false;               // CamelCase/CONST are distinctive
+  return true;                                     // short + all-lowercase = risky
+}
+
+function checkAlternations() {
+  console.log('\npattern alternation safety:');
+  let flagged = 0;
+  const files = fs.existsSync(PATTERNS_DIR)
+    ? fs.readdirSync(PATTERNS_DIR).filter(f => f.endsWith('.txt')) : [];
+  for (const f of files) {
+    const lines = fs.readFileSync(path.join(PATTERNS_DIR, f), 'utf8').split(/\r?\n/);
+    lines.forEach((line, i) => {
+      if (!line.trim() || line.startsWith('#')) return;
+      const parts = line.split('\t');
+      const id = parts[0]?.trim();
+      const re = parts[2];
+      if (!id || !re) return;
+      const branches = topLevelBranches(re);
+      if (branches.length < 2) return;
+      const bare = branches.filter(isRiskyBareBranch);
+      // All-bare is a deliberate keyword list (e.g. mongo operators). A bare
+      // branch sitting beside an anchored one is the bug.
+      if (bare.length > 0 && bare.length < branches.length) {
+        flagged++;
+        warn(`${f}:${i + 1} "${id}" mixes bare and anchored branches: ${bare.map(b => JSON.stringify(b.trim())).join(', ')} — parenthesise or add context`);
+      }
+    });
+  }
+  if (flagged === 0) ok('no mixed bare/anchored alternations');
+}
+
 // --- Main ---
 function main() {
   console.log('--- sync check ---\n');
@@ -236,9 +301,13 @@ function main() {
     ok('no cross-file pattern duplicates');
   }
 
+  checkAlternations();
+
   // Summary
   console.log(`\n--- result: ${errors} errors, ${warnings} warnings ---`);
   process.exit(errors > 0 ? 1 : 0);
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { topLevelBranches, isRiskyBareBranch };

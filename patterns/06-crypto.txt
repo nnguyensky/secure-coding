@@ -22,9 +22,9 @@ secret	*	AIza[0-9A-Za-z_-]{35}			critical
 secret	*	xox[baprs]-[0-9A-Za-z-]{10,}			critical
 secret	*	sk_live_[0-9a-zA-Z]{20,}|pk_live_[0-9a-zA-Z]{20,}			critical
 weak-crypto	*	\bDES\b|\bRC4\b|\bBlowfish\b	use AES-GCM or ChaCha20-Poly1305		medium
-weak-crypto	*	AES/ECB|MODE_ECB|aes-\d+-ecb	never use ECB — use GCM or CTR mode		medium
+weak-crypto	*	["'/]AES/ECB|["'.(,=]\s*MODE_ECB\b|["']aes-\d+-ecb	never use ECB — use GCM or CTR mode		medium
 weak-crypto	go	crypto/des|crypto/rc4|blowfish\.|des\.NewCipher|rc4\.NewCipher			medium
 weak-crypto	rb	OpenSSL::Cipher[^)]*(DES|RC4|Blowfish)|(DES|RC4|Blowfish)\.new			medium
-weak-crypto	php	mcrypt_|MCRYPT_(DES|RC4|BLOWFISH)|openssl_encrypt\s*\([^,]*,\s*["'](des|rc4|blowfish)			medium
+weak-crypto	php	mcrypt_\w+\s*\(|MCRYPT_(DES|RC4|BLOWFISH)|openssl_encrypt\s*\([^,]*,\s*["'](des|rc4|blowfish)			medium
 weak-crypto	cs	(DES|RC2|TripleDES)\.Create\s*\(|DESCryptoServiceProvider|RC2CryptoServiceProvider			medium
 weak-crypto	rs	(des|rc4|blowfish)::|Des::new|Rc4::new|Blowfish::new			medium

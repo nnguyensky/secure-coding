@@ -916,6 +916,24 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log(`MISS  api9-catches-deprecated: ${missedA.length}`); }
 })();
 
+// --- alternation validator catches bare branches ---
+// Four bugs came from a top-level `|` letting a branch match unanchored.
+(function alternationValidator() {
+  const sync = require('./sync.js');
+  uniq('alternation-validator-detects-bare');
+  const risky = ['auth', 'token', 'tmp_name'];
+  const safe = ['DESCryptoServiceProvider', 'crypto/des', 'faye-websocket', '\\$_FILES\\['];
+  const bad = risky.filter(b => !sync.isRiskyBareBranch(b));
+  const wrong = safe.filter(b => sync.isRiskyBareBranch(b));
+  if (bad.length === 0 && wrong.length === 0) pass++;
+  else { fail++; console.log(`alternation-validator: missed=${bad} falsepos=${wrong}`); }
+
+  uniq('alternation-splits-at-depth-zero');
+  const b = sync.topLevelBranches('a\\s*\\(|(x|y)|[a|b]');
+  if (b.length === 3) pass++;
+  else { fail++; console.log(`alternation-splits-at-depth-zero: got ${b.length} want 3`); }
+})();
+
 // --- no hardcoded test counts ---
 // Four stale-number bugs this session all came from literals. The installer
 // banners claimed 298 and 292 while the suite was at 469, and a banner that
