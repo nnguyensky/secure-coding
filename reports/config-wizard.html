@@ -595,6 +595,16 @@ footer {
         </div>
         <div class="toggle-row">
           <div class="toggle-info">
+            <strong>Multi-Line Taint Tracking</strong>
+            <span>Follow request data across assignments to a dangerous sink, not just single lines.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="cfgTaint" checked onchange="updateConfig()">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
             <strong>Auto-Format PR Comment Tables</strong>
             <span>Generate Markdown security summary tables automatically for GitHub and GitLab pull requests.</span>
           </div>
@@ -755,6 +765,7 @@ let selectedSeverity = 'high';
 const config = {
   failOn: 'high',
   entropyDetection: true,
+  taintTracking: true,
   generateMarkdownPR: true,
   modules: {
     llm: true,
@@ -793,6 +804,7 @@ function selectSeverity(sev, el) {
 
 function updateConfig() {
   config.entropyDetection = document.getElementById('cfgEntropy').checked;
+  config.taintTracking = document.getElementById('cfgTaint').checked;
   config.generateMarkdownPR = document.getElementById('cfgMarkdown').checked;
   config.modules.llm = document.getElementById('modLLM').checked;
   config.modules.jwt = document.getElementById('modJWT').checked;

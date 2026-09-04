@@ -73,7 +73,12 @@ function fixesRaw() {
 // Read the version from package.json rather than hardcoding it; the literal
 // had already drifted to 2.0.0 while the package was 2.1.0.
 let PKG_VERSION = '0.0.0';
-try { PKG_VERSION = require(path.join(DIR, 'package.json')).version || PKG_VERSION; } catch {}
+let PKG_HOMEPAGE = 'https://github.com/nnguyensky/secure-coding';
+try {
+  const pkg = require(path.join(DIR, 'package.json'));
+  PKG_VERSION = pkg.version || PKG_VERSION;
+  PKG_HOMEPAGE = pkg.homepage || PKG_HOMEPAGE;
+} catch { /* defaults above */ }
 
 function cweFor(id) {
   const text = fixesRaw();
@@ -209,7 +214,7 @@ function generateSarif(rows) {
           driver: {
             name: 'secure-coding',
             semanticVersion: PKG_VERSION,
-            informationUri: 'https://github.com/OWASP',
+            informationUri: PKG_HOMEPAGE,
             rules: Array.from(ruleMap.values()),
           },
         },

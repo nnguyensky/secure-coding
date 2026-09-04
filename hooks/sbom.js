@@ -26,6 +26,13 @@ Generates a CycloneDX v1.5 or SPDX v2.3 manifest.
 if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 const DIR = process.cwd();
+// DIR is the project being described; the tool's own identity comes from the
+// installed package, not from whatever repository is being scanned.
+const SELF_PKG = (() => {
+  try { return require(path.join(__dirname, '..', 'package.json')); } catch { return {}; }
+})();
+const SELF_VENDOR = (SELF_PKG.author && SELF_PKG.author.name) || 'secure-coding';
+const SELF_VERSION = SELF_PKG.version || '0.0.0';
 const FINDINGS_FILE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
 const AUDIT_FILE = statePath('audit.json', 'SECURE_CODING_AUDIT');
 
@@ -493,9 +500,9 @@ function generateCycloneDX(components, options = {}) {
       timestamp: new Date().toISOString(),
       tools: [
         {
-          vendor: 'OWASP',
+          vendor: SELF_VENDOR,
           name: 'secure-coding-sbom',
-          version: '2.1.0',
+          version: SELF_VERSION,
         },
       ],
       component: {
@@ -522,7 +529,7 @@ function generateSPDX(components) {
     name: path.basename(DIR),
     documentNamespace: `https://spdx.org/spdxdocs/${path.basename(DIR)}-${Date.now()}`,
     creationInfo: {
-      creators: ['Tool: secure-coding-sbom-2.1.0'],
+      creators: [`Tool: secure-coding-sbom-${SELF_VERSION}`],
       created: new Date().toISOString(),
     },
     packages: components.map((c, idx) => ({

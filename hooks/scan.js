@@ -9,7 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath, writeState, projectRoot } = require('./config');
+const { statePath, writeState, projectRoot, loadConfig, helpRequested } = require('./config');
 const { execFileSync } = require('child_process');
 
 const DIR = path.resolve(__dirname, '..');
@@ -114,12 +114,6 @@ function calculateShannonEntropy(str) {
     entropy -= p * Math.log2(p);
   }
   return entropy;
-}
-
-function loadConfig() {
-  const cfgFile = path.join(process.cwd(), '.securecodingrc.json');
-  if (!fs.existsSync(cfgFile)) return null;
-  try { return JSON.parse(fs.readFileSync(cfgFile, 'utf8')); } catch { return null; }
 }
 
 function maskSecret(snippet, id) {
@@ -408,6 +402,20 @@ function isIgnoredPath(file) {
 // git prints staged paths relative to the repo root, not to cwd. Resolving
 // them against cwd silently produces paths that do not exist when run from a
 // subdirectory, so every staged file gets skipped.
+// Regenerate the HTML report in a child process. `require`-ing report.js runs
+// it in-process, where it inherits scan.js's own process.argv -- so
+// `scan.js --all --help` printed report.js's usage, and any flag scan.js
+// accepts could change what the report did. One isolated call site instead of
+// three divergent ones.
+function regenerateReport() {
+  try {
+    const { execFileSync } = require('child_process');
+    execFileSync(process.execPath, [path.join(DIR, 'hooks', 'report.js')], {
+      env: process.env, stdio: 'ignore', timeout: 10000,
+    });
+  } catch (e) { /* report is best-effort */ }
+}
+
 function repoRoot() {
   try {
     return execFileSync('git', ['rev-parse', '--show-toplevel'],
@@ -473,6 +481,12 @@ Exit codes: 0 clean, 2 findings found.
 
 function main() {
   const args = process.argv.slice(2);
+
+  // Before anything else: --help combined with a mode flag (--all --help) used
+  // to run the whole scan, then print report.js's usage because the report was
+  // require()d in-process and saw --help on argv.
+  if (helpRequested(args, USAGE)) return;
+
   const patterns = loadPatterns();
 
   // Manual finding mode: node hooks/scan.js --find <id> <file> [note]
@@ -486,12 +500,7 @@ function main() {
     const rec = JSON.stringify({ file, id, section: 'manual', severity: 'medium', status: 'open', run_id: runId, first_seen: now, resolved_at: '', note });
     writeState(STATE, rec + '\n', { append: true });
     if (REPORT) {
-      try {
-        const { execFileSync } = require('child_process');
-        execFileSync(process.execPath, [path.join(DIR, 'hooks', 'report.js')], {
-          env: process.env, stdio: 'ignore', timeout: 10000,
-        });
-      } catch (e) { /* report is best-effort */ }
+      regenerateReport();
     }
     process.stdout.write(`Recorded: ${id}${file ? ' in ' + path.basename(file) : ''}\n`);
     return;
@@ -532,7 +541,9 @@ function main() {
     } else if (args[0] === '--file' && args[1]) {
       filesToScan = [path.resolve(args[1])];
     } else if (args[0] === '--files') {
-      filesToScan = args.slice(1).map(f => path.resolve(f));
+      // Drop flags: `--files app.js --json` used to resolve '--json' as a
+      // filename, silently skip the missing file, and never apply --json.
+      filesToScan = args.slice(1).filter(f => !f.startsWith('-')).map(f => path.resolve(f));
     }
 
     let allHits = [];
@@ -548,7 +559,7 @@ function main() {
     }
 
     if (REPORT) {
-      try { require(path.join(DIR, 'hooks', 'report.js')); } catch (e) {} // secure-coding-ignore: swallowed-exception -- optional step, must not abort
+      regenerateReport();
     }
 
     if (args.includes('--json')) {
@@ -602,7 +613,7 @@ function main() {
 
   const hits = scanSingleFile(file, patterns);
   if (REPORT) {
-    try { require(path.join(DIR, 'hooks', 'report.js')); } catch (e) { /* report is best-effort */ }
+    regenerateReport();
   }
 
   if (hits.length === 0) return;

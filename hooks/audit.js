@@ -8,7 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath, writeState, helpRequested } = require('./config');
+const { statePath, writeState, helpRequested, loadConfig } = require('./config');
 const { execFileSync } = require('child_process');
 
 // --help must print help, never run the tool. reset.js used to wipe the
@@ -253,12 +253,6 @@ function parseDotnetAudit(raw) {
     }
     return results;
   } catch { return []; }
-}
-
-function loadConfig() {
-  const cfgFile = path.join(process.cwd(), '.securecodingrc.json');
-  if (!fs.existsSync(cfgFile)) return null;
-  try { return JSON.parse(fs.readFileSync(cfgFile, 'utf8')); } catch { return null; }
 }
 
 function main() {

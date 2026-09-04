@@ -12,13 +12,18 @@ const path = require('path');
 const { exec } = require('child_process');
 
 const DIR = path.resolve(__dirname, '..');
-const ROOT = process.cwd();
-const CONFIG_FILE = path.join(ROOT, '.securecodingrc.json');
+// Resolved per call against the project root, not frozen at load time against
+// cwd. A constant here meant `cd packages/backend && scan.js x.js` looked for
+// the config in the subdirectory, found none, and silently discarded every
+// ignorePaths, failOn and taintTracking setting the project had declared.
+// projectRoot() is a hoisted function declaration, so it is callable here.
+function configFile() { return path.join(projectRoot(), '.securecodingrc.json'); }
 const WIZARD_HTML = path.join(DIR, 'reports', 'config-wizard.html');
 
 const DEFAULT_CONFIG = {
   failOn: 'high',
   entropyDetection: true,
+  taintTracking: true,
   generateMarkdownPR: true,
   modules: {
     llm: true,
@@ -42,9 +47,9 @@ const DEFAULT_CONFIG = {
 };
 
 function loadConfig() {
-  if (!fs.existsSync(CONFIG_FILE)) return DEFAULT_CONFIG;
+  if (!fs.existsSync(configFile())) return DEFAULT_CONFIG;
   try {
-    const raw = fs.readFileSync(CONFIG_FILE, 'utf8');
+    const raw = fs.readFileSync(configFile(), 'utf8');
     return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
   } catch (e) {
     return DEFAULT_CONFIG;
@@ -52,8 +57,8 @@ function loadConfig() {
 }
 
 function saveConfig(cfg) {
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2) + '\n');
-  console.log(`✅ Saved configuration to ${CONFIG_FILE}`);
+  fs.writeFileSync(configFile(), JSON.stringify(cfg, null, 2) + '\n');
+  console.log(`✅ Saved configuration to ${configFile()}`);
 }
 
 function openBrowser(url) {
@@ -73,8 +78,8 @@ function main() {
   }
 
   if (args.includes('--init')) {
-    if (fs.existsSync(CONFIG_FILE)) {
-      console.log(`Config already exists at ${CONFIG_FILE}`);
+    if (fs.existsSync(configFile())) {
+      console.log(`Config already exists at ${configFile()}`);
       return;
     }
     saveConfig(DEFAULT_CONFIG);

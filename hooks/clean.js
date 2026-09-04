@@ -265,11 +265,64 @@ function shouldSkip(filePath) {
   return false;
 }
 
+// Blank the inside of multi-line template literals, preserving newlines so
+// line numbers stay exact. Rules run line by line, so prose inside a `...`
+// block reads as code: "OWASP SCP item (1-213)" in a USAGE literal was
+// reported as a magic number.
+//
+// This needs a scanner, not a regex. A backtick also appears inside line
+// comments and regex literals, and pairing those blanked 419 lines of real
+// code -- including two genuine findings in this very file. Block comments
+// are left intact because isSuppressed() honours `/* secure-coding-ignore */`.
+function blankTemplateLiterals(src) {
+  const out = src.split('');
+  let i = 0;
+  const n = src.length;
+  while (i < n) {
+    const c = src[i];
+    const next = src[i + 1];
+    if (c === '\\') { i += 2; continue; }
+    if (c === '/' && next === '/') {                     // line comment
+      while (i < n && src[i] !== '\n') i++;
+      continue;
+    }
+    if (c === '/' && next === '*') {                     // block comment
+      i += 2;
+      while (i < n && !(src[i] === '*' && src[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+    if (c === '"' || c === "'") {                        // quoted string
+      const quote = c;
+      i++;
+      while (i < n && src[i] !== quote) { if (src[i] === '\\') i++; i++; }
+      i++;
+      continue;
+    }
+    if (c === '`') {                                     // template literal
+      const start = i;
+      i++;
+      while (i < n && src[i] !== '`') { if (src[i] === '\\') i++; i++; }
+      const end = i;
+      for (let k = start + 1; k < end && k < n; k++) {
+        if (out[k] !== '\n' && out[k] !== '\r') out[k] = ' ';
+      }
+      i++;
+      continue;
+    }
+    i++;
+  }
+  return out.join('');
+}
+
 function checkFile(filePath) {
   const content = readFile(filePath);
   if (!content) return [];
 
   const lines = content.split(/\r?\n/);
+  // Rules match against code with template-literal bodies blanked; suppression
+  // comments and snippets always come from the original line.
+  const codeLines = blankTemplateLiterals(content).split(/\r?\n/);
   const hits = [];
 
   for (const rule of RULES) {
@@ -365,7 +418,7 @@ function checkFile(filePath) {
     } else if (rule.check) {
       // Custom check function
       for (let i = 0; i < lines.length; i++) {
-        if (rule.check(lines[i]) && !isSuppressed(lines[i], rule.id)) {
+        if (rule.check(codeLines[i]) && !isSuppressed(lines[i], rule.id)) {
           hits.push({
             id: rule.id,
             severity: rule.severity,
@@ -379,7 +432,7 @@ function checkFile(filePath) {
     } else if (rule.re) {
       // Simple regex match
       for (let i = 0; i < lines.length; i++) {
-        if (rule.re.test(lines[i]) && !isSuppressed(lines[i], rule.id)) {
+        if (rule.re.test(codeLines[i]) && !isSuppressed(lines[i], rule.id)) {
           hits.push({
             id: rule.id,
             severity: rule.severity,

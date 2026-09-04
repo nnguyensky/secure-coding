@@ -1380,6 +1380,129 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log(`all-clis-answer-help: ${bad.join(', ')}`); }
 })();
 
+// --- config resolves from a subdirectory ---
+// CONFIG_FILE was frozen at load time against cwd, so running from
+// packages/backend found no config and silently discarded every policy.
+(function configFromSubdirectory() {
+  uniq('config-found-from-subdirectory');
+  const os = require('os');
+  const cp = require('child_process');
+  const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-sub-')));
+  let verdict = '';
+  try {
+    fs.mkdirSync(path.join(d, 'packages', 'backend'), { recursive: true });
+    cp.execFileSync('git', ['init', '-q'], { cwd: d, stdio: 'ignore' });
+    fs.writeFileSync(path.join(d, '.securecodingrc.json'),
+      JSON.stringify({ ignorePaths: ['packages/backend/**'], failOn: 'critical' }));
+    fs.writeFileSync(path.join(d, 'packages', 'backend', 'api.js'),
+      'const q = "SELECT * FROM t WHERE id=" + req.query.id;\n');
+    cp.execFileSync('git', ['add', '-A'], { cwd: d, stdio: 'ignore' });
+    cp.execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'i'],
+      { cwd: d, stdio: 'ignore' });
+    const env = { ...process.env };
+    delete env.SECURE_CODING_STATE;
+    const sub = cp.spawnSync('node', [path.join(DIR, 'hooks', 'scan.js'), 'api.js'],
+      { cwd: path.join(d, 'packages', 'backend'), encoding: 'utf8', env });
+    if (/sql-concat/.test(sub.stdout || '')) verdict = 'ignorePaths ignored from subdirectory';
+  } catch (e) { verdict = `harness failed: ${e.message.slice(0, 50)}`; }
+  finally { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ } }
+  if (!verdict) pass++;
+  else { fail++; console.log(`config-found-from-subdirectory: ${verdict}`); }
+})();
+
+// --- scan.js --help is never masked by a mode flag ---
+// --help sat after the mode branch, so `--all --help` ran the whole scan and
+// then printed report.js's usage, because report.js was require()d in-process
+// and saw --help on scan.js's argv.
+(function scanHelpAlwaysWins() {
+  uniq('scan-help-beats-mode-flags');
+  const cp = require('child_process');
+  const combos = [['--help'], ['-h'], ['--all', '--help'], ['--staged', '--help'],
+    ['--diff', '--help'], ['--files', 'x.js', '--help'], ['--json', '--help']];
+  const bad = [];
+  for (const argv of combos) {
+    const r = cp.spawnSync('node', [path.join(DIR, 'hooks', 'scan.js'), ...argv],
+      { encoding: 'utf8', timeout: 30000 });
+    if (!/^secure-coding scanner/.test(r.stdout || '')) bad.push(argv.join(' '));
+  }
+  if (bad.length === 0) pass++;
+  else { fail++; console.log(`scan-help-beats-mode-flags: ${bad.join('; ')}`); }
+
+  // report.js must never be run in-process, where it inherits scan.js's argv.
+  uniq('report-invoked-out-of-process');
+  const src = fs.readFileSync(path.join(DIR, 'hooks', 'scan.js'), 'utf8');
+  if (!/require\(path\.join\(DIR, 'hooks', 'report\.js'\)\)/.test(src)) pass++;
+  else { fail++; console.log('report-invoked-out-of-process: scan.js still requires report.js'); }
+})();
+
+// --- flags are not treated as file paths ---
+(function flagsNotFiles() {
+  uniq('scan-filters-flags-from-file-list');
+  const cp = require('child_process');
+  const r = cp.spawnSync('node',
+    [path.join(DIR, 'hooks', 'scan.js'), '--files', path.join(DIR, 'package.json'), '--json'],
+    { encoding: 'utf8', timeout: 30000, env: { ...process.env, SECURE_CODING_REPORT: 'off' } });
+  // --json must actually take effect: the output has to parse as JSON.
+  let ok = false;
+  try { JSON.parse((r.stdout || '').trim()); ok = true; } catch { ok = false; }
+  if (ok) pass++;
+  else { fail++; console.log(`scan-filters-flags-from-file-list: --json produced ${JSON.stringify((r.stdout || '').slice(0, 40))}`); }
+})();
+
+// --- prose inside template literals is not code ---
+(function templateLiteralsBlanked() {
+  const { checkFile } = require('./clean.js');
+  const os = require('os');
+  const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-tl-')));
+  const f = path.join(d, 'sample.js');
+
+  uniq('prose-in-template-literal-not-flagged');
+  fs.writeFileSync(f, [
+    'const USAGE = `Usage: tool',
+    'Handles 1-213 items and 4567 things.`;',
+    'const re = /`[^`]*`/g;',
+    '// a stray backtick ` in a comment',
+    'const real = 9999;',
+  ].join('\n') + '\n');
+  const hits = checkFile(f);
+  const magic = hits.filter(h => h.id === 'cc-magic-number');
+  // 9999 is real code and must still be reported; 213/4567 are prose.
+  const flaggedReal = magic.some(h => h.line === 5);
+  const flaggedProse = magic.some(h => h.line === 2);
+  if (flaggedReal && !flaggedProse) pass++;
+  else { fail++; console.log(`prose-in-template-literal-not-flagged: real=${flaggedReal} prose=${flaggedProse}`); }
+
+  // A blind backtick pair swallowed 419 lines of this repo, hiding real
+  // findings. Code after a comment backtick must still be linted.
+  uniq('code-after-comment-backtick-still-linted');
+  const swallowed = checkFile(f).some(h => h.line === 5);
+  if (swallowed) pass++;
+  else { fail++; console.log('code-after-comment-backtick-still-linted: line 5 was blanked'); }
+
+  try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
+})();
+
+// --- tool identity comes from package.json, never a literal ---
+(function toolIdentityDynamic() {
+  uniq('sbom-and-sarif-identity-not-hardcoded');
+  const pkg = require(path.join(DIR, 'package.json'));
+  const sbomSrc = fs.readFileSync(path.join(DIR, 'hooks', 'sbom.js'), 'utf8');
+  const repSrc = fs.readFileSync(path.join(DIR, 'hooks', 'report.js'), 'utf8');
+  const bad = [];
+  if (/vendor: 'OWASP'/.test(sbomSrc)) bad.push('sbom vendor hardcoded');
+  if (/secure-coding-sbom-\d/.test(sbomSrc)) bad.push('sbom version hardcoded');
+  if (/informationUri: 'https:\/\/github\.com\/OWASP'/.test(repSrc)) bad.push('sarif uri hardcoded');
+  if (!pkg.homepage || /OWASP/i.test(pkg.homepage)) bad.push('package homepage still OWASP');
+  if (bad.length === 0) pass++;
+  else { fail++; console.log(`sbom-and-sarif-identity-not-hardcoded: ${bad.join(', ')}`); }
+
+  uniq('default-config-has-taint-tracking');
+  const { DEFAULT_CONFIG } = require('./config.js');
+  const wiz = fs.readFileSync(path.join(DIR, 'reports', 'config-wizard.html'), 'utf8');
+  if (DEFAULT_CONFIG.taintTracking === true && /cfgTaint/.test(wiz)) pass++;
+  else { fail++; console.log(`default-config-has-taint-tracking: cfg=${DEFAULT_CONFIG.taintTracking} wizard=${/cfgTaint/.test(wiz)}`); }
+})();
+
 // --- no hardcoded test counts ---
 // Four stale-number bugs this session all came from literals. The installer
 // banners claimed 298 and 292 while the suite was at 469, and a banner that
