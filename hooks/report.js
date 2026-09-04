@@ -6,7 +6,17 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath } = require('./config');
+const { statePath, helpRequested } = require('./config');
+
+// --help must print help, never run the tool. reset.js used to wipe the
+// findings file when asked for help; audit.js and sbom.js ran in full.
+const USAGE = `Usage: node hooks/report.js [--sarif] [--markdown] [--out <file>]
+
+Renders the findings file into an HTML report, SARIF v2.1.0, or Markdown.
+Defaults to self-contained HTML under reports/.
+
+Env: SECURE_CODING_STATE (default: <project>/checks/findings.jsonl)`;
+if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 const DIR = path.resolve(__dirname, '..');
 const STATE = statePath('findings.jsonl', 'SECURE_CODING_STATE');

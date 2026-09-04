@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { loadConfig, projectRoot } = require('./config');
 
 const DIR = path.resolve(__dirname, '..');
 const FIXES = path.join(DIR, 'checks', 'fixes.md');
@@ -196,7 +197,9 @@ function ignoreGlobs() {
   if (_ignoreGlobs) return _ignoreGlobs;
   _ignoreGlobs = [];
   try {
-    const cfg = JSON.parse(fs.readFileSync(path.join(DIR, '.securecodingrc.json'), 'utf8'));
+    // loadConfig reads the scanned project's .securecodingrc.json. Reading it
+    // from DIR meant a consumer repository's ignorePaths were never applied.
+    const cfg = loadConfig();
     if (Array.isArray(cfg.ignorePaths)) _ignoreGlobs = cfg.ignorePaths;
   } catch { /* no config */ }
   return _ignoreGlobs;
@@ -223,12 +226,34 @@ function isSuppressed(line, ruleId) {
   return ids.includes(id) || ids.includes(short) || alts.some(a => ids.includes(a)) || ids.includes('all');
 }
 
+// A directory argument used to be handed straight to readFile, which threw
+// EISDIR, was swallowed, and exited 0 having linted nothing -- a silent pass
+// on an entire tree. Expand directories the way scan.js does.
+function expand(target) {
+  let stat;
+  try { stat = fs.statSync(target); } catch { return []; }
+  if (!stat.isDirectory()) return [target];
+  const out = [];
+  const walk = (dir) => {
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (SKIP_SEG.includes(e.name)) continue;
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (e.isFile()) out.push(full);
+    }
+  };
+  walk(target);
+  return out;
+}
+
 function shouldSkip(filePath) {
   const ext = path.extname(filePath).slice(1).toLowerCase();
   if (SKIP_EXT.has(ext)) return true;
   const segs = filePath.split(path.sep);
   if (segs.some(s => SKIP_SEG.includes(s))) return true;
-  const rel = path.relative(DIR, path.resolve(filePath)).split(path.sep).join('/');
+  const rel = path.relative(projectRoot(), path.resolve(filePath)).split(path.sep).join('/');
   if (!rel.startsWith('..')) {
     for (const g of ignoreGlobs()) {
       const re = new RegExp('^' + g.split('/').map(part =>
@@ -385,7 +410,10 @@ function formatOutput(filePath, hits, jsonMode) {
     })), null, 2);
   }
 
-  const rel = path.relative(DIR, filePath);
+  // Display relative to the project, not the installed skill: anchoring to DIR
+  // printed paths like ../../../../private/tmp/proj/src/a.js downstream.
+  let rel = path.relative(projectRoot(), path.resolve(filePath));
+  if (rel.startsWith('..')) rel = filePath; // outside the project: show as given
   const lines = [`Clean code issues in ${rel}:\n`];
   for (const h of hits) {
     const loc = h.endLine ? `:${h.line}-${h.endLine}` : `:${h.line}`;
@@ -443,10 +471,10 @@ function main() {
       }
     } catch { /* not a repo */ }
   } else if (fileIdx !== -1 && args[fileIdx + 1]) {
-    files.push(args[fileIdx + 1]);
+    files.push(...expand(args[fileIdx + 1]));
   } else {
     for (const a of args) {
-      if (!a.startsWith('-') && fs.existsSync(a)) files.push(a);
+      if (!a.startsWith('-') && fs.existsSync(a)) files.push(...expand(a));
     }
   }
 
@@ -497,7 +525,7 @@ function main() {
   const SEV_WEIGHT = { critical: 4, high: 3, medium: 2, low: 1 };
   let failOn = 'high';
   try {
-    const cfg = JSON.parse(fs.readFileSync(path.join(DIR, '.securecodingrc.json'), 'utf8'));
+    const cfg = loadConfig();
     if (cfg.failOn) failOn = String(cfg.failOn).toLowerCase();
   } catch { /* default */ }
   const minWeight = SEV_WEIGHT[failOn] || SEV_WEIGHT.high;

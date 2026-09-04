@@ -5,7 +5,12 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath, writeState } = require('./config');
+const { statePath, writeState, helpRequested } = require('./config');
+
+// --help must print help, never run the tool. This used to wipe the findings
+// file when asked for help.
+const USAGE = `Usage: node hooks/reset.js\n\nClears the per-session findings file and regenerates an empty report.\nRun at the start of a session so the report reflects only that session.\n\nEnv: SECURE_CODING_STATE (default: <project>/checks/findings.jsonl)`;
+if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 const DIR = path.resolve(__dirname, '..');
 const STATE = statePath('findings.jsonl', 'SECURE_CODING_STATE');

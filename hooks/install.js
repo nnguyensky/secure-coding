@@ -467,12 +467,16 @@ function installGlobal() {
       try { fs.unlinkSync(targetSymlink); } catch {}
       fs.symlinkSync(DIR, targetSymlink, 'dir');
       const manifestPath = path.join(pluginDir, 'plugin.json');
+      // Read from package.json: a hardcoded version goes stale on every
+      // release, and the author here still said OWASP after package.json
+      // was corrected.
+      const pkg = require(path.join(DIR, 'package.json'));
       fs.writeFileSync(manifestPath, JSON.stringify({
         name: 'secure-coding',
-        version: '2.1.0',
-        description: 'Catches insecure code as it is written, then asks the questions a scanner cannot.',
-        author: { name: 'OWASP' },
-        license: 'MIT',
+        version: pkg.version,
+        description: pkg.description || 'Catches insecure code as it is written, then asks the questions a scanner cannot.',
+        author: pkg.author,
+        license: pkg.license,
       }, null, 2) + '\n');
       console.log(`${GREEN}✅ Registered global Antigravity plugin:${NC} ${pluginDir}`);
     }

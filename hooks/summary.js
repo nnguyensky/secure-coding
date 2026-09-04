@@ -6,7 +6,17 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath } = require('./config');
+const { statePath, helpRequested } = require('./config');
+
+// --help must print help, never run the tool. reset.js used to wipe the
+// findings file when asked for help; audit.js and sbom.js ran in full.
+const USAGE = `Usage: node hooks/summary.js
+
+Prints a one-line summary of open versus fixed findings.
+Exits 2 when open findings remain, 0 when clean.
+
+Env: SECURE_CODING_STATE (default: <project>/checks/findings.jsonl)`;
+if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 const STATE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
 

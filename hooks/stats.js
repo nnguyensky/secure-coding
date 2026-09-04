@@ -9,7 +9,16 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath } = require('./config');
+const { statePath, helpRequested } = require('./config');
+
+// --help must print help, never run the tool. reset.js used to wipe the
+// findings file when asked for help; audit.js and sbom.js ran in full.
+const USAGE = `Usage: node hooks/stats.js [--top N] [--severity]
+
+Reports which patterns fire most often across recorded findings.
+  --top N      show the top N patterns (default: 10)
+  --severity   group the breakdown by severity`;
+if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 const STATE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
 const FP_FILE = path.join(process.cwd(), 'false-positives.json');

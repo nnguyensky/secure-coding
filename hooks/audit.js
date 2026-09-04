@@ -8,8 +8,19 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath, writeState } = require('./config');
+const { statePath, writeState, helpRequested } = require('./config');
 const { execFileSync } = require('child_process');
+
+// --help must print help, never run the tool. reset.js used to wipe the
+// findings file when asked for help; audit.js and sbom.js ran in full.
+const USAGE = `Usage: node hooks/audit.js [dir] [--help]
+
+Audits project dependencies across supported ecosystems (npm, pnpm, yarn,
+pip, cargo, go, dotnet, composer, bundler) for known advisories.
+Prints a JSON array of {ecosystem, package, installed, latest, severity, title}.
+
+Env: SECURE_CODING_AUDIT (default: <project>/checks/audit.json)`;
+if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 // argv[2] is a target directory, not a flag — a stray `--help` would otherwise
 // be treated as a path and have the audit file written into it.

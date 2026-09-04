@@ -72,7 +72,11 @@ function relevantFiles(files) {
     const ext = path.extname(f).slice(1).toLowerCase();
     if (IRRELEVANT_EXT.has(ext)) continue;
     if (f.split(path.sep).some(seg => IRRELEVANT_SEG.includes(seg))) continue;
-    if (/(^|[.\/])(test|spec)[.\/]|\.(test|spec)\.[a-z]+$|_test\.[a-z]+$/i.test(f)) continue;
+    // Normalise separators before the path regex: on Windows a path uses \,
+    // which [./] never matches, so test and spec files were reviewed as if
+    // they were production code.
+    const norm = f.split(path.sep).join('/');
+    if (/(^|[.\/])(test|spec)[.\/]|\.(test|spec)\.[a-z]+$|_test\.[a-z]+$/i.test(norm)) continue;
     let text = '';
     try { text = fs.readFileSync(f, 'utf8'); } catch { continue; }
     if (RELEVANT_CODE.some(re => re.test(text))) hits.push(f);

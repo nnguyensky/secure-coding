@@ -11,8 +11,19 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath } = require('./config');
+const { statePath, helpRequested } = require('./config');
 const { randomUUID } = require('crypto');
+
+// --help must print help, never run the tool. reset.js used to wipe the
+// findings file when asked for help; audit.js and sbom.js ran in full.
+const USAGE = `Usage: node hooks/sbom.js [--format cyclonedx|spdx] [--ai] [--vex] [--out <file>]
+
+Generates a CycloneDX v1.5 or SPDX v2.3 manifest.
+  --format     output specification (default: cyclonedx)
+  --ai         include the BSI AI-SBOM 7 information clusters
+  --vex        include VEX exploitability statements
+  --out <f>    write to a file instead of stdout`;
+if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 const DIR = process.cwd();
 const FINDINGS_FILE = statePath('findings.jsonl', 'SECURE_CODING_STATE');

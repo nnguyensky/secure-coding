@@ -9,7 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath, writeState } = require('./config');
+const { statePath, writeState, projectRoot } = require('./config');
 const { execFileSync } = require('child_process');
 
 const DIR = path.resolve(__dirname, '..');
@@ -392,8 +392,11 @@ function isIgnoredPath(file) {
   const cfg = loadConfig();
   const globs = cfg && Array.isArray(cfg.ignorePaths) ? cfg.ignorePaths : [];
   if (globs.length === 0) return false;
-  const rel = path.relative(DIR, path.resolve(file)).split(path.sep).join('/');
-  if (rel.startsWith('..')) return false; // outside the project
+  // Relative to the project being scanned, not the installed skill: resolving
+  // against DIR made every downstream path start with '..', so ignorePaths
+  // matched nothing at all outside this repository.
+  const rel = path.relative(projectRoot(), path.resolve(file)).split(path.sep).join('/');
+  if (rel.startsWith('..')) return false; // genuinely outside the project
   return globs.some(g => {
     const re = new RegExp('^' + g.split('/').map(part =>
       part === '**' ? '.*' : part.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')
@@ -495,6 +498,13 @@ function main() {
   }
 
   // CLI Mode: --staged or --diff or --files
+  // A bare path is treated as --files. Without this, `scan.js app.js` fell
+  // through to stdin hook mode: with a piped stdin it read the wrong input,
+  // and on a terminal it reported nothing and exited 0 -- a silent all-clear
+  // on a file that may be full of findings.
+  const positional = args.length > 0 && !args[0].startsWith('-');
+  if (positional) args.unshift('--files');
+
   if (args[0] === '--staged' || args[0] === '--diff' || args[0] === '--files' || args[0] === '--file' || args[0] === '--all') {
     let filesToScan = [];
     const { execFileSync } = require('child_process');

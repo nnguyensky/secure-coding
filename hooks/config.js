@@ -111,22 +111,21 @@ if (require.main === module) {
   main();
 }
 
-// Findings, audit results and gate answers describe the project being scanned,
-// not the skill. Resolving them against the package directory made a downstream
-// scan write its findings into the installed skill, where they leaked into
-// every other project's reports. State follows the project; skill assets
-// (patterns, fixes.md) stay with the package.
-//
-// Order: explicit env override, then the project's own checks/ directory, then
-// the package -- so the skill scanning itself keeps working unchanged.
-function stateDir() {
-  let root = process.cwd();
+// Findings, audit results, gate answers and ignorePaths globs all describe the
+// project being scanned, not the installed skill. Resolving them against the
+// package directory made a downstream scan write findings into the skill and
+// made every ignorePaths glob silently fail to match. Skill assets (patterns,
+// fixes.md) stay with the package; everything project-shaped resolves here.
+function projectRoot() {
   try {
-    root = require('child_process')
+    return require('child_process')
       .execFileSync('git', ['rev-parse', '--show-toplevel'],
-        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || root;
-  } catch { /* not a git repo: cwd is the project */ }
-  return path.join(root, 'checks');
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || process.cwd();
+  } catch { return process.cwd(); } // not a git repo: cwd is the project
+}
+
+function stateDir() {
+  return path.join(projectRoot(), 'checks');
 }
 
 // `name` is a bare filename such as 'findings.jsonl'. `env` names an
@@ -158,4 +157,14 @@ function writeState(file, data, { append = false } = {}) {
   }
 }
 
-module.exports = { loadConfig, DEFAULT_CONFIG, stateDir, statePath, writeState };
+// `--help` must never do the thing. reset.js used to wipe the findings file
+// when asked for help, and audit.js/sbom.js ran their full operation, so a
+// user typing --help to learn what a tool does triggered it instead. Call this
+// as the first statement of a CLI, before any work.
+function helpRequested(argv, usage) {
+  if (!argv.includes('--help') && !argv.includes('-h')) return false;
+  process.stdout.write(usage.trimEnd() + '\n');
+  return true;
+}
+
+module.exports = { loadConfig, DEFAULT_CONFIG, projectRoot, stateDir, statePath, writeState, helpRequested };

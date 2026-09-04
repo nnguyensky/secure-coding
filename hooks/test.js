@@ -1132,6 +1132,110 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log(`no-blocking-scan-in-instructions: ${offenders.join(', ')}`); }
 })();
 
+// --- downstream project correctness ---
+// A batch of bugs that all shared one root cause: paths and config resolved
+// against the installed skill rather than the project being scanned.
+(function downstreamCorrectness() {
+  const os = require('os');
+  const cp = require('child_process');
+  const mkProject = () => {
+    const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-ds-')));
+    cp.execFileSync('git', ['init', '-q'], { cwd: d, stdio: 'ignore' });
+    fs.mkdirSync(path.join(d, 'tests'), { recursive: true });
+    fs.mkdirSync(path.join(d, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(d, '.securecodingrc.json'),
+      JSON.stringify({ ignorePaths: ['tests/**'], failOn: 'critical' }));
+    fs.writeFileSync(path.join(d, 'tests', 'fixture.js'),
+      'const q = "SELECT * FROM t WHERE id=" + req.query.id;\n');
+    fs.writeFileSync(path.join(d, 'src', 'a.js'),
+      'function f() {\n  try { g(); } catch (e) {}\n}\n');
+    cp.execFileSync('git', ['add', '-A'], { cwd: d, stdio: 'ignore' });
+    cp.execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'i'],
+      { cwd: d, stdio: 'ignore' });
+    return d;
+  };
+  const run = (script, args, cwd) => cp.spawnSync('node',
+    [path.join(DIR, 'hooks', script), ...args], { cwd, encoding: 'utf8' });
+
+  const proj = mkProject();
+  try {
+    // ignorePaths resolved against DIR, so every downstream path began with
+    // '..' and no glob ever matched.
+    uniq('ignorepaths-honoured-downstream');
+    const scanOut = run('scan.js', ['--all'], proj);
+    if (!/tests\/fixture\.js/.test(scanOut.stdout)) pass++;
+    else { fail++; console.log('ignorepaths-honoured-downstream: tests/** was scanned anyway'); }
+
+    // clean.js read .securecodingrc.json from the skill directory.
+    uniq('clean-reads-project-config');
+    const strict = run('clean.js', ['src/a.js'], proj);   // failOn critical -> exit 0
+    fs.writeFileSync(path.join(proj, '.securecodingrc.json'),
+      JSON.stringify({ ignorePaths: ['tests/**'], failOn: 'high' }));
+    const loose = run('clean.js', ['src/a.js'], proj);    // failOn high -> exit 2
+    if (strict.status === 0 && loose.status === 2) pass++;
+    else { fail++; console.log(`clean-reads-project-config: critical=${strict.status} high=${loose.status}`); }
+
+    // A directory argument hit EISDIR, was swallowed, and exited 0 having
+    // linted nothing.
+    uniq('clean-expands-directory-arg');
+    const dir = run('clean.js', ['src'], proj);
+    if (/cc-swallowed-error/.test(dir.stdout)) pass++;
+    else { fail++; console.log('clean-expands-directory-arg: directory linted nothing'); }
+
+    // A bare path fell through to stdin hook mode and reported clean.
+    uniq('scan-accepts-positional-files');
+    fs.writeFileSync(path.join(proj, 'live.js'),
+      'const q = "SELECT * FROM t WHERE id=" + req.query.id;\n');
+    const pos = run('scan.js', ['live.js'], proj);
+    if (/sql-concat/.test(pos.stdout) && pos.status === 2) pass++;
+    else { fail++; console.log(`scan-accepts-positional-files: status=${pos.status}`); }
+  } finally {
+    try { fs.rmSync(proj, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+})();
+
+// --- --help never performs the operation ---
+// reset.js wiped the findings file when asked for help; audit.js and sbom.js
+// ran in full.
+(function helpIsInert() {
+  uniq('help-prints-usage-and-does-nothing');
+  const cp = require('child_process');
+  const os = require('os');
+  const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-help-')));
+  fs.mkdirSync(path.join(d, 'checks'), { recursive: true });
+  const state = path.join(d, 'checks', 'findings.jsonl');
+  const bad = [];
+  for (const tool of ['reset.js', 'summary.js', 'stats.js', 'fix.js', 'report.js', 'audit.js', 'sbom.js']) {
+    fs.writeFileSync(state, '{"id":"probe","status":"open"}\n');
+    const r = cp.spawnSync('node', [path.join(DIR, 'hooks', tool), '--help'],
+      { cwd: d, encoding: 'utf8', env: { ...process.env, SECURE_CODING_STATE: state }, timeout: 30000 });
+    if (!/^Usage:/m.test(r.stdout || '')) bad.push(`${tool} (no usage)`);
+    if (fs.readFileSync(state, 'utf8').trim() === '') bad.push(`${tool} (destroyed state)`);
+  }
+  try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
+  if (bad.length === 0) pass++;
+  else { fail++; console.log(`help-prints-usage-and-does-nothing: ${bad.join(', ')}`); }
+})();
+
+// --- gate.js skips test files on Windows-shaped paths ---
+(function gateNormalisesSeparators() {
+  uniq('gate-test-skip-normalises-separators');
+  const re = /(^|[.\/])(test|spec)[.\/]|\.(test|spec)\.[a-z]+$|_test\.[a-z]+$/i;
+  const win = 'src\\test\\a.js';
+  if (!re.test(win) && re.test(win.split('\\').join('/'))) pass++;
+  else { fail++; console.log('gate-test-skip-normalises-separators: premise no longer holds'); }
+})();
+
+// --- Antigravity plugin manifest is not hardcoded ---
+(function pluginManifestDynamic() {
+  uniq('plugin-manifest-reads-package-json');
+  const src = fs.readFileSync(path.join(DIR, 'hooks', 'install.js'), 'utf8');
+  const i = src.indexOf('manifestPath, JSON.stringify({');
+  const blk = i === -1 ? '' : src.slice(i, i + 400);
+  if (blk && !/version: '\d/.test(blk) && !/name: 'OWASP'/.test(blk)) pass++;
+  else { fail++; console.log('plugin-manifest-reads-package-json: still hardcoded'); }
+})();
+
 // --- no hardcoded test counts ---
 // Four stale-number bugs this session all came from literals. The installer
 // banners claimed 298 and 292 while the suite was at 469, and a banner that
