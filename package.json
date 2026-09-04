@@ -60,7 +60,7 @@
     "grill": "node hooks/gate.js --grill",
     "gate": "node hooks/gate.js --check",
     "audit": "node hooks/audit.js",
-    "clean": "node hooks/clean.js",
+    "clean": "node hooks/clean.js --all",
     "sbom": "node hooks/sbom.js --format cyclonedx --ai --vex",
     "mcp": "node mcp/server.js",
     "wizard": "node hooks/config.js --ui"

@@ -178,11 +178,34 @@ function readFile(filePath) {
   try { return fs.readFileSync(filePath, 'utf8'); } catch (e) { return ''; }
 }
 
+// Honour .securecodingrc.json ignorePaths, the same list scan.js uses, so
+// generated output and fixtures are not linted by one tool and skipped by
+// the other.
+let _ignoreGlobs = null;
+function ignoreGlobs() {
+  if (_ignoreGlobs) return _ignoreGlobs;
+  _ignoreGlobs = [];
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(DIR, '.securecodingrc.json'), 'utf8'));
+    if (Array.isArray(cfg.ignorePaths)) _ignoreGlobs = cfg.ignorePaths;
+  } catch { /* no config */ }
+  return _ignoreGlobs;
+}
+
 function shouldSkip(filePath) {
   const ext = path.extname(filePath).slice(1).toLowerCase();
   if (SKIP_EXT.has(ext)) return true;
   const segs = filePath.split(path.sep);
   if (segs.some(s => SKIP_SEG.includes(s))) return true;
+  const rel = path.relative(DIR, path.resolve(filePath)).split(path.sep).join('/');
+  if (!rel.startsWith('..')) {
+    for (const g of ignoreGlobs()) {
+      const re = new RegExp('^' + g.split('/').map(part =>
+        part === '**' ? '.*' : part.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')
+      ).join('/').replace(/\.\*\//g, '(?:.*/)?') + '$');
+      if (re.test(rel)) return true;
+    }
+  }
   return false;
 }
 
@@ -237,7 +260,14 @@ function checkFile(filePath) {
           const trimmed = lines[i].trim();
           const nextTrimmed = lines[i + 1] ? lines[i + 1].trim() : '';
           // Code after return/throw/continue/break (not in nested blocks)
-          if (/^(?:return|throw|continue|break)\b/.test(trimmed) && !trimmed.endsWith(',')) {
+          // A statement that continues on the next line is not followed by dead
+          // code: `return xs.map(x => {` opens a callback, it does not end the
+          // function. Without this the linter flags its own source.
+          // A continuation marker can sit at the end of this line (`map(x => {`)
+          // or the start of the next (`? left`, `.filter(...)`, `&& more`).
+          const continues = /[[{(+\-*&|?:.]$/.test(trimmed) || /=>\s*$/.test(trimmed) || trimmed.endsWith(',')
+            || /^[?:.+\-*&|)\]}]|^(?:and|or|not)\b/.test(nextTrimmed);
+          if (/^(?:return|throw|continue|break)\b/.test(trimmed) && !continues) {
             // Check next line isn't a closing brace, comment, empty, or label
             // Indentation-scoped languages (Python et al.) close a block by
             // dedenting, so a next line at the same or lower indent has left it.
@@ -347,7 +377,10 @@ function main() {
 
   // Hook mode: read payload from stdin
   if (args.length === 0 && !process.stdin.isTTY) {
-    const payload = fs.readFileSync(0, 'utf8');
+    // Reading fd 0 can fail with EAGAIN when stdin is inherited but has no
+    // data — an npm script or CI runner. scan.js already guards this.
+    let payload = '';
+    try { payload = fs.readFileSync(0, 'utf8'); } catch { return; }
     const m = payload.match(/"file_path"\s*:\s*"([^"]*)"/);
     if (!m) return;
     const file = m[1];
@@ -368,7 +401,17 @@ function main() {
   const countMode = args.includes('--count');
 
   const files = [];
-  if (fileIdx !== -1 && args[fileIdx + 1]) {
+  if (args.includes('--all')) {
+    // Lint every tracked file. git ls-files respects .gitignore.
+    try {
+      const { execFileSync } = require('child_process');
+      const root = execFileSync('git', ['rev-parse', '--show-toplevel'],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || process.cwd();
+      for (const f of execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/)) {
+        if (f) files.push(path.resolve(root, f));
+      }
+    } catch { /* not a repo */ }
+  } else if (fileIdx !== -1 && args[fileIdx + 1]) {
     files.push(args[fileIdx + 1]);
   } else {
     for (const a of args) {
@@ -412,4 +455,8 @@ function main() {
   if (total > 0) process.exit(2);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = { checkFile, shouldSkip, RULES };

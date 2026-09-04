@@ -817,6 +817,67 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
 })();
 
+// --- clean.js robustness ---
+(function cleanRobust() {
+  const CLEAN = path.join(DIR, 'hooks', 'clean.js');
+  const dir = path.join(TMP, 'cleanrb');
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+
+  // A statement continuing across lines is not followed by dead code. The
+  // linter used to flag its own source on this.
+  uniq('dead-code-multiline-return');
+  const cont = path.join(dir, 'cont.js');
+  fs.writeFileSync(cont, [
+    'function a() {',
+    '  return xs.map(x => {',
+    '    return x * 2;',
+    '  });',
+    '}',
+    'function b() {',
+    '  return cond',
+    '    ? left',
+    '    : right;',
+    '}',
+    'function c() {',
+    '  return JSON.stringify(items.map(h => ({',
+    '    file: h.file,',
+    '  })));',
+    '}',
+    '',
+  ].join('\n'));
+  const contOut = spawnSync('node', [CLEAN, cont], { encoding: 'utf8', input: '' }).stdout || '';
+  if (!/cc-dead-code/.test(contOut)) pass++;
+  else { fail++; console.log('FALSE+ dead-code-multiline-return'); }
+
+  // ...but genuine dead code must still be reported.
+  uniq('dead-code-still-caught');
+  const real = path.join(dir, 'real.js');
+  fs.writeFileSync(real, 'function f() {\n  return 1;\n  console.log("dead");\n}\n');
+  if (/cc-dead-code/.test(spawnSync('node', [CLEAN, real], { encoding: 'utf8', input: '' }).stdout || '')) pass++;
+  else { fail++; console.log('MISS  dead-code-still-caught'); }
+
+  // The linter must not flag its own source.
+  uniq('clean-self-lint-no-dead-code');
+  const self = spawnSync('node', [CLEAN, CLEAN], { encoding: 'utf8', input: '' }).stdout || '';
+  if (!/cc-dead-code/.test(self)) pass++;
+  else { fail++; console.log('FALSE+ clean-self-lint-no-dead-code'); }
+
+  // require() must not execute main() and read stdin.
+  uniq('clean-requireable');
+  const req = spawnSync('node', ['-e',
+    `const m = require(${JSON.stringify(CLEAN)}); if (typeof m.checkFile !== 'function') process.exit(1);`],
+    { encoding: 'utf8', input: '' });
+  if (req.status === 0) pass++;
+  else { fail++; console.log(`MISS  clean-requireable: ${(req.stderr || '').slice(0, 60)}`); }
+
+  // ignorePaths must apply here too, or one tool skips what the other lints.
+  uniq('clean-honours-ignorepaths');
+  const all = spawnSync('node', [CLEAN, '--all'], { cwd: DIR, encoding: 'utf8', input: '' }).stdout || '';
+  if (!/reports\/|hooks\/test\.js/.test(all)) pass++;
+  else { fail++; console.log('MISS  clean-honours-ignorepaths: linted an ignored path'); }
+})();
+
 // --- gate relevance matches the scanner's sources ---
 // scan.js gained request.json/get_json/values; if gate.js does not, staging a
 // Flask handler that reads request.json skips the review it needs.
