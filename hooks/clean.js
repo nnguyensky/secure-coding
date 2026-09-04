@@ -18,7 +18,11 @@ const FIXES = path.join(DIR, 'checks', 'fixes.md');
 const STATE = process.env.SECURE_CODING_STATE || path.join(DIR, 'checks', 'findings.jsonl');
 const REPORT = (process.env.SECURE_CODING_REPORT || 'on') === 'on';
 
-const SKIP_EXT = new Set(['md', 'txt', 'json', 'lock', 'csv', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'pdf', 'min.js', 'map']);
+// Clean-code rules describe executable code. Config and markup have no
+// functions to keep small and no constants to name, so linting them only
+// produces noise — a YAML version pin is not a magic number.
+const SKIP_EXT = new Set(['md', 'txt', 'json', 'lock', 'csv', 'svg', 'png', 'jpg', 'jpeg', 'gif',
+  'pdf', 'min.js', 'map', 'yml', 'yaml', 'toml', 'xml', 'html', 'htm', 'css', 'scss', 'ini', 'cfg', 'conf']);
 const SKIP_SEG = ['node_modules', 'vendor', '.git', 'dist', 'build', 'target'];
 
 // Rules: { id, re, severity, hint }
@@ -43,12 +47,18 @@ const RULES = [
       if (/import|require|from/.test(trimmed) && /['"]/.test(trimmed)) return false;
       // Skip version strings and port numbers
       if (/\d+\.\d+/.test(trimmed) || /:\d{2,5}/.test(trimmed)) return false;
+      // A number inside a message or a regex is not a magic number:
+      // console.log("All 298 tests passed") names nothing. Blank the literals
+      // out before looking for constants.
+      const code = trimmed
+        .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g, '""')
+        .replace(/\/(?:[^\/\\\n]|\\.)+\/[gimsuy]*/g, '//');
       // Find numeric literals > 2 that aren't part of larger numbers
       const re = /(?<![0-9a-fx."])\b(?!0\b|1\b|2\b|10\b|-1\b)\d{2,}\b(?!\.\d)/g;
-      const matches = trimmed.match(re);
+      const matches = code.match(re);
       if (!matches) return false;
       // Allowed common status codes and time units
-      const allowed = new Set([0, 1, 2, 10, -1, 60, 100, 200, 201, 204, 301, 302, 400, 401, 403, 404, 500, 502, 503, 1000, 3600, 5000, 10000, 15000, 30000, 86400]);
+      const allowed = new Set([0, 1, 2, 10, -1, 60, 64, 100, 200, 201, 204, 301, 302, 400, 401, 403, 404, 500, 502, 503, 1000, 3600, 5000, 10000, 15000, 30000, 86400]);
       return matches.some(m => {
         const n = parseInt(m, 10);
         return !allowed.has(n);
@@ -192,6 +202,17 @@ function ignoreGlobs() {
   return _ignoreGlobs;
 }
 
+// Same inline suppression scan.js honours, so a reviewed exception documented
+// on the line is respected by both tools. Accepts the rule id with or without
+// the cc- prefix: `// secure-coding-ignore: swallowed-error`.
+function isSuppressed(line, ruleId) {
+  const m = line.match(/(?:\/\/|#|\/\*)\s*(?:secure-coding-ignore|nosec):\s*([A-Za-z0-9_,\s-]+?)(?:--|\*\/|$)/i);
+  if (!m) return false;
+  const ids = m[1].split(/[,\s]+/).map(x => x.trim().toLowerCase()).filter(Boolean);
+  const id = ruleId.toLowerCase();
+  return ids.includes(id) || ids.includes(id.replace(/^cc-/, '')) || ids.includes('all');
+}
+
 function shouldSkip(filePath) {
   const ext = path.extname(filePath).slice(1).toLowerCase();
   if (SKIP_EXT.has(ext)) return true;
@@ -309,7 +330,7 @@ function checkFile(filePath) {
     } else if (rule.check) {
       // Custom check function
       for (let i = 0; i < lines.length; i++) {
-        if (rule.check(lines[i])) {
+        if (rule.check(lines[i]) && !isSuppressed(lines[i], rule.id)) {
           hits.push({
             id: rule.id,
             severity: rule.severity,
@@ -323,7 +344,7 @@ function checkFile(filePath) {
     } else if (rule.re) {
       // Simple regex match
       for (let i = 0; i < lines.length; i++) {
-        if (rule.re.test(lines[i])) {
+        if (rule.re.test(lines[i]) && !isSuppressed(lines[i], rule.id)) {
           hits.push({
             id: rule.id,
             severity: rule.severity,
@@ -459,4 +480,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { checkFile, shouldSkip, RULES };
+module.exports = { checkFile, shouldSkip, isSuppressed, RULES };

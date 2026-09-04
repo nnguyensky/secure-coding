@@ -817,6 +817,57 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
 })();
 
+// --- clean.js precision ---
+// Clean-code rules describe executable code. Flagging a YAML version pin or a
+// number inside a log message is noise, and noise is how a linter gets muted.
+(function cleanPrecision() {
+  const CLEAN = path.join(DIR, 'hooks', 'clean.js');
+  const dir = path.join(TMP, 'cleanprec');
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  const lint = (name, body) => {
+    const f = path.join(dir, name);
+    fs.writeFileSync(f, body);
+    return spawnSync('node', [CLEAN, f], { encoding: 'utf8', input: '' }).stdout || '';
+  };
+
+  uniq('clean-skips-config-formats');
+  const body = 'description: Lints code against 14 universal Clean Code standards for you\n';
+  const yaml = lint('hooks.yaml', body);
+  const asJs = lint('same.js', body);
+  if (!/cc-magic-number/.test(yaml) && /cc-magic-number/.test(asJs)) pass++;
+  else { fail++; console.log('FALSE+ clean-skips-config-formats: extension is not being honoured'); }
+
+  // A number in a message or a regex names nothing.
+  uniq('magic-number-ignores-literals');
+  const str = lint('msg.js', 'console.log("All 298 tests passed");\n');
+  const rx = lint('rx.js', 'const re = /[^a]{0,40}/;\n');
+  if (!/cc-magic-number/.test(str) && !/cc-magic-number/.test(rx)) pass++;
+  else { fail++; console.log('FALSE+ magic-number-ignores-literals'); }
+
+  // ...but a real constant in code must still be caught.
+  uniq('magic-number-still-caught');
+  if (/cc-magic-number/.test(lint('real.js', 'setTimeout(fn, 86400000);\n'))) pass++;
+  else { fail++; console.log('MISS  magic-number-still-caught'); }
+
+  // scan.js honours inline suppression; clean.js must agree, or a reviewed
+  // exception is silenced by one tool and reported by the other.
+  uniq('clean-honours-suppression');
+  const sup = lint('sup.js', 'try { x(); } catch (e) {} // secure-coding-ignore: swallowed-error -- deliberate\n');
+  const unsup = lint('unsup.js', 'try { x(); } catch (e) {}\n');
+  if (!/cc-swallowed/.test(sup) && /cc-swallowed/.test(unsup)) pass++;
+  else { fail++; console.log('MISS  clean-honours-suppression'); }
+
+  uniq('clean-suppression-forms');
+  const forms = [
+    'try { x(); } catch (e) {} // secure-coding-ignore: cc-swallowed-error\n',
+    'try { x(); } catch (e) {} // nosec: all\n',
+  ];
+  const leaked = forms.filter((b, i) => /cc-swallowed/.test(lint(`f${i}.js`, b)));
+  if (leaked.length === 0) pass++;
+  else { fail++; console.log(`MISS  clean-suppression-forms: ${leaked.length} not honoured`); }
+})();
+
 // --- clean.js robustness ---
 (function cleanRobust() {
   const CLEAN = path.join(DIR, 'hooks', 'clean.js');
