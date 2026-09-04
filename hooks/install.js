@@ -692,8 +692,15 @@ async function runInteractive() {
     const testScript = path.join(DIR, 'hooks', 'test.js');
     if (fs.existsSync(syncScript) && fs.existsSync(testScript)) {
       execSync(`node "${syncScript}"`, { stdio: 'ignore' });
-      execSync(`node "${testScript}"`, { stdio: 'ignore' });
-      console.log(`\n${GREEN}✅ Self-check: All 298 tests and pattern validations PASSED.${NC}`);
+        // Report the real count and only claim PASSED when it is. execSync
+        // throws on a non-zero exit, so a broken suite reaches the catch.
+        const out = execSync(`node "${testScript}"`, { encoding: 'utf8' });
+        const m = out.match(/pass=(\d+)\s+fail=(\d+)/);
+        if (m && m[2] === '0') {
+        console.log(`\n${GREEN}✅ Self-check: all ${m[1]} tests and pattern validations PASSED.${NC}`);
+        } else if (m) {
+        console.log(`\n${YELLOW}⚠️  Self-check: ${m[2]} test(s) FAILED.${NC}`);
+        }
     }
   } catch (e) {
     // Ignore in non-dev repos

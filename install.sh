@@ -385,8 +385,11 @@ esac
 printf "\n${BOLD}Verifying installation self-test...${NC}\n"
 if [ -f "$SCRIPT_DIR/hooks/sync.js" ] && [ -f "$SCRIPT_DIR/hooks/test.js" ]; then
   node "$SCRIPT_DIR/hooks/sync.js" > /dev/null 2>&1
-  node "$SCRIPT_DIR/hooks/test.js" > /dev/null 2>&1
-  printf "${GREEN}✅ All 292 self-check tests and synchronization validations PASSED.${NC}\n"
+  TEST_OUT="$(node "$SCRIPT_DIR/hooks/test.js" 2>&1 | tail -1)"
+  case "$TEST_OUT" in
+    *"fail=0"*) printf "${GREEN}✅ Self-check: %s and synchronization validations PASSED.${NC}\n" "$TEST_OUT" ;;
+    *)          printf "${YELLOW}⚠️  Self-check reported: %s${NC}\n" "$TEST_OUT" ;;
+  esac
 fi
 
 # Optional browser wizard

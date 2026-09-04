@@ -817,6 +817,30 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
 })();
 
+// --- no hardcoded test counts ---
+// Four stale-number bugs this session all came from literals. The installer
+// banners claimed 298 and 292 while the suite was at 469, and a banner that
+// runs the tests but ignores their exit code says PASSED either way.
+(function noHardcodedCounts() {
+  uniq('installer-count-not-hardcoded');
+  const offenders = [];
+  for (const f of ['hooks/install.js', 'install.sh']) {
+    const text = fs.readFileSync(path.join(DIR, f), 'utf8');
+    for (const line of text.split('\n')) {
+      if (/self-check|Self-check/i.test(line) && /\b\d{3}\b/.test(line)) offenders.push(`${f}: ${line.trim().slice(0, 50)}`);
+    }
+  }
+  if (offenders.length === 0) pass++;
+  else { fail++; console.log(`MISS  installer-count-not-hardcoded: ${offenders.join(' | ')}`); }
+
+  // The banner must read the real result, not assume success.
+  uniq('installer-checks-test-result');
+  const js = fs.readFileSync(path.join(DIR, 'hooks', 'install.js'), 'utf8');
+  const sh = fs.readFileSync(path.join(DIR, 'install.sh'), 'utf8');
+  if (/pass=\(\\d\+\)/.test(js) && /fail=0/.test(sh)) pass++;
+  else { fail++; console.log('MISS  installer-checks-test-result: banner does not inspect the outcome'); }
+})();
+
 // --- clean.js severity threshold and id aliases ---
 (function cleanThreshold() {
   const CLEAN = path.join(DIR, 'hooks', 'clean.js');
