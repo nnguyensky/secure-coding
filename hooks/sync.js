@@ -166,6 +166,107 @@ function checkAlternations() {
   if (flagged === 0) ok('no mixed bare/anchored alternations');
 }
 
+
+// --- Documented counts match reality ---
+// Five separate stale-number bugs so far: badges claiming 298/292/301/419
+// tests against an actual 469-483, "22 rules" against 14, "356 patterns"
+// against 376, "6 MCP tools" against 9. Each was a literal typed into prose
+// that nothing checked, and each `sed` sweep silently missed a site whose
+// formatting differed. Counts are derived here, never hardcoded.
+function countPatternRules() {
+  let rules = 0;
+  const ids = new Set();
+  for (const f of fs.readdirSync(PATTERNS_DIR).filter(x => x.endsWith('.txt'))) {
+    for (const line of fs.readFileSync(path.join(PATTERNS_DIR, f), 'utf8').split(/\r?\n/)) {
+      if (!line.trim() || line.startsWith('#')) continue;
+      const parts = line.split('\t');
+      if (parts.length > 2 && parts[0].trim()) { rules++; ids.add(parts[0].trim()); }
+    }
+  }
+  return { rules, ids: ids.size };
+}
+
+function checkDocCounts() {
+  console.log('\ndocumented counts:');
+  const { rules } = countPatternRules();
+  const truth = {
+    patterns: rules,
+    templates: fs.readdirSync(TEMPLATES_DIR).filter(f => f.endsWith('.md')).length,
+    mcpTools: (fs.readFileSync(path.join(DIR, 'mcp', 'server.js'), 'utf8')
+      .match(/^\s*name: '/gm) || []).length,
+    cleanRules: (() => {
+      try { return require('./clean.js').RULES.length; } catch { return null; }
+    })(),
+    // Written by test.js on a green run. sync.js runs first in `npm test`, so
+    // it cannot invoke the suite; counting uniq() registrations undercounts
+    // every test that loops (123 registrations vs 483 assertions). A missing
+    // file means the suite has not passed here yet -- skip rather than guess.
+    tests: (() => {
+      try {
+        return parseInt(fs.readFileSync(path.join(DIR, 'checks', '.test-count'), 'utf8').trim(), 10);
+      } catch { return null; }
+    })(),
+  };
+
+  // [regex, what it claims] -- each capture group 1 is the number.
+  const CLAIMS = [
+    [/(\d+)\s+patterns\b/g, 'patterns'],
+    [/(\d+)\s+language templates\b/g, 'templates'],
+    [/(\d+)\s+(?:standard )?security tools\b/g, 'mcpTools'],
+    [/(\d+)\s+clean[- ]code\b/gi, 'cleanRules'],
+  ];
+
+  const docs = ['README.md', 'INSTALLATION.md', 'SKILL.md', 'AGENTS.md']
+    .filter(f => fs.existsSync(path.join(DIR, f)));
+  let bad = 0;
+  for (const doc of docs) {
+    const text = fs.readFileSync(path.join(DIR, doc), 'utf8');
+    for (const [re, key] of CLAIMS) {
+      const want = truth[key];
+      if (want == null) continue;
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        const got = parseInt(m[1], 10);
+        if (got !== want) {
+          bad++;
+          const line = text.slice(0, m.index).split('\n').length;
+          err(`${doc}:${line} claims ${got} ${key}, actual is ${want}`);
+        }
+      }
+    }
+  }
+
+  // Test counts appear in badges (Tests-483%20Passing), prose ("483 test
+  // assertions", "301 test fixtures") and commands (pass=483). One pass over
+  // every shape, so a differently-worded site cannot slip through.
+  const TEST_CLAIMS = [
+    /Tests-(\d+)%20/g,
+    /pass=(\d+)/g,
+    /(\d+)\s+test\s+(?:assertions|fixtures|cases)/g,
+    /all\s+(\d+)\s+tests?\b/gi,
+  ];
+  for (const doc of truth.tests == null ? [] : docs) {
+    const text = fs.readFileSync(path.join(DIR, doc), 'utf8');
+    for (const re of TEST_CLAIMS) {
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        const got = parseInt(m[1], 10);
+        if (got !== truth.tests) {
+          bad++;
+          const line = text.slice(0, m.index).split('\n').length;
+          err(`${doc}:${line} claims ${got} tests, actual is ${truth.tests}`);
+        }
+      }
+    }
+  }
+
+  if (bad === 0) {
+    ok(`counts match (${truth.tests == null ? 'tests unknown' : truth.tests + ' tests'},  ${truth.patterns} patterns, ${truth.templates} templates, ${truth.mcpTools} MCP tools, ${truth.cleanRules} clean rules)`);
+  }
+}
+
 // --- Main ---
 function main() {
   console.log('--- sync check ---\n');
@@ -302,6 +403,7 @@ function main() {
   }
 
   checkAlternations();
+  checkDocCounts();
 
   // Summary
   console.log(`\n--- result: ${errors} errors, ${warnings} warnings ---`);

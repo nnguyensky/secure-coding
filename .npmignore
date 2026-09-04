@@ -12,3 +12,4 @@ reports/security-*.html
 *.tgz
 node_modules/
 .DS_Store
+checks/.test-count

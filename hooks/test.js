@@ -1000,6 +1000,34 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   try { fs.rmSync(tmp2, { recursive: true, force: true }); } catch { /* ignore */ }
 })();
 
+// --- sync.js catches stale documented counts ---
+// Five stale-number bugs so far (298/292/301/419 tests, 22-vs-14 rules,
+// 356-vs-376 patterns, 6-vs-9 MCP tools). Each sed sweep missed a site whose
+// formatting differed, so the guard has to match every shape a count takes.
+(function docCountGuard() {
+  uniq('sync-detects-stale-counts');
+  const readme = path.join(DIR, 'README.md');
+  const orig = fs.readFileSync(readme, 'utf8');
+  const probes = [
+    [/483 test assertions/, '999 test assertions'],
+    [/9 security tools/, '6 security tools'],
+    [/376 patterns/, '356 patterns'],
+    [/13 language templates/, '12 language templates'],
+    [/Tests-483/, 'Tests-470'],
+  ];
+  const missed = [];
+  try {
+    for (const [re, bad] of probes) {
+      if (!re.test(orig)) continue; // wording changed; nothing to probe
+      fs.writeFileSync(readme, orig.replace(re, bad));
+      const out = spawnSync('node', [path.join(DIR, 'hooks', 'sync.js')], { encoding: 'utf8' });
+      if (out.status === 0) missed.push(bad);
+    }
+  } finally { fs.writeFileSync(readme, orig); }
+  if (missed.length === 0) pass++;
+  else { fail++; console.log(`sync-detects-stale-counts: not caught -> ${missed.join('; ')}`); }
+})();
+
 // --- no hardcoded test counts ---
 // Four stale-number bugs this session all came from literals. The installer
 // banners claimed 298 and 292 while the suite was at 469, and a banner that
@@ -2275,6 +2303,17 @@ if (reportOut.status === 0 && reportOut.stdout.includes('Security Scan Summary')
 
 console.log('---');
 console.log(`pass=${pass} fail=${fail}`);
+
+// Record the real assertion count so sync.js can check the documented numbers
+// against it. sync.js runs before test.js in `npm test`, so it cannot invoke
+// the suite itself, and counting uniq() registrations undercounts every test
+// that loops. Only a green run is authoritative.
+if (fail === 0) {
+  try {
+    fs.writeFileSync(path.join(DIR, 'checks', '.test-count'), String(pass) + '\n');
+  } catch { /* read-only checkout: sync.js falls back to skipping the check */ }
+}
+
 process.exit(fail === 0 ? 0 : 1);
 
 

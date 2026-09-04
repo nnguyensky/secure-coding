@@ -97,7 +97,7 @@ Run verification to confirm zero open issues:
 2. **Review Guidance:** Fix any flagged patterns using the provided `When / Wrong / Right / Watch` blocks.
 3. **Autofix:** Run `node hooks/fix.js --apply` to automatically refactor common deterministic issues.
 4. **Audit Dependencies:** `node hooks/audit.js` (scans package lockfiles).
-5. **Quality Check:** `node hooks/clean.js --file <path>`.
+5. **Quality Check:** `node hooks/clean.js <path>` (or `--all` for the whole repo).
 6. **Done Gate:** Run `node hooks/summary.js && node hooks/audit.js && node hooks/gate.js --check`.
 
 #### Done Gate Criteria:
@@ -209,7 +209,7 @@ Even when no automated pattern flags, check for these design smells:
 | **`audit.js`** | Dependency vulnerability scan across 9 ecosystems | `node hooks/audit.js` |
 | **`fix.js`** | View remediation guidance or apply automated refactors | `node hooks/fix.js --apply` |
 | **`sbom.js`** | CycloneDX v1.5 & SPDX v2.3 SBOM with AI-SBOM & VEX | `node hooks/sbom.js --ai --vex` |
-| **`clean.js`** | Universal clean code linter (14 rules) | `node hooks/clean.js --file <f>` |
+| **`clean.js`** | Universal clean code linter (14 rules) | `node hooks/clean.js <f>` / `--all` |
 | **`report.js`** | Export HTML report, PR Markdown, or SARIF v2.1.0 | `node hooks/report.js --sarif` |
 | **`config.js`** | Manage policy or launch visual browser UI | `node hooks/config.js --ui` |
 | **`mcp/server.js`** | Native Model Context Protocol (MCP) stdio server | `node mcp/server.js` |
