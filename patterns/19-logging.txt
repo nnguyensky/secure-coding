@@ -3,15 +3,15 @@
 # Section 19 in the skill's group numbering.
 #
 # id	exts	regex	!exclude	hint  (ONE regex: !a|b|c, never !a|!b|!c)
-log-inject	*	console\.(log|warn|error|info|debug)\s*\([^)]*\$\{[^}]*(req\.|request\.|res\.|user|input|body|params|query)	log injection: sanitize user input before logging; strip CR/LF		medium
-log-inject	*	console\.(log|warn|error|info|debug)\s*\([^)]*\+\s*(req\.|request\.|res\.|user|input|body|params|query)			medium
+log-inject	*	console\.(log|warn|error|info|debug)\s*\([^)]*\$\{[^}]*(\b(?:req|request|res)\.|\b(?:userInput|user_input|userData|input|body|params|query)\b)	log injection: sanitize user input before logging; strip CR/LF		medium
+log-inject	*	console\.(log|warn|error|info|debug)\s*\([^)]*\+\s*(\b(?:req|request|res)\.|\b(?:userInput|user_input|userData|input|body|params|query)\b)			medium
 log-inject	py	(log|logging|logger)\.(debug|info|warning|error|critical|exception)\s*\([^)]*(?:\.format\s*\(|f["']|%\s*)	log injection: use structured logging, sanitize user input		medium
 log-inject	rb	Rails\.logger\.(debug|info|warn|error|fatal)\s*\([^)]*#\{|logger\.(debug|info|warn|error)\s*\([^)]*#\{			medium
 log-inject	go	log\.(Print|Printf|Println|Fatal|Fatalf)\s*\([^)]*\+|log\.(Debug|Info|Warn|Error)\s*\([^)]*fmt\.Sprintf			medium
 log-inject	java,kt	(Log|log|logger|Logger)\.(debug|info|warn|error|trace)\s*\([^)]*\+\s*(req\.|request\.|user|input)			medium
 log-inject	cs	(Log|log|Logger|logger)\.(Debug|Information|Warning|Error)\s*\([^)]*\+\s*(req\.|request\.|user|input)			medium
 log-inject	php	(error_log|log|Log)\s*\([^)]*\.\s*\$_|trigger_error\s*\([^)]*\.\s*\$_			medium
-log-leak	*	console\.(log|warn|error|info)\s*\([^)]*(password|passwd|secret|token|api_?key|auth|credential|ssn|credit.?card)	sensitive data in logs: remove passwords, tokens, and PII from log output		critical
+log-leak	*	console\.(log|warn|error|info)\s*\([^)]*\b(password|passwd|secret|token|api_?key|apiKey|auth|credential|ssn|credit.?card)\b\s*[,:=)]	sensitive data in logs: remove passwords, tokens, and PII from log output		critical
 log-leak	*	(log|Log|Logger|logger)\.(debug|info|warn|error|fatal)\s*\([^)]*(password|passwd|secret|token|api_?key|auth|credential)			critical
 log-leak	py	logging\.(debug|info|warning|error|critical)\s*\([^)]*(password|secret|token|api.?key|auth)			critical
 log-leak	go	log\.(Print|Printf|Debug|Info|Warn|Error)\s*\([^)]*(password|secret|token|api.?key|auth)			critical

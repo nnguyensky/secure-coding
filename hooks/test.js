@@ -817,6 +817,36 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log('MISS  gate-expires-on-new-commit: stale answers still passed'); }
 })();
 
+// --- logging rules match values, not prose ---
+// Found on a real repo: a WCAG script logging a count was reported as a
+// critical secret leak, because "theme token(s)" contains "token" and
+// "${tokenFailures." contains "res.".
+(function loggingPrecision() {
+  const { loadPatterns, matchContent } = require('./scan.js');
+  const pats = loadPatterns();
+  const ids = (code) => matchContent(code, 'lg.js', pats)
+    .filter(h => h.id.startsWith('log-')).map(h => h.id);
+
+  uniq('log-rules-ignore-prose');
+  const prose = [
+    'console.error(`✗ contrast: ${tokenFailures.length} theme token(s) below AA`);',
+    'console.log("Retrieved 5 auth records for review");',
+  ];
+  const wrong = prose.filter(c => ids(c).length > 0);
+  if (wrong.length === 0) pass++;
+  else { fail++; console.log(`FALSE+ log-rules-ignore-prose: ${wrong.length}`); }
+
+  uniq('log-rules-catch-values');
+  const real = [
+    ['console.log("auth token=", token);', 'log-leak'],
+    ['console.error("password:", password);', 'log-leak'],
+    ['console.log(`user ${req.query.name}`);', 'log-inject'],
+  ];
+  const missed = real.filter(([c, id]) => !ids(c).includes(id));
+  if (missed.length === 0) pass++;
+  else { fail++; console.log(`MISS  log-rules-catch-values: ${missed.map(m => m[1])}`); }
+})();
+
 // --- no hardcoded test counts ---
 // Four stale-number bugs this session all came from literals. The installer
 // banners claimed 298 and 292 while the suite was at 469, and a banner that
