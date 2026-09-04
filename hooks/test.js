@@ -847,6 +847,75 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   else { fail++; console.log(`MISS  log-rules-catch-values: ${missed.map(m => m[1])}`); }
 })();
 
+// --- log-leak anchors apply to every language, not just JS ---
+// The first fix anchored only the console.* rule; Python, Go, Java, Ruby, C#
+// and PHP kept matching bare substrings, so "auth completed" was CRITICAL.
+(function loggingPrecisionAllLangs() {
+  const { loadPatterns, matchContent } = require('./scan.js');
+  const pats = loadPatterns();
+  const leaks = (code, ext) => matchContent(code, 'lg.' + ext, pats)
+    .filter(h => h.id === 'log-leak');
+
+  uniq('log-leak-ignores-prose-all-langs');
+  const prose = [
+    ['logging.info("auth completed")', 'py'],
+    ['logger.info("processed 5 tokens")', 'py'],
+    ['log.Printf("user auth succeeded")', 'go'],
+    ['logger.info("auth check passed")', 'java'],
+    ['Rails.logger.info("token refresh done")', 'rb'],
+    ['logger.Information("auth ok")', 'cs'],
+    ['error_log("secret santa list built")', 'php'],
+  ];
+  const wrongL = prose.filter(([c, e]) => leaks(c, e).length > 0);
+  if (wrongL.length === 0) pass++;
+  else { fail++; console.log(`FALSE+ log-leak-ignores-prose-all-langs: ${wrongL.map(w => w[1])}`); }
+
+  uniq('log-leak-catches-values-all-langs');
+  const real = [
+    ['logging.info("pw", password)', 'py'],
+    ['log.Printf("%v", apiKey)', 'go'],
+    ['logger.info("u", password)', 'java'],
+    ['Rails.logger.debug(secret)', 'rb'],
+    ['logger.Debug(apiKey)', 'cs'],
+    ['error_log($password);', 'php'],
+  ];
+  const missedL = real.filter(([c, e]) => leaks(c, e).length === 0);
+  if (missedL.length === 0) pass++;
+  else { fail++; console.log(`MISS  log-leak-catches-values-all-langs: ${missedL.map(m => m[1])}`); }
+})();
+
+// --- API-9 flags deprecated versions, not the current one ---
+// The rule matched /api/v1/, so every healthy versioned REST API was told
+// its current version was deprecated.
+(function api9Precision() {
+  const { loadPatterns, matchContent } = require('./scan.js');
+  const pats = loadPatterns();
+  const hit = (code, ext) => matchContent(code, 'r.' + ext, pats)
+    .filter(h => h.id === 'API-9').length > 0;
+
+  uniq('api9-ignores-current-version');
+  const current = [
+    ["app.use('/api/v1', router);", 'js'],
+    ['const u = "/api/v1/users";', 'js'],
+    ['@app.route("/api/v1/x")', 'py'],
+    ['fetch("/api/v2/items")', 'js'],
+  ];
+  const wrongA = current.filter(([c, e]) => hit(c, e));
+  if (wrongA.length === 0) pass++;
+  else { fail++; console.log(`FALSE+ api9-ignores-current-version: ${wrongA.length}`); }
+
+  uniq('api9-catches-deprecated');
+  const dep = [
+    ["app.use('/api/legacy', router);", 'js'],
+    ['const u = "/api/v0/users";', 'js'],
+    ['@app.route("/api/beta/x")', 'py'],
+    ['/** @deprecated */', 'js'],
+  ];
+  const missedA = dep.filter(([c, e]) => !hit(c, e));
+  if (missedA.length === 0) pass++;
+  else { fail++; console.log(`MISS  api9-catches-deprecated: ${missedA.length}`); }
+})();
+
 // --- no hardcoded test counts ---
 // Four stale-number bugs this session all came from literals. The installer
 // banners claimed 298 and 292 while the suite was at 469, and a banner that

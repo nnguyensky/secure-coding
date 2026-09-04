@@ -12,13 +12,13 @@ log-inject	java,kt	(Log|log|logger|Logger)\.(debug|info|warn|error|trace)\s*\([^
 log-inject	cs	(Log|log|Logger|logger)\.(Debug|Information|Warning|Error)\s*\([^)]*\+\s*(req\.|request\.|user|input)			medium
 log-inject	php	(error_log|log|Log)\s*\([^)]*\.\s*\$_|trigger_error\s*\([^)]*\.\s*\$_			medium
 log-leak	*	console\.(log|warn|error|info)\s*\([^)]*\b(password|passwd|secret|token|api_?key|apiKey|auth|credential|ssn|credit.?card)\b\s*[,:=)]	sensitive data in logs: remove passwords, tokens, and PII from log output		critical
-log-leak	*	(log|Log|Logger|logger)\.(debug|info|warn|error|fatal)\s*\([^)]*(password|passwd|secret|token|api_?key|auth|credential)			critical
-log-leak	py	logging\.(debug|info|warning|error|critical)\s*\([^)]*(password|secret|token|api.?key|auth)			critical
-log-leak	go	log\.(Print|Printf|Debug|Info|Warn|Error)\s*\([^)]*(password|secret|token|api.?key|auth)			critical
-log-leak	rb	Rails\.logger\.(debug|info|warn|error|fatal)\s*\([^)]*(password|secret|token|api.?key|auth)			critical
-log-leak	java,kt	(log|Log|Logger|logger)\.(debug|info|warn|error)\s*\([^)]*(password|secret|token|apiKey|auth)			critical
-log-leak	cs	(Log|Logger|logger)\.(Debug|Information|Warning|Error)\s*\([^)]*(password|secret|token|apiKey|auth)			critical
-log-leak	php	(error_log|Log)\s*\([^)]*(password|secret|token|api.?key|auth)			critical
+log-leak	*	(log|Log|Logger|logger)\.(debug|info|warn|error|fatal)\s*\([^)]*\b(password|passwd|secret|token|api_?key|apiKey|auth|credential|ssn|credit.?card)\b\s*[,:=)]			critical
+log-leak	py	logging\.(debug|info|warning|error|critical)\s*\([^)]*\b(password|passwd|secret|token|api_?key|apiKey|auth|credential|ssn|credit.?card)\b\s*[,:=)]			critical
+log-leak	go	log\.(Print|Printf|Debug|Info|Warn|Error)\s*\([^)]*\b(password|passwd|secret|token|api_?key|apiKey|auth|credential|ssn|credit.?card)\b\s*[,:=)]			critical
+log-leak	rb	Rails\.logger\.(debug|info|warn|error|fatal)\s*\([^)]*\b(password|passwd|secret|token|api_?key|apiKey|auth|credential|ssn|credit.?card)\b\s*[,:=)]			critical
+log-leak	java,kt	(log|Log|Logger|logger)\.(debug|info|warn|error)\s*\([^)]*\b(password|passwd|secret|token|api_?key|apiKey|auth|credential|ssn|credit.?card)\b\s*[,:=)]			critical
+log-leak	cs	(Log|Logger|logger)\.(Debug|Information|Warning|Error)\s*\([^)]*\b(password|passwd|secret|token|api_?key|apiKey|auth|credential|ssn|credit.?card)\b\s*[,:=)]			critical
+log-leak	php	(error_log|Log)\s*\([^)]*\b(password|passwd|secret|token|api_?key|apiKey|auth|credential|ssn|credit.?card)\b\s*[,:=)]			critical
 
 # --- A09: insufficient logging (CWE-778, 223, 221) ---
 logging-disabled	*	(LOG_LEVEL|log_level|logLevel)\s*[:=]\s*["']?(off|none|silent|disabled?|OFF|NONE|SILENT)		logging is disabled — security events cannot be detected or investigated	high
