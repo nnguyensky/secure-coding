@@ -27,12 +27,13 @@
 Run the interactive terminal wizard directly via npm/npx:
 
 ```bash
-# Pin a release tag: without one, npx runs whatever is on main right now.
+# This runs whatever is on main right now. To pin a reviewed version,
+# append #<tag-or-sha>: github:nnguyensky/secure-coding#<tag-or-sha>
 # Launch interactive setup wizard
-npx github:nnguyensky/secure-coding#v2.2.0 --global
+npx github:nnguyensky/secure-coding --global
 
 # Or install with MCP server and Antigravity rules non-interactively
-npx github:nnguyensky/secure-coding#v2.2.0 --global --agent antigravity --mcp --yes
+npx github:nnguyensky/secure-coding --global --agent antigravity --mcp --yes
 ```
 
 An install puts nine commands on your PATH. Every one takes `--help`, and
