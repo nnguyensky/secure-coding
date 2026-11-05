@@ -20,3 +20,4 @@ pw-fast-hash	rb	Digest::[A-Za-z0-9]+\.hexdigest\s*\([^)]*(password|passwd|pwd)		
 pw-fast-hash	php	(password_hash|hash)\s*\(\s*["'](sha256|sha512|md5|sha1)["']			high
 pw-fast-hash	cs	(SHA256|SHA512|MD5|SHA1)\.Create\s*\(\s*\)\s*\.ComputeHash\s*\([^)]*(password|passwd|pwd)			high
 pw-fast-hash	rs	(Sha256|Sha512|Md5|Sha1)::digest\s*\([^)]*(password|passwd|pwd)			high
+weak-hash	swift	Insecure\.(MD5|SHA1)\b|\bCC_(MD5|SHA1)\s*\(	use SHA256 from CryptoKit for integrity; a password hash (Argon2/scrypt) for passwords		high

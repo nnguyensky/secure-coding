@@ -10,7 +10,7 @@
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-577%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-626%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -33,7 +33,7 @@ carry findings. What static analysis genuinely cannot see — a missing ownershi
 check, an absent guard, a fail-open `catch` — it asks as four written questions
 before the change lands.
 
-13 language templates · 393 patterns mapped to CWE and OWASP Top 10:2025 · 577
+13 language templates · 403 patterns mapped to CWE and OWASP Top 10:2025 · 626
 self-tests · zero dependencies.
 
 ## 💡 The Inverted Architecture
@@ -59,7 +59,7 @@ Five layers, from design to remediation:
 │  • 9 Focused Trigger Groups  • 13 Drop-In Templates (25 Standards Each)     │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  LAYER 2: MECHANICAL SCANNER & SHANNON ENTROPY (0 Tokens Clean, <20ms)      │
-│  • 32 Pattern Files (393 Regexes)  • Shannon Entropy H ≥ 3.5 Bits/Byte      │
+│  • 32 Pattern Files (403 Regexes)  • Shannon Entropy H ≥ 3.5 Bits/Byte      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  LAYER 3: VERIFICATION & MULTI-ECOSYSTEM AUDITING                           │
 │  • 213 Verifiable Controls  • 9 Package Managers  • 14 Clean Code Standards │
@@ -104,7 +104,7 @@ flowchart TD
     subgraph L2["Layer 2: Fast Mechanical Scanner (0 Tokens Clean)"]
         SCAN["hooks/scan.js (&lt;20ms)<br/>• Line Numbers &amp; Code Snippets"]
         ENTROPY["Shannon Entropy Engine<br/>• Un-prefixed Secret Detection ($H \\ge 3.5$)"]
-        PATTERNS["patterns/*.txt (32 Files, 393 Regexes)<br/>• JWT, CORS, Deser, Cloud Keys, SbD, IoT"]
+        PATTERNS["patterns/*.txt (32 Files, 403 Regexes)<br/>• JWT, CORS, Deser, Cloud Keys, SbD, IoT"]
         SUPPRESS["Inline Comment Suppression<br/>• // secure-coding-ignore: id"]
     end
 
@@ -150,12 +150,63 @@ questions that only make sense once a change is complete.
 | You do this | This runs | What happens |
 |---|---|---|
 | Ask an agent for a route, auth change, data model, upload or LLM tool | The agent asks the **five security frontiers** first (`checks/secure-grilling.md`) | It puts the decisions to you with a recommended secure default each, instead of guessing silently |
-| Ask an agent to write code touching input, auth, secrets, files, or network calls | The agent loads `SKILL.md` | It reads the rules for that topic before writing, not all 393 patterns |
-| The agent finishes writing a file | `scan.js`, via the PostToolUse hook `install.js` sets up | ~1ms. Silent when clean, so it costs no tokens. Otherwise prints the finding and how to fix it, immediately — no commit needed |
+| Ask an agent to write code touching input, auth, secrets, files, or network calls | The agent loads `SKILL.md` | It reads the rules for that topic before writing, not all 403 patterns |
+| The agent finishes writing a file | `scan.js`, via the PostToolUse hook `install.js` sets up | ~1ms. Silent when clean, so it costs no tokens. Otherwise prints the finding and how to fix it, immediately — no commit needed. For an edit, only findings on the lines it wrote block (`"hookScope": "file"` to block on the whole file) |
+| The agent adds a dependency to `package.json`, `requirements*.txt` or `pyproject.toml` | `deps.js`, from the same hook | Blocks a package that does not exist (a name the model made up) or was first published in the last 30 days |
 | `git commit` | `scan.js --staged`, then `gate.js --check` | Blocks the commit if the staged code has findings, or if it handles requests and the review is unanswered |
 | `git push` | `audit.js`, then `summary.js` | Blocks on a vulnerable dependency, or on findings left over from a commit that skipped the hooks |
 | Open a PR or push to `main` | GitHub Actions | Re-runs the checks, uploads SARIF so findings appear on the PR diff |
 | Weekly, on GitHub | Dependabot | Opens a PR when a pinned GitHub Action has an update |
+
+### Adopting it on an existing codebase
+
+A repository that already has findings would otherwise block every edit and
+commit that touches an old file. Record what exists once, commit the file, and
+only new findings block from then on:
+
+```bash
+node hooks/scan.js --baseline        # writes .securecoding-baseline.json
+git add .securecoding-baseline.json
+```
+
+Entries are matched by file, rule and the text of the line — not the line
+number — so moving code does not resurrect them, and editing a baselined line
+makes it a new finding. `--no-baseline` lists everything; baselined findings
+appear in the report and in SARIF as external suppressions.
+
+### Dependencies an agent adds
+
+Assistants suggest packages by name, and some of those names do not exist.
+Attackers register such names so the next install runs their code
+("slopsquatting"). `deps.js` checks every dependency a change **adds**:
+
+| Finding | Meaning | Blocks |
+|---|---|---|
+| `dep-not-found` | Not on npm / PyPI — likely a hallucinated name | yes |
+| `dep-new-package` | First published less than 30 days ago (`deps.minAgeDays`) | yes |
+| `dep-install-script` | Runs a script when installed (npm) | no |
+| `dep-sdist-only` | No wheel, so `setup.py` runs on install (PyPI) | no |
+
+It runs from the write-time hook and `scan.js --staged`, and in CI against the
+PR base (`deps.js --diff origin/main --strict`). Offline, packages are reported
+as unverified rather than failing — `--strict` fails instead. Reviewed packages
+go in `"deps": { "allow": ["name"] }`.
+
+**What it sends:** only the names of newly added dependencies, to the public
+registry they would install from. Internal names are never sent — that would
+leak them, and it is how a dependency-confusion attack starts. It skips names
+matching `"deps": { "private": ["@acme/*", "acme-*"] }`, npm scopes that
+`.npmrc` maps to another registry (and everything when `.npmrc` sets a private
+default registry), and all Python names when pip uses a private index
+(`--index-url`, `PIP_INDEX_URL`, `pip.conf`). These are listed as `NOT SENT`.
+`SECURE_CODING_DEPS_OFFLINE=1` or `"deps": { "enabled": false }` sends nothing.
+
+### Secrets already in history
+
+Deleting a key from the code leaves it in every clone. `scan.js --history`
+checks the lines past commits added, with the secret rules and the entropy
+check, and says whether each key is still in `HEAD` or only in history.
+Rotate every one; rewrite history only if the repository was never shared.
 
 ### When the Done Gate asks, and when it stays quiet
 
@@ -304,7 +355,7 @@ Each file is loaded only when its topic comes up:
 - **Done Gate** ([`hooks/gate.js`](hooks/gate.js)): see the section below.
 
 ### 🔧 Layer 5: Automated In-Place Remediation & MCP Server
-- **Interactive Guidance**: `node hooks/fix.js --suggest <id>` prints the `When / Wrong / Right / Watch` block for a finding, sourced from [`checks/fixes.md`](checks/fixes.md) — 145 blocks, every one tagged with its CWE and OWASP 2025 category.
+- **Interactive Guidance**: `node hooks/fix.js --suggest <id>` prints the `When / Wrong / Right / Watch` block for a finding, sourced from [`checks/fixes.md`](checks/fixes.md) — 155 blocks, every one tagged with its CWE and OWASP 2025 category.
 - **Autofix Engine**: `node hooks/fix.js --apply` rewrites only the lines the scanner currently reports, one rule per language (weak RNG, JWT verification off, missing request timeout, unbounded LLM tokens, legacy TLS, IoT debug flags). The replacement keeps the expression's type, so surrounding code keeps working; a line it cannot rewrite safely is left for a manual fix. `--dry-run` prints each changed line as `-`/`+`.
 - **Native MCP Server** ([`mcp/server.js`](mcp/server.js)): Exposes tools directly over JSON-RPC 2.0 stdio for IDEs and AI agents.
 
@@ -345,7 +396,7 @@ node install.js --agent all --mcp
 ### 2. Verify it works
 
 ```bash
-node hooks/test.js     # expect: pass=577 fail=0
+node hooks/test.js     # expect: pass=626 fail=0
 node hooks/sync.js     # expect: 0 errors, 0 warnings
 ```
 
@@ -429,7 +480,7 @@ when you type it.
 | ⚡ | `gate.js --check` | `git commit`, after the scan — blocks if the staged code needs review |
 | ⚡ | `audit.js`, `summary.js` | `git push` — blocks on a vulnerable dependency, or on findings a `--no-verify` commit skipped |
 | ⚡ | `report.js` | Any scan that finds something, writing `reports/security-<date>.html`. Set `SECURE_CODING_REPORT=off` to stop it |
-| ⚡ | `sync.js`, `test.js`, `audit.js`, `scan.js --files`, `report.js --sarif`, `sbom.js` | A push or PR to `main`/`master`/`develop`, via GitHub Actions |
+| ⚡ | `sync.js`, `test.js`, `audit.js`, `scan.js --files`, `deps.js --diff`, `report.js --sarif`, `sbom.js` | A push or PR to `main`/`master`/`develop`, via GitHub Actions (tests on Linux, macOS and Windows, Node 18/20/22) |
 | ⚡ | `scan.js` (stdin) | **An agent finishes writing a file.** `install.js --agent claude` configures this, so scanning happens at write time and never waits for a commit |
 
 `clean.js` runs automatically only if you enable the `secure-coding-clean`
@@ -478,7 +529,7 @@ pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js
 | | `node hooks/detect.js` | Reports which languages a project uses. |
 | | `node hooks/grep.js <pattern-id> [path]` | Finds every occurrence of one rule across the project. |
 | | `node hooks/reset.js` | Clears findings state for a new session. |
-| | `node hooks/test.js` | Executes the full 577-test self-check suite. |
+| | `node hooks/test.js` | Executes the full 626-test self-check suite. |
 
 ---
 
@@ -662,13 +713,13 @@ MCP lets an IDE or agent call the scanner directly instead of shelling out to
 the CLI. Same engine, same results — it returns findings as structured data the
 agent can act on.
 
-`secure-coding` includes a native, zero-dependency JSON-RPC 2.0 MCP server ([`mcp/server.js`](mcp/server.js)). It gives AI agents direct access to 9 security tools without running subshells or polluting chat context.
+`secure-coding` includes a native, zero-dependency JSON-RPC 2.0 MCP server ([`mcp/server.js`](mcp/server.js)). It gives AI agents direct access to 12 security tools without running subshells or polluting chat context, and serves the guidance itself as MCP **resources** (`secure-coding://skill`, `secure-coding://checks/<name>`, `secure-coding://fix/<id>`) and two **prompts** (`secure_design_review`, `fix_finding`).
 
 ### 🛠️ Available MCP Tools
 
 | MCP Tool | Purpose | Example AI Prompt |
 |---|---|---|
-| `secure_code_scan` | Scans in-memory code snippets or staged files for 393 OWASP & SbD patterns. | *"Scan this authentication function for vulnerabilities."* |
+| `secure_code_scan` | Scans in-memory code snippets or staged files for 403 OWASP & SbD patterns. | *"Scan this authentication function for vulnerabilities."* |
 | `secure_code_autofix` | Returns exact remediation diffs or refactors code in-place. | *"Fix the weak random number generator in auth.ts."* |
 | `security_dependency_audit` | Scans lockfiles across 9 package ecosystems for CVEs. | *"Check package.json and requirements.txt for vulnerabilities."* |
 | `clean_code_lint` | Lints source code against 14 universal Clean Code quality standards. | *"Lint my recent changes for clean code issues."* |
@@ -677,6 +728,9 @@ agent can act on.
 | `record_security_decision` | Records one Done Gate answer, for agents without shell access. | *"Record that ownership is scoped by org_id."* |
 | `check_done_gate` | Reports what the review still needs, or renders it as an ADR. | *"Is the security review complete?"* |
 | `security_summary` | Returns a one-line status of open vs resolved security findings. | *"Give me a security status summary of the workspace."* |
+| `explain_finding` | Why one finding id is dangerous, the wrong and right code, and its CWE/OWASP mapping. | *"Explain taint-ssrf."* |
+| `check_dependencies` | Checks packages a change adds: missing (hallucinated), brand new, install scripts. | *"Do the packages I just added actually exist?"* |
+| `scan_git_history` | Finds secrets in past commits, including ones already deleted from the code. | *"Has a key ever been committed to this repo?"* |
 
 ---
 
@@ -765,7 +819,7 @@ trust a change:
 | `node hooks/sync.js` | Patterns, templates and remediation blocks agree with each other. |
 | `node hooks/coverage.js` | All 213 OWASP SCP items are accounted for. |
 
-Verify all 577 test assertions, pattern compilation, secret masking, and MCP tools:
+Verify all 626 test assertions, pattern compilation, secret masking, and MCP tools:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js

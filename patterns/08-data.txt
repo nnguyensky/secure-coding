@@ -11,3 +11,4 @@ insecure-deserialization	java,kt	ObjectInputStream.*\.readObject|XMLDecoder\s*\(
 insecure-deserialization	cs	(BinaryFormatter|NetDataContractSerializer)|TypeNameHandling\.(All|Auto|Objects)	avoid BinaryFormatter and TypeNameHandling.All; use System.Text.Json		critical
 insecure-deserialization	php	\bunserialize\s*\(	never pass untrusted user input to unserialize(); use json_decode()		critical
 insecure-deserialization	rb	Marshal\.(load|restore)\s*\(	never use Marshal.load on untrusted input; use JSON.parse		critical
+mobile-insecure-storage	swift,kt,java	UserDefaults\.standard\.set\s*\([^)]*forKey:\s*"[^"]*([Tt]oken|[Pp]assword|[Ss]ecret|[Aa]pi_?[Kk]ey)|kSecAttrAccessibleAlways\b|getSharedPreferences\s*\([^)]*\)\.edit\s*\(\s*\)\.putString\s*\(\s*"[^"]*([Tt]oken|[Pp]assword|[Ss]ecret)	store secrets in the Keychain / Android Keystore (EncryptedSharedPreferences), not in preferences		high

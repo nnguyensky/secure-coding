@@ -86,7 +86,8 @@ try {
 function cweFor(id) {
   const text = fixesRaw();
   if (!text) return null;
-  const m = text.match(new RegExp('^## ' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\n([^\\n]*)', 'm'));
+  // \r?: a Windows checkout with autocrlf has CRLF line endings.
+  const m = text.match(new RegExp('^## ' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\r?\\n([^\\r\\n]*)', 'm'));
   if (!m) return null;
   const cwe = m[1].match(/CWE-(\d+)/);
   const cat = m[1].match(/(A\d\d):2025/);
@@ -122,9 +123,11 @@ function generateMarkdown(rows, audit) {
   const openRows = rows.filter(r => r.status === 'open');
   const fixedRows = rows.filter(r => r.status === 'fixed');
   const supRows = rows.filter(r => r.status === 'suppressed');
+  const baseRows = rows.filter(r => r.status === 'baselined');
   let md = '### 🛡️ Security Scan Summary\n\n';
   md += `**Findings:** ${openRows.length} open, ${fixedRows.length} resolved`
-    + (supRows.length ? `, ${supRows.length} suppressed inline` : '') + '.\n\n';
+    + (supRows.length ? `, ${supRows.length} suppressed inline` : '')
+    + (baseRows.length ? `, ${baseRows.length} in the baseline` : '') + '.\n\n';
 
   if (openRows.length > 0) {
     md += '| Severity | Finding ID | Location | Remediation |\n';
@@ -166,7 +169,7 @@ function generateSarif(rows) {
   // Suppressed findings are emitted too, marked as in-source suppressions:
   // code scanning then shows them as dismissed, with the reason, rather than
   // the finding vanishing without a trace.
-  const openRows = rows.filter(r => r.status === 'open' || r.status === 'suppressed');
+  const openRows = rows.filter(r => r.status === 'open' || r.status === 'suppressed' || r.status === 'baselined');
   const levelMap = {
     critical: 'error',
     high: 'error',
@@ -207,7 +210,9 @@ function generateSarif(rows) {
     const relFile = path.isAbsolute(r.file) ? path.relative(process.cwd(), r.file) : r.file;
     const suppression = r.status === 'suppressed'
       ? { suppressions: [{ kind: 'inSource', justification: r.reason || 'no reason given' }] }
-      : {};
+      : r.status === 'baselined'
+        ? { suppressions: [{ kind: 'external', justification: 'in .securecoding-baseline.json (known before adoption)' }] }
+        : {};
     return {
       ...suppression,
       ruleId: r.id,

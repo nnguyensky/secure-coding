@@ -17,6 +17,12 @@ const DIR = path.resolve(__dirname, '..');
 // the config in the subdirectory, found none, and silently discarded every
 // ignorePaths, failOn and taintTracking setting the project had declared.
 // projectRoot() is a hoisted function declaration, so it is callable here.
+// Caches for projectRoot() and loadConfig(). Declared before anything runs:
+// the CLI's main() executes mid-file, and a `const` below it is not yet
+// initialised when main() calls in.
+const _rootCache = new Map();
+const _configCache = new Map();
+
 function configFile() { return path.join(projectRoot(), '.securecodingrc.json'); }
 const WIZARD_HTML = path.join(DIR, 'reports', 'config-wizard.html');
 
@@ -46,14 +52,23 @@ const DEFAULT_CONFIG = {
   },
 };
 
+// Parsed once per file version: the scanner asks for the config for every
+// file it scans, and re-reading and re-parsing it each time was measurable on
+// a large repository. Keyed by path and mtime, so an edit is still seen.
 function loadConfig() {
-  if (!fs.existsSync(configFile())) return DEFAULT_CONFIG;
+  const file = configFile();
+  let mtime;
+  try { mtime = fs.statSync(file).mtimeMs; } catch { return DEFAULT_CONFIG; }
+  const hit = _configCache.get(file);
+  if (hit && hit.mtime === mtime) return hit.cfg;
+  let cfg;
   try {
-    const raw = fs.readFileSync(configFile(), 'utf8');
-    return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+    cfg = { ...DEFAULT_CONFIG, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
   } catch (e) {
-    return DEFAULT_CONFIG;
+    cfg = DEFAULT_CONFIG;
   }
+  _configCache.set(file, { mtime, cfg });
+  return cfg;
 }
 
 function saveConfig(cfg) {
@@ -134,12 +149,32 @@ if (require.main === module) {
 // package directory made a downstream scan write findings into the skill and
 // made every ignorePaths glob silently fail to match. Skill assets (patterns,
 // fixes.md) stay with the package; everything project-shaped resolves here.
+// Remembered per working directory. It spawned `git rev-parse` on every call
+// — three times per scanned file — which made `scan.js --all` on 2,000 files
+// take 22s instead of 5s.
 function projectRoot() {
+  const cwd = process.cwd();
+  if (!_rootCache.has(cwd)) _rootCache.set(cwd, findProjectRoot());
+  return _rootCache.get(cwd);
+}
+
+function findProjectRoot() {
+  let root;
   try {
-    return require('child_process')
+    root = require('child_process')
       .execFileSync('git', ['rev-parse', '--show-toplevel'],
         { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || process.cwd();
-  } catch { return process.cwd(); } // not a git repo: cwd is the project
+  } catch { root = process.cwd(); } // not a git repo: cwd is the project
+  return canonicalPath(root);
+}
+
+// One spelling per directory. On Windows git prints C:/Users/runneradmin/...
+// while the working directory may be C:\Users\RUNNER~1\... (an 8.3 short
+// name); path.relative() between the two starts with '..', so ignorePaths and
+// the baseline matched nothing. realpath.native expands short names and
+// resolves symlinks (macOS /tmp -> /private/tmp) the same way for both sides.
+function canonicalPath(p) {
+  try { return fs.realpathSync.native(path.resolve(p)); } catch { return path.resolve(p); }
 }
 
 function stateDir() {
@@ -252,4 +287,4 @@ function helpRequested(argv, usage) {
   return true;
 }
 
-module.exports = { loadConfig, DEFAULT_CONFIG, projectRoot, stateDir, statePath, writeState, withFileLock, helpRequested, normalizeSeverity, openPath };
+module.exports = { canonicalPath, loadConfig, DEFAULT_CONFIG, projectRoot, stateDir, statePath, writeState, withFileLock, helpRequested, normalizeSeverity, openPath };

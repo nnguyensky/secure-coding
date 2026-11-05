@@ -35,3 +35,6 @@ xss-sink	php	\b(echo|print)\b[^;]*\$_(GET|POST|REQUEST|COOKIE)	!htmlspecialchars
 sql-concat	*	(execute|query|raw)\s*\(\s*["'][^"']*(SELECT|INSERT|UPDATE|DELETE)[^"']*["']\s*\.format\s*\(	use parameterized query: execute(sql, [param])		critical
 sql-concat	rb	\.(where|find_by_sql|order|group|having|joins|select|pluck)\s*\(\s*"[^"]*#\{	use placeholders: where("name = ?", name)		critical
 shell	js,ts	\b(exec|execSync)\s*\(\s*(`[^`]*\$\{|["'][^"']*["']\s*\+)	use execFile/spawn with an argument array, never a shell string		critical
+shell	java,kt	Runtime\.getRuntime\s*\(\s*\)\s*\.exec\s*\(|\bnew\s+ProcessBuilder\s*\(\s*"(sh|bash|cmd|cmd\.exe|powershell)"	use ProcessBuilder with a fixed binary and an argument list; never a shell		high
+sql-concat	java,kt	\.(queryFor\w+|query|update|execute|batchUpdate)\s*\(\s*"[^"]*(SELECT|INSERT|UPDATE|DELETE)[^"]*"\s*\+	use ? placeholders: jdbcTemplate.query(sql, mapper, arg)		critical
+sql-concat	swift	sqlite3_(exec|prepare_v2|prepare)\s*\([^,]*,\s*"[^"]*\\\(	bind values with sqlite3_bind_*; never interpolate into SQL text		critical

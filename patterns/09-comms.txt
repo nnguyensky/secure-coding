@@ -21,3 +21,4 @@ tls-off	java,kt	setHostnameVerifier\s*\(\s*\([^)]*\)\s*->\s*true|HostnameVerifie
 # CORS Misconfigurations
 cors-wildcard-credentials	*	(Access-Control-Allow-Origin|origin)['"]?\s*[,:=]\s*['"]\*['"].*(credentials|Access-Control-Allow-Credentials)	never combine wildcard Access-Control-Allow-Origin with credentials: true		high
 cors-origin-reflection	js,ts,py,go,java,kt,cs	(Access-Control-Allow-Origin|setHeader\(['"]Access-Control-Allow-Origin['"])\s*,\s*(req\.headers\.(origin|get\(['"]origin['"]\))|request\.headers\[['"]Origin['"]\])	validate Origin against a strict allowlist before reflecting		high
+tls-off	swift,plist	NSAllowsArbitraryLoads|NSExceptionAllowsInsecureHTTPLoads|URLCredential\s*\(\s*trust:\s*\w+\.serverTrust	keep App Transport Security on; pin or validate the server trust instead of accepting it		critical

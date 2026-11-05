@@ -1,0 +1,7 @@
+# Check text files out with LF on every platform. The scanner, the tests and
+# sync.js parse these files line by line (fix blocks, pattern columns, the
+# report scaffold); a Windows checkout with core.autocrlf turned every "\n"
+# boundary into "\r\n" and broke those parsers.
+* text=auto eol=lf
+*.png binary
+*.jpg binary

@@ -1,7 +1,7 @@
 {
   "name": "secure-coding",
-  "version": "2.2.0",
-  "description": "Scans every file an AI agent writes against 393 OWASP, Secure-by-Design and CWE patterns in ~1ms. Blocks commits on findings, and on the ownership and authorization questions no pattern can answer.",
+  "version": "2.3.0",
+  "description": "Scans every file an AI agent writes against 403 OWASP, Secure-by-Design and CWE patterns in ~1ms. Blocks commits on findings, and on the ownership and authorization questions no pattern can answer.",
   "keywords": [
     "security",
     "secure-coding",
@@ -43,7 +43,9 @@
     "secure-coding-audit": "./hooks/audit.js",
     "secure-coding-sbom": "./hooks/sbom.js",
     "secure-coding-fix": "./hooks/fix.js",
-    "secure-coding-config": "./hooks/config.js"
+    "secure-coding-config": "./hooks/config.js",
+    "secure-coding-deps": "./hooks/deps.js",
+    "secure-coding-history": "./hooks/history.js"
   },
   "files": [
     "AGENTS.md",

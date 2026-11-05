@@ -6,7 +6,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A521.0.0-green?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![MCP Protocol](https://img.shields.io/badge/MCP%202024--11--05-Compatible-purple?style=for-the-badge&logo=probot&logoColor=white)](mcp/server.js)
-[![Tests](https://img.shields.io/badge/Tests-577%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-626%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 
 <p align="center">
   <a href="#-quickstart-options">⚡ Quickstart</a> •
@@ -88,13 +88,13 @@ node hooks/config.js --ui
 
 ## 🔌 Model Context Protocol (MCP) Setup
 
-`secure-coding` includes a native, zero-dependency JSON-RPC 2.0 MCP server ([`mcp/server.js`](mcp/server.js)) exposing 9 standard security tools directly to AI editors and agent runtimes:
+`secure-coding` includes a native, zero-dependency JSON-RPC 2.0 MCP server ([`mcp/server.js`](mcp/server.js)) exposing 12 standard security tools directly to AI editors and agent runtimes:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    NATIVE MCP SERVER (mcp/server.js)                        │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  • secure_code_scan          • Scan code / staged files for 393 OWASP bugs  │
+│  • secure_code_scan          • Scan code / staged files for 403 OWASP bugs  │
 │  • secure_code_autofix       • Retrieve fix advice or refactor in-place     │
 │  • security_dependency_audit • Audit lockfiles across 9 package ecosystems  │
 │  • clean_code_lint           • Lint code against 14 Clean Code rules        │
@@ -103,7 +103,14 @@ node hooks/config.js --ui
 │  • record_security_decision  • Record one Done Gate answer                  │
 │  • check_done_gate           • Gate status, or render it as an ADR          │
 │  • security_summary          • Fast status check of open vs resolved bugs   │
+│  • explain_finding           • Why a finding matters, wrong vs right code   │
+│  • check_dependencies        • Catch hallucinated or brand-new packages     │
+│  • scan_git_history          • Secrets in past commits, even deleted ones   │
 └─────────────────────────────────────────────────────────────────────────────┘
+
+It also serves the guidance as MCP resources (`secure-coding://skill`,
+`secure-coding://checks/<name>`, `secure-coding://fix/<id>`) and two prompts:
+`secure_design_review` and `fix_finding`.
 ```
 
 ### 1. Google Antigravity & VS Code
@@ -329,7 +336,7 @@ repos:
 
 ## 🧪 Verification
 
-Verify all 577 test fixtures, pattern compilations, secret masking, and MCP tool handlers:
+Verify all 626 test fixtures, pattern compilations, secret masking, and MCP tool handlers:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js

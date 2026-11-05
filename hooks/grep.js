@@ -12,6 +12,8 @@
 const fs = require('fs');
 const path = require('path');
 const { helpRequested } = require('./config');
+// Same language aliases as the scanner (.tsx is TypeScript, .mjs is JavaScript).
+const { EXT_ALIASES } = require('./scan');
 
 // --help prints usage and exits, without running the tool.
 const USAGE = `Usage: node hooks/grep.js <pattern-id> [path]
@@ -105,7 +107,7 @@ function main() {
     for (const p of patterns) {
       if (patternId && p.id !== patternId) continue;
       if (re && p.re.source !== re.source) continue;
-      if (p.exts !== '*' && !p.exts.split(',').includes(ext)) continue;
+      if (p.exts !== '*' && ![ext, ...(EXT_ALIASES[ext] || [])].some(e => p.exts.split(',').includes(e))) continue;
       if (p.exclFileRe && p.exclFileRe.test(content)) continue;
 
       for (let i = 0; i < lines.length; i++) {
