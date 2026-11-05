@@ -41,6 +41,12 @@ const EXT_ALIASES = {
   vue: ['js', 'ts'], svelte: ['js', 'ts'], astro: ['js', 'ts'],
   kts: ['kt'], pyw: ['py'], pyi: ['py'], phtml: ['php'],
   hh: ['hpp', 'h'], hxx: ['hpp', 'h'], cxx: ['cpp'], 'c++': ['cpp'],
+  // Same platform APIs, different syntax: the JVM rules apply to Scala and
+  // the .NET rules to VB.NET, on top of their own patterns.
+  scala: ['java'], sc: ['scala', 'java'], vb: ['cs'],
+  mm: ['m', 'cpp'], psm1: ['ps1'], psd1: ['ps1'], gvy: ['groovy'],
+  pls: ['sql'], pks: ['sql'], pkb: ['sql'], plsql: ['sql'], tsql: ['sql'],
+  cob: ['cbl'], cpy: ['cbl'], cobol: ['cbl'], exs: ['ex'],
 };
 const extFamily = ext => [ext, ...(EXT_ALIASES[ext] || [])];
 // Path segments we never scan (vendored / generated).
@@ -175,7 +181,15 @@ const LEXICAL = {
   hpp: { line: ['//'], block: true, quotes: '"' }, swift: { line: ['//'], block: true, quotes: '"' },
   rs: { line: ['//'], block: true, quotes: '"' },
   php: { line: ['//', '#'], block: true, quotes: '"\'' },
-  py: HASH, rb: HASH,
+  py: HASH, rb: HASH, pl: HASH, pm: HASH, r: HASH, ex: HASH,
+  scala: C_LIKE, dart: C_LIKE, groovy: C_LIKE, gradle: C_LIKE, sol: C_LIKE, m: C_LIKE,
+  cls: { line: ['//'], block: true, quotes: "'" }, apex: { line: ['//'], block: true, quotes: "'" },
+  ps1: { line: ['#'], block: false, quotes: '"\'' },
+  lua: { line: ['--'], block: false, quotes: '"\'' },
+  sql: { line: ['--'], block: true, quotes: "'" },
+  vb: { line: ["'"], block: false, quotes: '"' },
+  cbl: { line: ['*>'], block: false, quotes: '"\'' },
+  abap: { line: ['"'], block: false, quotes: "'`" },
 };
 
 // Boolean per character: true where the character is code.

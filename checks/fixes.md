@@ -1093,3 +1093,94 @@ The package ships only a source distribution, so installing it runs its setup.py
 Wrong: pip install of an sdist-only package in CI with secrets in the environment
 Right: prefer packages with wheels; build sdists in an isolated step without secrets, or vendor a reviewed wheel.
 Watch: --only-binary :all: makes pip refuse sdists outright.
+
+## jenkins-sh-interpolation
+OWASP: Software Supply Chain CS | CWE-78 | A03:2025
+A double-quoted `sh` step is a Groovy string: `${params.X}` is pasted into the shell script before it runs, so a parameter or branch name can add commands, and an interpolated credential is printed in the build log.
+Wrong: sh "git checkout ${params.BRANCH}"; sh "curl -H 'Authorization: ${TOKEN}' ..."
+Right: withEnv(["BRANCH=${params.BRANCH}"]) { sh 'git checkout "$BRANCH"' } — single quotes, the shell expands a quoted variable.
+Watch: the same applies to bat and powershell steps.
+
+## cobol-dynamic-call
+OWASP: 76,77 | CWE-470 | A01:2025
+CALL or EXEC CICS LINK/XCTL with a program name held in a data item runs whichever program that item names. If any input reaches it, the caller chooses the code.
+Wrong: MOVE WS-INPUT-PGM TO WS-PGM. CALL WS-PGM USING WS-AREA.
+Right: CALL 'ACCTUPD' USING WS-AREA — a literal; or EVALUATE the input against a fixed list and CALL a literal in each branch.
+Watch: RACF program profiles and CICS transaction security still apply, but do not rely on them to fix this.
+
+## atom-exhaustion
+OWASP: 15 | CWE-400 | A05:2025
+Atoms are never garbage-collected and the atom table has a fixed size. Converting input to atoms lets a caller crash the whole BEAM node.
+Wrong: String.to_atom(params["role"])
+Right: String.to_existing_atom(params["role"]), or a map from allowed strings to atoms.
+Watch: Jason.decode!(body, keys: :atoms) has the same problem — use keys: :atoms! or string keys.
+
+## apex-without-sharing
+OWASP: 76,77 | CWE-862 | A01:2025
+A class declared without sharing ignores the user's record-level access, so a controller or service built on it returns records the user may not see.
+Wrong: public without sharing class OrderController { ... }
+Right: public with sharing class OrderController { ... }; for queries also WITH USER_MODE or AccessLevel.USER_MODE.
+Watch: inherited sharing takes the caller's mode; a class with no keyword runs without sharing when called from one that has none.
+
+## abap-client-specified
+OWASP: 76,77 | CWE-639 | A01:2025
+CLIENT SPECIFIED / USING CLIENT reads data from other SAP clients, which are separate companies or environments.
+Wrong: SELECT * FROM kna1 CLIENT SPECIFIED WHERE mandt = lv_client.
+Right: plain Open SQL, which is limited to the logon client.
+Watch: cross-client access is sometimes needed in admin tools — guard it with AUTHORITY-CHECK and keep it out of user-facing code.
+
+## sql-grant-public
+OWASP: 76,77,145 | CWE-732 | A01:2025
+Granting to PUBLIC gives every login the permission, including ones created later; db_owner or DBA for an application account turns any SQL injection into full control.
+Wrong: GRANT SELECT ON dbo.Customers TO PUBLIC; ALTER ROLE db_owner ADD MEMBER app;
+Right: CREATE ROLE app_read; GRANT SELECT ON dbo.Orders TO app_read; grant EXECUTE on procedures instead of table rights.
+Watch: check ownership chains and SECURITY DEFINER functions, which run with the owner's rights.
+
+## sql-weak-login
+OWASP: 33,34 | CWE-521 | A07:2025
+CHECK_POLICY = OFF skips the Windows password policy (length, complexity, lockout) for that SQL login.
+Wrong: CREATE LOGIN app WITH PASSWORD = ..., CHECK_POLICY = OFF;
+Right: CHECK_POLICY = ON, or better, Windows / Entra ID authentication with no SQL password at all.
+Watch: service accounts with non-expiring passwords need a rotation process instead of CHECK_EXPIRATION = OFF.
+
+## solidity-tx-origin
+OWASP: SC Top 10 | CWE-477 | A01:2025
+tx.origin is the wallet that started the transaction, not the caller. A malicious contract the owner interacts with can call yours and pass the check.
+Wrong: require(tx.origin == owner);
+Right: msg.sender with OpenZeppelin Ownable or AccessControl.
+Watch: tx.origin == msg.sender to block contracts is also unreliable (account abstraction).
+
+## solidity-unchecked-call
+OWASP: SC Top 10 | CWE-252 | A10:2025
+Low-level call and send return false instead of reverting. Ignoring it loses funds silently; sending before updating state invites reentrancy.
+Wrong: payable(to).call{value: amount}(""); balances[msg.sender] = 0;
+Right: update state first, then (bool ok, ) = payable(to).call{value: amount}(""); if (!ok) revert TransferFailed(); and nonReentrant.
+Watch: ERC-20 transfer can also return false — use SafeERC20.
+
+## solidity-delegatecall
+OWASP: SC Top 10 | CWE-829 | A08:2025
+delegatecall runs another contract's code with your storage and balance. If the target can be chosen by a caller, they own your contract.
+Wrong: function exec(address target, bytes calldata data) external { target.delegatecall(data); }
+Right: delegatecall only to fixed, audited implementations (a proxy's admin-set implementation), never to a parameter.
+Watch: storage layout of proxy and implementation must match exactly.
+
+## solidity-weak-randomness
+OWASP: SC Top 10 | CWE-338 | A04:2025
+Block values are known to, or chosen by, validators and to anyone simulating the transaction. Randomness derived from them can be predicted or manipulated.
+Wrong: uint256 r = uint256(keccak256(abi.encode(block.timestamp, msg.sender))) % 100;
+Right: Chainlink VRF (or another verifiable randomness source), or commit-reveal with a deadline.
+Watch: keep the request and the fulfillment separate so a caller cannot revert unfavourable results.
+
+## solidity-old-compiler
+OWASP: SC Top 10 | CWE-190 | A06:2025
+Before 0.8, arithmetic wrapped silently on overflow, and older compilers carry known bugs. A floating pragma compiles with whichever version is installed.
+Wrong: pragma solidity ^0.6.0;
+Right: pragma solidity 0.8.28; (exact version), checked arithmetic, unchecked blocks only with proven bounds.
+Watch: SafeMath is unnecessary on 0.8+ but required below it.
+
+## solidity-selfdestruct
+OWASP: SC Top 10 | CWE-749 | A08:2025
+selfdestruct is deprecated (EIP-6780) and, in upgradeable systems, could delete the implementation every proxy relies on.
+Wrong: function kill() external onlyOwner { selfdestruct(payable(owner)); }
+Right: a pause mechanism and a withdrawal function.
+Watch: an uninitialized implementation contract behind a proxy can be taken over — call _disableInitializers().

@@ -55,3 +55,10 @@ xxe	js,ts	parseXml(String)?\s*\([^)]*noent\s*:\s*true	leave entity expansion off
 xxe	cs	DtdProcessing\s*=\s*DtdProcessing\.Parse|XmlResolver\s*=\s*new\s+XmlUrlResolver|ProhibitDtd\s*=\s*false	DtdProcessing.Prohibit and XmlResolver = null		high
 xxe	php	\bLIBXML_(NOENT|DTDLOAD|DTDATTR)\b	do not pass LIBXML_NOENT / LIBXML_DTDLOAD to the parser		high
 xxe	rb	\bnoent\b|ParseOptions::(NOENT|DTDLOAD)	parse with the default options (NONET, no entity substitution)		high
+eval	ps1	\b(Invoke-Expression|iex)\b\s+[\$("]|\|\s*(Invoke-Expression|iex)\b	call the program directly; never Invoke-Expression on built strings		critical
+eval	groovy,gradle,jenkinsfile	\bEval\.(me|x|xy|xyz)\s*\(|new\s+GroovyShell\s*\([^)]*\)\s*\.\s*(evaluate|parse)\s*\(	never evaluate code built from input		critical
+eval	abap	\bGENERATE\s+SUBROUTINE\s+POOL\b|\bINSERT\s+REPORT\b	never generate code from input		critical
+eval	pl,pm	\beval\s+\$\w|\beval\s*\(\s*\$\w|\beval\s*"[^"]*\$	never eval a string built from input		critical
+eval	lua	\b(loadstring|load|dofile)\s*\(\s*[a-zA-Z_][\w.]*\s*\)	never load code from input		critical
+eval	ex,exs	\bCode\.(eval_string|eval_quoted|compile_string)\s*\(	never evaluate code from input		critical
+eval	r	\beval\s*\(\s*parse\s*\(\s*text\s*=	never eval(parse(text = ...)) on input		critical

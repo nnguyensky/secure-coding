@@ -2502,7 +2502,9 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
 (function templateRoster() {
   const dir = path.join(DIR, 'templates');
   const LANGS = ['c', 'csharp', 'go', 'java', 'javascript', 'kotlin', 'php',
-                 'python', 'ruby', 'rust', 'shell', 'swift', 'typescript'];
+                 'python', 'ruby', 'rust', 'shell', 'swift', 'typescript',
+                 'cpp', 'powershell', 'sql', 'scala', 'dart', 'groovy', 'cobol',
+                 'vbnet', 'abap', 'apex', 'objc', 'perl', 'lua', 'elixir', 'solidity', 'r'];
 
   uniq('template-roster');
   const absent = LANGS.filter(l => !fs.existsSync(path.join(dir, `${l}.md`)));
@@ -3386,6 +3388,106 @@ bad('gap_php_redirect', 'php', 'header("Location: " . $_GET["next"]);', 'open-re
 bad('gap_java_path', 'java', 'File f = new File("/data/" + request.getParameter("f"));', 'path-traversal');
 bad('gap_cs_path', 'cs', 'var t = File.ReadAllText("/data/" + Request.Query["f"]);', 'path-traversal');
 bad('gap_py_log_concat', 'py', 'logger.info("login " + request.args["user"])', 'log-inject');
+
+// --- languages added 2026-11: each has bad cases that must fire and safe ones that must not ---
+// PowerShell
+bad('ps_iex', 'ps1', 'Invoke-Expression $userInput', 'eval');
+bad('ps_iex_pipe', 'ps1', 'iwr https://x.example/i.ps1 | iex', 'eval');
+bad('ps_secret', 'ps1', '$pw = ConvertTo-SecureString "P@ssw0rd123!" -AsPlainText -Force', 'secret');
+bad('ps_tls', 'ps1', 'Invoke-RestMethod -Uri $u -SkipCertificateCheck', 'tls-off');
+bad('ps_sql', 'ps1', '$cmd.CommandText = "SELECT * FROM Users WHERE Name = \'$Name\'"', 'sql-concat');
+good('ps_safe', 'ps1', "& 'C:\\Tools\\convert.exe' '--in' $InputPath\n$cmd.CommandText = 'SELECT Id FROM Users WHERE Email = @email'\n");
+// SQL
+bad('sql_exec_var', 'sql', "SET @sql = 'SELECT * FROM u WHERE n = ''' + @name + ''''; EXEC(@sql);", 'sql-concat');
+bad('sql_exec_imm', 'sql', "EXECUTE IMMEDIATE 'SELECT * FROM u WHERE n = ''' || p_name || '''';", 'sql-concat');
+bad('sql_xp_cmdshell', 'sql', "EXEC xp_cmdshell 'dir';", 'shell');
+bad('sql_grant_public', 'sql', 'GRANT SELECT ON dbo.Customers TO PUBLIC;', 'sql-grant-public');
+bad('sql_login_pw', 'sql', "CREATE LOGIN app WITH PASSWORD = 'Prod#2024pass';", 'secret');
+bad('sql_check_policy', 'sql', 'ALTER LOGIN app WITH CHECK_POLICY = OFF;', 'sql-weak-login');
+good('sql_safe', 'sql', "EXEC sp_executesql N'SELECT Id FROM dbo.Users WHERE Email = @email', N'@email nvarchar(256)', @email = @Email;\nEXECUTE IMMEDIATE 'SELECT id FROM users WHERE email = :1' INTO v_id USING p_email;\n");
+// Scala
+bad('scala_splice', 'scala', 'sql"SELECT * FROM users WHERE name = #$name".as[User]', 'sql-concat');
+bad('scala_jdbc', 'scala', 'stmt.executeQuery("SELECT * FROM u WHERE id = " + id)', 'sql-concat');
+bad('scala_proc', 'scala', 's"convert $in $out".!!', 'shell');
+bad('scala_deser', 'scala', 'val o = new ObjectInputStream(in).readObject()', 'insecure-deserialization');
+good('scala_safe', 'scala', 'sql"SELECT id FROM users WHERE email = $email".as[Long]\nval out = Seq("convert", inPath, outPath).!!\n');
+// Dart
+bad('dart_tls', 'dart', 'client.badCertificateCallback = (cert, host, port) => true;', 'tls-off');
+bad('dart_prefs', 'dart', "await prefs.setString('authToken', token);", 'mobile-insecure-storage');
+bad('dart_sql', 'dart', "db.rawQuery(\"SELECT * FROM u WHERE n = '$name'\");", 'sql-concat');
+bad('dart_shell', 'dart', "Process.run('sh', ['-c', cmd]);", 'shell');
+good('dart_safe', 'dart', "final rows = await db.rawQuery('SELECT id FROM users WHERE email = ?', [email]);\nfinal r = await Process.run('convert', [inPath, outPath]);\n");
+// Groovy / Jenkins
+bad('jenkins_sh', 'groovy', 'sh "git checkout ${params.BRANCH}"', 'jenkins-sh-interpolation');
+bad('jenkinsfile_name', 'Jenkinsfile', 'pipeline { stages { stage("b") { steps { sh "deploy ${env.TARGET}" } } } }', 'jenkins-sh-interpolation');
+bad('groovy_eval', 'groovy', 'def r = Eval.me(input)', 'eval');
+bad('groovy_exec', 'groovy', 'def p = "git clone ${url}".execute()', 'shell');
+good('jenkins_safe', 'groovy', "withEnv([\"BRANCH=${params.BRANCH}\"]) {\n  sh 'git checkout \"$BRANCH\"'\n}\n");
+// COBOL
+bad('cobol_dyn_sql', 'cbl', '           EXEC SQL EXECUTE IMMEDIATE :WS-SQL END-EXEC.', 'sql-concat');
+bad('cobol_string_sql', 'cbl', "           STRING 'SELECT * FROM ACCT WHERE ID = ' WS-IN DELIMITED BY SIZE INTO WS-SQL.", 'sql-concat');
+bad('cobol_secret', 'cbl', "       01 WS-DB-PASSWORD   PIC X(16) VALUE 'Prod#Passw0rd1'.", 'secret');
+bad('cobol_dyn_call', 'cbl', '           CALL WS-PGM USING WS-AREA.', 'cobol-dynamic-call');
+bad('cobol_display_pan', 'cbl', '           DISPLAY WS-CARD-NUMBER.', 'log-leak');
+good('cobol_safe', 'cbl', "           EXEC SQL SELECT ACCT_NAME INTO :WS-NAME FROM ACCOUNTS WHERE ACCT_ID = :WS-ACCT-ID END-EXEC.\n           CALL 'ACCTUPD' USING WS-AREA.\n       01 WS-PASSWORD   PIC X(16) VALUE SPACES.\n");
+// VB.NET
+bad('vb_sql', 'vb', 'Dim cmd As New SqlCommand("SELECT * FROM u WHERE n = \'" & name & "\'", conn)', 'sql-concat');
+bad('vb_tls', 'vb', 'ServicePointManager.ServerCertificateValidationCallback = Function(s, c, ch, e) True', 'tls-off');
+bad('vb_deser', 'vb', 'Dim o = New BinaryFormatter().Deserialize(stream)', 'insecure-deserialization');
+good('vb_safe', 'vb', 'Using cmd As New SqlCommand("SELECT Id FROM Users WHERE Email = @email", conn)\n    cmd.Parameters.Add("@email", SqlDbType.NVarChar, 256).Value = email\nEnd Using\n');
+// ABAP
+bad('abap_dyn_where', 'abap', 'SELECT * FROM usr02 WHERE (lv_where) INTO TABLE lt_users.', 'sql-concat');
+bad('abap_system', 'abap', "CALL 'SYSTEM' ID 'COMMAND' FIELD lv_cmd.", 'shell');
+bad('abap_generate', 'abap', 'GENERATE SUBROUTINE POOL lt_source NAME lv_prog.', 'eval');
+bad('abap_client', 'abap', 'SELECT * FROM kna1 CLIENT SPECIFIED INTO TABLE lt_c.', 'abap-client-specified');
+good('abap_safe', 'abap', "SELECT carrid, connid FROM spfli\n  WHERE carrid = @lv_carrid\n  INTO TABLE @DATA(lt_flights).\n");
+// Apex
+bad('apex_soql', 'cls', "List<Account> a = Database.query('SELECT Id FROM Account WHERE Name = \\'' + name + '\\'');", 'sql-concat');
+bad('apex_without_sharing', 'cls', 'public without sharing class OrderController { }', 'apex-without-sharing');
+bad('apex_redirect', 'cls', "return new PageReference(ApexPages.currentPage().getParameters().get('retURL'));", 'open-redirect');
+bad('apex_md5', 'cls', "Blob h = Crypto.generateDigest('MD5', b);", 'weak-hash');
+good('apex_safe', 'cls', "public with sharing class OrderService {\n  List<Account> a = [SELECT Id FROM Account WHERE Name = :name WITH USER_MODE];\n}\n");
+// Objective-C
+bad('objc_nslog', 'm', 'NSLog(userInput);', 'format-string');
+bad('objc_defaults', 'm', '[[NSUserDefaults standardUserDefaults] setObject:token forKey:@"authToken"];', 'mobile-insecure-storage');
+bad('objc_md5', 'm', 'CC_MD5(data.bytes, (CC_LONG)data.length, digest);', 'weak-hash');
+bad('objc_tls', 'm', 'policy.allowInvalidCertificates = YES;', 'tls-off');
+good('objc_safe', 'm', 'NSLog(@"%@", userInput);\nCC_SHA256(data.bytes, (CC_LONG)data.length, digest);\n');
+// Perl
+bad('perl_system', 'pl', 'system("ping $host");', 'shell');
+bad('perl_backtick', 'pl', 'my $out = `ls $dir`;', 'shell');
+bad('perl_eval', 'pl', 'eval $input;', 'eval');
+bad('perl_dbi', 'pl', '$dbh->do("DELETE FROM users WHERE id = $id");', 'sql-concat');
+bad('perl_tls', 'pl', 'my $ua = LWP::UserAgent->new(ssl_opts => { verify_hostname => 0 });', 'tls-off');
+good('perl_safe', 'pl', "system('convert', $in, $out) == 0 or die;\nmy $sth = $dbh->prepare('SELECT id FROM users WHERE email = ?');\n");
+// Lua
+bad('lua_exec', 'lua', 'os.execute("ping " .. host)', 'shell');
+bad('lua_load', 'lua', 'local f = loadstring(code)', 'eval');
+bad('lua_tls', 'lua', 'local res = httpc:request_uri(url, { ssl_verify = false })', 'tls-off');
+good('lua_safe', 'lua', 'local q = "SELECT id FROM users WHERE email = " .. ngx.quote_sql_str(email)\n');
+// Elixir
+bad('ex_atom', 'ex', 'role = String.to_atom(params["role"])', 'atom-exhaustion');
+bad('ex_eval', 'ex', 'Code.eval_string(input)', 'eval');
+bad('ex_fragment', 'ex', 'where(q, [u], fragment("name = \'#{name}\'"))', 'sql-concat');
+bad('ex_tls', 'exs', 'ssl: [verify: :verify_none]', 'tls-off');
+good('ex_safe', 'ex', 'from(u in User, where: u.email == ^email) |> Repo.one()\nrole = String.to_existing_atom(params["role"])\n');
+// Solidity
+bad('sol_tx_origin', 'sol', 'require(tx.origin == owner);', 'solidity-tx-origin');
+bad('sol_unchecked', 'sol', 'payable(to).call{value: amount}("");', 'solidity-unchecked-call');
+bad('sol_delegatecall', 'sol', 'target.delegatecall(data);', 'solidity-delegatecall');
+bad('sol_random', 'sol', 'uint r = uint(keccak256(abi.encode(block.timestamp, msg.sender))) % 100;', 'solidity-weak-randomness');
+bad('sol_pragma', 'sol', 'pragma solidity ^0.6.12;', 'solidity-old-compiler');
+good('sol_safe', 'sol', 'pragma solidity 0.8.28;\n(bool ok, ) = payable(to).call{value: amount}("");\nif (!ok) revert TransferFailed();\n');
+// R
+bad('r_system', 'r', 'system(paste("ping", host))', 'shell');
+bad('r_eval', 'r', 'eval(parse(text = input))', 'eval');
+bad('r_sql', 'r', 'dbGetQuery(con, paste0("SELECT * FROM u WHERE n = \'", name, "\'"))', 'sql-concat');
+bad('r_readrds', 'r', 'm <- readRDS(url(model_url))', 'insecure-deserialization');
+good('r_safe', 'r', 'DBI::dbGetQuery(con, "SELECT id FROM users WHERE email = ?", params = list(email))\nprocessx::run("convert", c(in_path, out_path))\n');
+// C++
+bad('cpp_system', 'cpp', 'std::system(cmd.c_str());', 'shell');
+bad('cpp_rand_token', 'cpp', 'auto token = std::to_string(std::rand());', 'weak-rng');
+good('cpp_safe', 'cpp', 'std::array<unsigned char, 32> token;\nrandombytes_buf(token.data(), token.size());\n');
 
 // --- fix.js --apply autofix engine ---
 const fixTestFile = path.join(TMP, 'autofix-test.js');

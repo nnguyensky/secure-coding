@@ -8,3 +8,7 @@ jwt	*	verify_signature[^)]*False			high
 cors	*	Access-Control-Allow-Origin["']?\s*[,:]\s*["']\*	never allow all origins with credentials — use explicit origin list	never allow all origins with credentials	high
 cors	*	origin\s*:\s*true.*credentials\s*:\s*true			high
 assert-security-check	py	^\s*assert\s+[^#]*\b(is_admin|is_superuser|is_staff|is_authenticated|has_perm|has_permission|is_owner|is_authorized|authorized|can_access|check_permission)\b	assert is removed under python -O; raise an exception or return 403		high
+apex-without-sharing	cls,trigger,apex	\bwithout\s+sharing\b	use "with sharing" (or "inherited sharing") on classes that serve user requests		high
+abap-client-specified	abap	\bCLIENT\s+SPECIFIED\b|\bUSING\s+(ALL\s+)?CLIENTS?\b	read only the logon client; never another client's data		high
+sql-grant-public	sql	\bGRANT\b[^;]*\bTO\s+PUBLIC\b|\bdb_owner\b|\bGRANT\s+DBA\b	grant the least privilege to a named role		high
+sql-weak-login	sql	\bCHECK_POLICY\s*=\s*OFF\b|\bCHECK_EXPIRATION\s*=\s*OFF\b	keep CHECK_POLICY = ON		medium
