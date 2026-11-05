@@ -2544,7 +2544,10 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
     lines.forEach((line, i) => {
       if (!line || line.startsWith('#')) return;
       const cols = line.split('\t');
-      if (cols.length > 3 && cols[3].startsWith('!') && cols[3].slice(1).includes('!')) {
+      // `!!re` is the file-level form and `(?!` a lookahead; neither is a
+      // second negation. What this catches is `!a|!b`.
+      const body = cols.length > 3 ? cols[3].replace(/^!!?/, '').replace(/\(\?<?!/g, '') : '';
+      if (cols.length > 3 && cols[3].startsWith('!') && body.includes('!')) {
         offenders.push(`${f}:${i + 1} ${cols[0]} -> ${cols[3]}`);
       }
     });
@@ -2780,6 +2783,157 @@ const CFG_SCRIPT = path.join(DIR, 'hooks', 'config.js');
 const cfgOut = spawnSync('node', [CFG_SCRIPT, '--get', 'failOn'], { encoding: 'utf8' });
 if (cfgOut.stdout.trim() === 'high') pass++;
 else { fail++; console.log('MISS  config-get'); }
+
+// --- detection benchmark (2026-11 review) ---
+// Common vulnerable shapes the scanner used to miss, and safe code it used to
+// flag. Each entry is a regression test; add to it whenever a gap is found.
+bad('bm_xss_res_send', 'js', 'app.get("/", (req, res) => res.send("<h1>" + req.query.q + "</h1>"));', 'taint-xss');
+bad('bm_exec_template', 'js', 'exec(`git log ${branch}`);', 'shell');
+bad('bm_path_wrapped', 'js', 'res.sendFile(path.join(__dirname, req.query.file));', 'taint-path-traversal');
+bad('bm_proto_merge', 'js', 'Object.assign(config, JSON.parse(req.body.cfg));', 'prototype-pollution');
+bad('bm_jwt_decode', 'js', 'const p = jwt.decode(token);', 'jwt-no-verify');
+bad('bm_vm_run', 'js', 'vm.runInNewContext(req.body.code);', 'eval');
+bad('bm_py_sql_format', 'py', 'cur.execute("SELECT * FROM t WHERE id={}".format(uid))', 'sql-concat');
+bad('bm_py_xxe_lxml', 'py', 'etree.fromstring(data, etree.XMLParser(resolve_entities=True))', 'xxe');
+bad('bm_py_assert_auth', 'py', 'def view(user):\n    assert user.is_admin\n    return data\n', 'assert-security-check');
+bad('bm_java_xxe', 'java', 'DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();\nDocument d = dbf.newDocumentBuilder().parse(in);\n', 'xxe');
+good('bm_java_xxe_hardened', 'java', 'DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();\ndbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);\n');
+bad('bm_php_echo', 'php', '<?php echo $_GET["name"];', 'xss-sink');
+good('bm_php_echo_escaped', 'php', '<?php echo htmlspecialchars($_GET["name"], ENT_QUOTES, "UTF-8");');
+bad('bm_rb_where', 'rb', 'User.where("name = \'#{params[:name]}\'")', 'sql-concat');
+bad('bm_c_printf', 'c', 'printf(user);', 'format-string');
+good('bm_c_printf_literal', 'c', 'printf("%s", user);');
+bad('bm_rs_ptr_write', 'rs', 'unsafe { ptr::write(p, v) }', 'mem');
+bad('bm_curl_bash', 'sh', 'curl -s https://x.sh | bash', 'curl-pipe-shell');
+bad('bm_tf_acl', 'tf', 'resource "aws_s3_bucket_acl" "b" {\n  acl = "public-read"\n}\n', 'tf-public-access');
+bad('bm_tf_ingress', 'tf', 'resource "aws_security_group" "s" {\n  ingress {\n    from_port   = 22\n    cidr_blocks = ["0.0.0.0/0"]\n  }\n}\n', 'tf-public-access');
+good('bm_tf_egress', 'tf', 'resource "aws_security_group" "s" {\n  egress {\n    cidr_blocks = ["0.0.0.0/0"]\n  }\n}\n');
+bad('bm_gha_injection', 'yml', 'steps:\n  - run: echo "${{ github.event.issue.title }}"\n', 'gha-script-injection');
+good('bm_gha_env', 'yml', 'steps:\n  - env:\n      TITLE: ${{ github.event.issue.title }}\n    run: echo "$TITLE"\n');
+bad('bm_gha_prt', 'yml', 'on:\n  pull_request_target:\n    types: [opened]\n', 'gha-pull-request-target');
+good('bm_eval_in_string', 'js', 'const msg = "Do not call eval() in production";\n');
+good('bm_shell_in_comment', 'py', '# os.system(cmd) is banned here\n');
+good('bm_md5_not_security', 'py', 'h = hashlib.md5(file_bytes, usedforsecurity=False).hexdigest()  # etag\n');
+good('bm_dompurify', 'js', 'el.innerHTML = DOMPurify.sanitize(input);\n');
+good('bm_param_query', 'js', 'db.query("SELECT * FROM users WHERE id = $1", [req.params.id]);\n');
+
+// --- autofix rewrites only the reported line, and keeps code valid ---
+(function autofixScoped() {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-af-'));
+  const st = path.join(d, 'state.jsonl');
+  const env = { ...process.env, SECURE_CODING_STATE: st, SECURE_CODING_REPORT: 'off' };
+  const js = path.join(d, 'b.js');
+  const py = path.join(d, 'a.py');
+  fs.writeFileSync(js, [
+    'const token = Math.random().toString(36);',
+    'const dice = Math.floor(Math.random() * 6) + 1;',
+    'const r = await client.messages.create({ model: "m", messages: msgs });',
+    'const k = Math.random(); // secure-coding-ignore: weak-rng -- jitter only',
+    '',
+  ].join('\n'));
+  fs.writeFileSync(py, '"""Doc."""\nimport requests\nr = requests.get(build_url(host), headers=h)\ntoken = "".join(random.choice(chars) for _ in range(16))\n');
+  spawnSync('node', [SCAN, '--files', js, py], { env, encoding: 'utf8' });
+  spawnSync('node', [path.join(DIR, 'hooks', 'fix.js'), '--apply'], { env, encoding: 'utf8' });
+  const jsOut = fs.readFileSync(js, 'utf8').split('\n');
+  const pyOut = fs.readFileSync(py, 'utf8');
+
+  uniq('autofix-only-flagged-lines');
+  if (/randomBytes/.test(jsOut[0]) && jsOut[1] === 'const dice = Math.floor(Math.random() * 6) + 1;'
+      && jsOut[3].startsWith('const k = Math.random();')) pass++;
+  else { fail++; console.log(`MISS  autofix-only-flagged-lines: ${JSON.stringify(jsOut.slice(0, 4))}`); }
+
+  uniq('autofix-js-options-object');
+  if (jsOut[2].includes('create({ max_tokens: 1024, model')) pass++;
+  else { fail++; console.log(`MISS  autofix-js-options-object: ${jsOut[2]}`); }
+
+  uniq('autofix-timeout-outer-call');
+  if (pyOut.includes('requests.get(build_url(host), headers=h, timeout=10)')) pass++;
+  else { fail++; console.log(`MISS  autofix-timeout-outer-call: ${pyOut}`); }
+
+  uniq('autofix-python-import');
+  if (/^"""Doc\."""\nimport secrets\n/.test(pyOut) && pyOut.includes('secrets.SystemRandom().choice(')) pass++;
+  else { fail++; console.log(`MISS  autofix-python-import: ${JSON.stringify(pyOut.slice(0, 60))}`); }
+
+  // Same type as before: the rewritten expression is still a float in [0, 1).
+  uniq('autofix-rng-keeps-type');
+  const v = eval("(require('crypto').randomBytes(6).readUIntBE(0, 6) / 2 ** 48)"); // secure-coding-ignore: eval -- evaluating the autofix's own constant expression
+  if (typeof v === 'number' && v >= 0 && v < 1) pass++;
+  else { fail++; console.log(`MISS  autofix-rng-keeps-type: ${v}`); }
+  try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
+})();
+
+// --- MCP: a failing tool still answers its own request ---
+(function mcpErrors() {
+  const MCP = path.join(DIR, 'mcp', 'server.js');
+  const input = [
+    { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26' } },
+    { jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'clean_code_lint', arguments: { files: { not: 'a list' } } } },
+    [1],
+  ].map(m => JSON.stringify(m)).join('\n') + '\n';
+  const r = spawnSync('node', [MCP], { input, encoding: 'utf8', timeout: 20000 });
+  const msgs = (r.stdout || '').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return {}; } });
+
+  uniq('mcp-negotiates-protocol');
+  if (msgs.some(m => m.id === 1 && m.result && m.result.protocolVersion === '2025-03-26')) pass++;
+  else { fail++; console.log('MISS  mcp-negotiates-protocol'); }
+
+  uniq('mcp-tool-error-keeps-id');
+  if (msgs.some(m => m.id === 9 && m.result) && !msgs.some(m => m.error && m.error.code === -32700)) pass++;
+  else { fail++; console.log(`MISS  mcp-tool-error-keeps-id: ${r.stdout}`); }
+
+  uniq('mcp-invalid-request');
+  if (msgs.some(m => m.error && m.error.code === -32600)) pass++;
+  else { fail++; console.log('MISS  mcp-invalid-request'); }
+})();
+
+// --- audit severities from every ecosystem land on one scale ---
+(function severityScale() {
+  uniq('audit-severity-normalized');
+  const { normalizeSeverity } = require('./config');
+  const cases = { '9.8': 'critical', '7.5': 'high', '5.0': 'medium', moderate: 'medium', High: 'high', unknown: 'high', '': 'high', info: 'low' };
+  const wrong = Object.entries(cases).filter(([k, v]) => normalizeSeverity(k) !== v);
+  if (wrong.length === 0) pass++;
+  else { fail++; console.log(`MISS  audit-severity-normalized: ${wrong.map(([k]) => k).join(', ')}`); }
+})();
+
+// --- SBOM: names, purls, ranges and VEX references are well-formed ---
+(function sbomShape() {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-sbom-'));
+  fs.writeFileSync(path.join(d, 'package-lock.json'), JSON.stringify({ name: 'demo', lockfileVersion: 3, packages: {
+    '': { name: 'demo' },
+    'node_modules/lodash': { version: '4.17.20' },
+    'node_modules/@scope/pkg': { version: '1.2.3' },
+    'node_modules/a/node_modules/lodash': { version: '4.17.21' },
+    'packages/web': { version: '0.1.0' },
+  } }));
+  fs.writeFileSync(path.join(d, 'requirements.txt'), 'openai==1.2.0\nrequests>=2.0 ; python_version > "3.8"\n');
+  const audit = path.join(d, 'audit.json');
+  fs.writeFileSync(audit, JSON.stringify({ findings: [{ ecosystem: 'npm', package: 'lodash', installed: '4.17.20', severity: 'high', title: 'Prototype Pollution GHSA-p6mc-m468-83gw' }] }));
+  const r = spawnSync('node', [path.join(DIR, 'hooks', 'sbom.js'), '--format', 'cyclonedx', '--vex'],
+    { cwd: d, encoding: 'utf8', env: { ...process.env, SECURE_CODING_AUDIT: audit, SECURE_CODING_STATE: path.join(d, 'none.jsonl') } });
+  let bom = {};
+  try { bom = JSON.parse(r.stdout); } catch { /* reported below */ }
+  const comps = bom.components || [];
+  const refs = new Set([bom.metadata && bom.metadata.component && bom.metadata.component['bom-ref'], ...comps.map(c => c['bom-ref'])]);
+
+  uniq('sbom-nested-and-scoped-names');
+  const purls = comps.map(c => c.purl);
+  if (purls.includes('pkg:npm/lodash@4.17.21') && purls.includes('pkg:npm/%40scope/pkg@1.2.3')
+      && !comps.some(c => /node_modules|packages\//.test(c.name))) pass++;
+  else { fail++; console.log(`MISS  sbom-nested-and-scoped-names: ${purls.join(' ')}`); }
+
+  uniq('sbom-range-is-not-a-version');
+  const req = comps.find(c => c.name === 'requests');
+  if (req && !req.version && req.purl === 'pkg:pypi/requests') pass++;
+  else { fail++; console.log(`MISS  sbom-range-is-not-a-version: ${JSON.stringify(req)}`); }
+
+  uniq('sbom-vex-refs-resolve');
+  const v = (bom.vulnerabilities || [])[0];
+  if (v && v.id === 'GHSA-p6mc-m468-83gw' && refs.has(v.affects[0].ref) && v.affects[0].ref === 'pkg:npm/lodash@4.17.20'
+      && Array.isArray(v.analysis.response)) pass++;
+  else { fail++; console.log(`MISS  sbom-vex-refs-resolve: ${JSON.stringify(v)}`); }
+  try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
+})();
 
 // --- fix.js --apply autofix engine ---
 const fixTestFile = path.join(TMP, 'autofix-test.js');

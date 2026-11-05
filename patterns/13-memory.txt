@@ -1,9 +1,10 @@
 # OWASP SCP - Memory Management [194-202]
 # id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
-# POSIX ERE only - BSD grep has no -P and fails silently on it.
+# JavaScript RegExp, one line; keep lookarounds to the exclusion column (see CONTRIBUTING.md).
 
 mem	c,h,cpp,cc,hpp	\b(strcpy|strcat|sprintf|gets|vsprintf)\s*\(	use bounded copies (snprintf, strlcpy); check allocs; free once+null		medium
 mem	c,h,cpp,cc,hpp	\balloca\s*\(	use malloc with bounds check, or a fixed-size buffer		medium
 mem	rs	unsafe\s*\{[^}]*\b(transmute|from_raw_parts|get_unchecked|set_len|assume_init|copy_nonoverlapping|offset|as_mut|from_utf8_unchecked)(::<[^>]*>)?\s*\(	validate length and lifetime before an unchecked memory operation		medium
-mem	rs	\b(std::mem::transmute|from_raw_parts(_mut)?|get_unchecked(_mut)?|assume_init|copy_nonoverlapping|from_utf8_unchecked)(::<[^>]*>)?\s*\(	validate length and lifetime before an unchecked memory operation		medium
+mem	rs	\b(std::mem::transmute|from_raw_parts(_mut)?|get_unchecked(_mut)?|assume_init|copy_nonoverlapping|from_utf8_unchecked|ptr::(read|write)(_unaligned|_volatile|_bytes)?|ptr::copy)(::<[^>]*>)?\s*\(	validate length and lifetime before an unchecked memory operation		medium
 mem	cs	\bunsafe\s*\{			medium
+format-string	c,h,cpp,cc,hpp	\b(printf|vprintf)\s*\(\s*[A-Za-z_][\w.>\[\]-]*\s*\)|\b(fprintf|vfprintf|dprintf|syslog|sprintf)\s*\(\s*[^,()]+,\s*[A-Za-z_][\w.>\[\]-]*\s*\)|\bsnprintf\s*\(\s*[^,()]+,\s*[^,]+,\s*[A-Za-z_][\w.>\[\]-]*\s*\)	use a literal format string: printf("%s", s)		high

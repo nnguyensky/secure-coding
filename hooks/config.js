@@ -9,7 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { spawn } = require('child_process');
 
 const DIR = path.resolve(__dirname, '..');
 // Resolved per call against the project root, not frozen at load time against
@@ -61,11 +61,24 @@ function saveConfig(cfg) {
   console.log(`✅ Saved configuration to ${configFile()}`);
 }
 
+// Open a local file in the default app, without a shell: the path was
+// interpolated into a shell string, so a quote in the install path broke
+// out of it. explorer.exe on Windows, because `start` is a cmd.exe builtin.
+function openPath(target) {
+  const [cmd, args] = process.platform === 'darwin' ? ['open', [target]]
+    : process.platform === 'win32' ? ['explorer.exe', [target]]
+      : ['xdg-open', [target]];
+  try {
+    const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
+    child.on('error', () => console.log(`Open manually: file://${target}`));
+    child.unref();
+  } catch {
+    console.log(`Open manually: file://${target}`);
+  }
+}
+
 function openBrowser(url) {
-  const start = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
-  exec(`${start} "${url}"`, (err) => {
-    if (err) console.log(`Open wizard manually: file://${url}`);
-  });
+  openPath(url);
 }
 
 function main() {
@@ -207,6 +220,28 @@ function withFileLock(file, fn) {
   }
 }
 
+// One severity scale for every ecosystem. The tools disagree: npm says
+// "moderate", cargo-audit gives a CVSS score ("7.5"), dotnet "High",
+// pip-audit and govulncheck often give nothing. Before this, a score or an
+// unrecognised word ranked as the lowest level, so a CVSS 9.8 cargo advisory
+// never failed the build. A known advisory with no severity is treated as
+// high: it is a confirmed vulnerability, and failing closed is the safe side.
+function normalizeSeverity(sev) {
+  const s = String(sev == null ? '' : sev).trim().toLowerCase();
+  const score = parseFloat(s);
+  if (/^\d+(\.\d+)?$/.test(s) && !Number.isNaN(score)) {
+    if (score >= 9) return 'critical';
+    if (score >= 7) return 'high';
+    if (score >= 4) return 'medium';
+    return 'low';
+  }
+  if (s === 'critical') return 'critical';
+  if (s === 'high' || s === 'important') return 'high';
+  if (s === 'medium' || s === 'moderate') return 'medium';
+  if (s === 'low' || s === 'info' || s === 'informational' || s === 'none') return 'low';
+  return 'high';
+}
+
 // `--help` must never do the thing. reset.js used to wipe the findings file
 // when asked for help, and audit.js/sbom.js ran their full operation, so a
 // user typing --help to learn what a tool does triggered it instead. Call this
@@ -217,4 +252,4 @@ function helpRequested(argv, usage) {
   return true;
 }
 
-module.exports = { loadConfig, DEFAULT_CONFIG, projectRoot, stateDir, statePath, writeState, withFileLock, helpRequested };
+module.exports = { loadConfig, DEFAULT_CONFIG, projectRoot, stateDir, statePath, writeState, withFileLock, helpRequested, normalizeSeverity, openPath };

@@ -1,9 +1,9 @@
 # OWASP SCP - Authentication & Password Management [23-57]
 # id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
-# POSIX ERE only - BSD grep has no -P and fails silently on it.
+# JavaScript RegExp, one line; keep lookarounds to the exclusion column (see CONTRIBUTING.md).
 
-weak-hash	*	\b(md5|sha1)\s*\(	never use MD5/SHA-1 for security — use sha256+ for checksums, argon2id for passwords		high
-weak-hash	*	hashlib\.(md5|sha1)\b			high
+weak-hash	*	\b(md5|sha1)\s*\(	!usedforsecurity\s*=\s*False	never use MD5/SHA-1 for security — use sha256+ for checksums, argon2id for passwords	high
+weak-hash	*	hashlib\.(md5|sha1)\b	!usedforsecurity\s*=\s*False	never use MD5/SHA-1 for security — pass usedforsecurity=False only for checksums	high
 weak-hash	*	MessageDigest\.getInstance\s*\(\s*["'](MD5|SHA-?1)["']			high
 weak-hash	*	createHash\s*\(\s*["'](md5|sha1)["']	never use MD5/SHA-1 for security		high
 weak-hash	go	(crypto/md5|crypto/sha1)|md5\.New\s*\(|sha1\.New\s*\(			high

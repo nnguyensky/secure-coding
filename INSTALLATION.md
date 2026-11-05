@@ -6,7 +6,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A521.0.0-green?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![MCP Protocol](https://img.shields.io/badge/MCP%202024--11--05-Compatible-purple?style=for-the-badge&logo=probot&logoColor=white)](mcp/server.js)
-[![Tests](https://img.shields.io/badge/Tests-536%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-577%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 
 <p align="center">
   <a href="#-quickstart-options">⚡ Quickstart</a> •
@@ -27,11 +27,12 @@
 Run the interactive terminal wizard directly via npm/npx:
 
 ```bash
+# Pin a release tag: without one, npx runs whatever is on main right now.
 # Launch interactive setup wizard
-npx github:nnguyensky/secure-coding --global
+npx github:nnguyensky/secure-coding#v2.2.0 --global
 
 # Or install with MCP server and Antigravity rules non-interactively
-npx github:nnguyensky/secure-coding --global --agent antigravity --mcp --yes
+npx github:nnguyensky/secure-coding#v2.2.0 --global --agent antigravity --mcp --yes
 ```
 
 An install puts nine commands on your PATH. Every one takes `--help`, and
@@ -92,7 +93,7 @@ node hooks/config.js --ui
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    NATIVE MCP SERVER (mcp/server.js)                        │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  • secure_code_scan          • Scan code / staged files for 376 OWASP bugs  │
+│  • secure_code_scan          • Scan code / staged files for 393 OWASP bugs  │
 │  • secure_code_autofix       • Retrieve fix advice or refactor in-place     │
 │  • security_dependency_audit • Audit lockfiles across 9 package ecosystems  │
 │  • clean_code_lint           • Lint code against 14 Clean Code rules        │
@@ -327,7 +328,7 @@ repos:
 
 ## 🧪 Verification
 
-Verify all 536 test fixtures, pattern compilations, secret masking, and MCP tool handlers:
+Verify all 577 test fixtures, pattern compilations, secret masking, and MCP tool handlers:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js

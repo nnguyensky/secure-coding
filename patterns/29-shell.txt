@@ -18,3 +18,4 @@ set-hide-error	sh,bash,zsh	^\s*set\s+\+e\b	leave errexit on; handle errors expli
 # Matches: [ $var == yes ], test $var -eq 0
 # Does not match: [ "$var" == "yes" ] (quoted is safe)
 unquoted-test	sh,bash,zsh	(?:\[|test)\s+(?!\")\$(?![{(])\S+\s+(?:-[a-z]|==|!=)	quote variables in test expressions: "$var"		medium
+curl-pipe-shell	sh,bash,zsh,yml,yaml	\b(curl|wget)\b[^|#]*\|\s*(sudo\s+)?(-\w+\s+)*(ba|z|da)?sh\b	download to a file, verify a checksum or signature, then run it		high

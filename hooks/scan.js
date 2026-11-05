@@ -18,6 +18,8 @@ const FIXES = path.join(DIR, 'checks', 'fixes.md');
 const STATE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
 const REPORT = (process.env.SECURE_CODING_REPORT || 'on') === 'on';
 const MAX_HITS = 4;
+// Lines a multi-line pattern may span (see the fallback in matchContentDetailed).
+const FALLBACK_WINDOW = 6;
 // Occurrences reported per id per file. Beyond this the count is truncated —
 // the finding is still reported, you just stop getting every line.
 const MAX_OCCURRENCES = Number(process.env.SECURE_CODING_MAX_OCCURRENCES) || 20;
@@ -82,11 +84,19 @@ function loadPatterns() {
       if (!id || !regex) continue;
       const extsLower = exts ? exts.toLowerCase() : exts;
       let exclRe = null;
+      let exclFileRe = null;
       let hint = '';
       let severity = 'medium';
       if (cols.length >= 4 && cols[3]) {
         if (cols[3].startsWith('!')) {
-          try { exclRe = new RegExp(cols[3].slice(1)); } catch (e) { exclRe = null; }
+          // `!!re` excludes on the whole file, `!re` on the matched line. The
+          // file form is for a fix that sits on another line: an XML factory
+          // hardened with setFeature(...) two lines further down.
+          if (cols[3].startsWith('!!')) {
+            try { exclFileRe = new RegExp(cols[3].slice(2)); } catch (e) { exclFileRe = null; }
+          } else {
+            try { exclRe = new RegExp(cols[3].slice(1)); } catch (e) { exclRe = null; }
+          }
           if (cols[4]) hint = cols[4];
         } else {
           hint = cols[3];
@@ -101,7 +111,15 @@ function loadPatterns() {
       }
       let re;
       try { re = new RegExp(regex); } catch (e) { continue; }
-      out.push({ id, exts: extsLower, re, exclRe, section, hint, severity });
+      // A call-shaped pattern (`name\s*\(`) describes code, so a match inside
+      // a string or comment is ignored. Patterns about string contents — they
+      // mention a quote, a URL scheme or are secrets — must see inside literals
+      // (SQL text, an MQTT URL, "crypto/des"), so they are left alone.
+      const codeOnly = /\\\(/.test(regex) && !/["'`]/.test(regex)
+        && !/:(\\)?\/(\\)?\//.test(regex) && !/^secret/.test(id);
+      let reG = null;
+      try { reG = new RegExp(regex, 'g'); } catch (e) { reG = null; }
+      out.push({ id, exts: extsLower, re, reG, exclRe, exclFileRe, codeOnly, section, hint, severity });
     }
   }
   return out;
@@ -126,6 +144,68 @@ function suppressionFor(line, id) {
 
 function isSuppressed(line, id) {
   return suppressionFor(line, id) !== null;
+}
+
+// --- strings and comments ---
+// `"Do not call eval() in production"` is not a call to eval. For languages
+// with C-like or hash-style literals, code-only patterns must match at a
+// position that is code, not inside a quoted string or a comment.
+// Deliberately simple and single-line: backtick templates are treated as code
+// (their ${...} parts are code), and an unterminated quote is treated as code
+// from that point on, so a lexing mistake costs a false positive, never a miss.
+const C_LIKE = { line: ['//'], block: true, quotes: '"\'' };
+const HASH = { line: ['#'], block: false, quotes: '"\'' };
+const LEXICAL = {
+  js: C_LIKE, jsx: C_LIKE, ts: C_LIKE, tsx: C_LIKE, mjs: C_LIKE, cjs: C_LIKE,
+  java: C_LIKE, kt: C_LIKE, cs: C_LIKE, go: { line: ['//'], block: true, quotes: '"' },
+  c: { line: ['//'], block: true, quotes: '"' }, h: { line: ['//'], block: true, quotes: '"' },
+  cpp: { line: ['//'], block: true, quotes: '"' }, cc: { line: ['//'], block: true, quotes: '"' },
+  hpp: { line: ['//'], block: true, quotes: '"' }, swift: { line: ['//'], block: true, quotes: '"' },
+  rs: { line: ['//'], block: true, quotes: '"' },
+  php: { line: ['//', '#'], block: true, quotes: '"\'' },
+  py: HASH, rb: HASH,
+};
+
+// Boolean per character: true where the character is code.
+function codeMask(line, lang) {
+  const mask = new Array(line.length).fill(true);
+  let i = 0;
+  while (i < line.length) {
+    const c = line[i];
+    if (lang.line.some(t => line.startsWith(t, i))) {
+      for (let k = i; k < line.length; k++) mask[k] = false;
+      break;
+    }
+    if (lang.block && line.startsWith('/*', i)) {
+      const end = line.indexOf('*/', i + 2);
+      const stop = end === -1 ? line.length : end + 2;
+      for (let k = i; k < stop; k++) mask[k] = false;
+      i = stop;
+      continue;
+    }
+    if (lang.quotes.includes(c)) {
+      let j = i + 1;
+      while (j < line.length && line[j] !== c) j += line[j] === '\\' ? 2 : 1;
+      if (j >= line.length) { i++; continue; } // unterminated: leave as code
+      for (let k = i; k <= j; k++) mask[k] = false;
+      i = j + 1;
+      continue;
+    }
+    i++;
+  }
+  return mask;
+}
+
+function matchesInCode(p, line, lang) {
+  if (!p.reG) return true;
+  const mask = codeMask(line, lang);
+  p.reG.lastIndex = 0;
+  let m;
+  while ((m = p.reG.exec(line)) !== null) {
+    if (mask[m.index]) return true;
+    if (m[0].length === 0) p.reG.lastIndex++;
+  }
+  return false;
 }
 
 function calculateShannonEntropy(str) {
@@ -195,13 +275,43 @@ const TAINT_SINKS = [
   { id: 'taint-sql', severity: 'critical', section: '02',
     re: /\.\s*(?:query|execute|exec|raw|prepare)\s*\(/,
     hint: 'request data reaches a query call — use a parameterized query' },
+  { id: 'taint-xss', severity: 'high', section: '02',
+    re: /\b(?:res|response|reply)\s*\.\s*(?:send|write|end)\s*\(/,
+    hint: 'request data is written into the HTTP response unescaped — render through an escaping template, or send JSON' },
 ];
 
 // Any of these on the assignment or the sink line means the value was handled.
-const TAINT_SANITIZED = /\b(?:sanitiz|escape|validate|allowlist|whitelist|basename|realpath|resolve|normaliz|encodeURI|parseInt|parseFloat|Number|Boolean|String|schema|zod|joi|yup|isSafe|is_safe|safe_path|assert|check)\w*\s*\(|\?\?|\|\||\bparameteriz/i;
+// Stems take a suffix (sanitize/sanitizer, validate/validated); casts and
+// names must match exactly. `joi\w*` used to match `join(`, so
+// path.join(__dirname, req.query.file) counted as sanitized, and
+// `String\w*` matched JSON.stringify(.
+const TAINT_SANITIZED = /\b(?:sanitiz\w*|escape\w*|validat\w*|allowlist\w*|whitelist\w*|basename|realpath\w*|resolve|normaliz\w*|encodeURI(?:Component)?|parseInt|parseFloat|Number|Boolean|String|isSafe\w*|is_safe\w*|safe_path|assert\w*|check\w*)\s*\(|\b(?:joi|zod|yup|schema)\s*\.|\?\?|\|\||\bparameteriz/i;
 
 // Function/block boundary — taint does not cross it.
 const TAINT_BOUNDARY = /^\s*(?:(?:export\s+)?(?:async\s+)?function\b|def\b|func\b|(?:public|private|protected)\s|class\b|\}\s*$)/;
+
+// Text of the first argument of the call whose '(' is at `open`, or null
+// when the line does not hold it. Skips strings so a comma inside a literal
+// does not end the argument.
+function firstArgument(line, open) {
+  if (line[open] !== '(') return null;
+  let depth = 0;
+  for (let i = open; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"' || c === "'" || c === '`') {
+      let j = i + 1;
+      while (j < line.length && line[j] !== c) j += line[j] === '\\' ? 2 : 1;
+      i = j;
+      continue;
+    }
+    if (c === '(' || c === '[' || c === '{') depth++;
+    else if (c === ')' || c === ']' || c === '}') {
+      depth--;
+      if (depth === 0) return line.slice(open + 1, i);
+    } else if (c === ',' && depth === 1) return line.slice(open + 1, i);
+  }
+  return line.slice(open + 1);
+}
 
 function findTaintFlows(fileLines) {
   const found = [];
@@ -213,6 +323,22 @@ function findTaintFlows(fileLines) {
 
     // A new function resets what we know.
     if (TAINT_BOUNDARY.test(line)) tainted = new Map();
+
+    // Source and sink on the same line, with the source wrapped in another
+    // call: res.sendFile(path.join(__dirname, req.query.file)). The pattern
+    // files only see the source when it is the sink's direct argument.
+    for (const sink of TAINT_SINKS) {
+      const sm = sink.re.exec(line);
+      if (!sm) continue;
+      // Only the first argument is the dangerous one: the query text, the
+      // path, the URL, the command, the response body. A request value in a
+      // later argument is a bound parameter, an argv entry or an options
+      // object — db.query("... $1", [req.params.id]) is the safe form.
+      const first = firstArgument(line, sm.index + sm[0].length - 1);
+      const src = first && first.match(TAINT_SOURCE);
+      if (!src || TAINT_SANITIZED.test(first)) continue;
+      found.push({ sink, line: i + 1, snippet: line.trim(), varName: src[0].replace(/\s+/g, ''), srcLine: i + 1 });
+    }
 
     // Destructuring is the dominant idiom in modern JS/TS:
     // `const { file } = req.query`. Handles renames (`{ a: b }`) and
@@ -250,12 +376,16 @@ function findTaintFlows(fileLines) {
     if (tainted.size === 0) continue;
 
     for (const sink of TAINT_SINKS) {
-      if (!sink.re.test(line)) continue;
+      const sm = sink.re.exec(line);
+      if (!sm) continue;
       if (TAINT_SANITIZED.test(line)) continue;
+      // As above: only the first argument carries the vulnerability.
+      const first = firstArgument(line, sm.index + sm[0].length - 1);
+      const arg = '(' + (first === null ? line.slice(sm.index) : first);
       for (const [name, srcLine] of tainted) {
-        // The variable must actually appear as an argument on this line.
-        const used = new RegExp('[(,\\s\\[`+.]\\$?' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b');
-        if (!used.test(line)) continue;
+        // The variable must actually appear in that argument.
+        const used = new RegExp('[(,\\s\\[`+.{]\\$?' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b');
+        if (!used.test(arg)) continue;
         found.push({ sink, line: i + 1, snippet: line.trim(), varName: name, srcLine });
         break;
       }
@@ -275,6 +405,7 @@ function matchContentDetailed(content, filenameOrExt, patterns) {
   const suppressed = new Map(); // `${id}@${line}` -> record
   const cfg = loadConfig();
   const secretsOnly = SECRETS_ONLY_EXT.has(ext);
+  const maskLangs = LEXICAL[ext] || null;
 
   const noteSuppressed = (id, section, severity, lineNo, sup) => {
     const key = `${id}@${lineNo}`;
@@ -301,6 +432,7 @@ function matchContentDetailed(content, filenameOrExt, patterns) {
       if (!want.includes(ext) && !named) continue;
     }
 
+    if (p.exclFileRe && p.exclFileRe.test(content)) continue;
     if (!occById.has(p.id)) occById.set(p.id, new Map());
     const occ = occById.get(p.id);
     const add = (lineNo, snippet) => {
@@ -317,11 +449,17 @@ function matchContentDetailed(content, filenameOrExt, patterns) {
 
     let lineMatched = false;
     let lineMatchedAndSuppressed = false;
+    // Any single line the regex matches, before exclusions. The whole-file
+    // fallback is only for patterns that span lines; a line-level match that
+    // was excluded (by `!re`, a string or a comment) must stay excluded.
+    let anyLineHit = false;
 
     for (let i = 0; i < fileLines.length; i++) {
       const line = fileLines[i];
       if (!p.re.test(line)) continue;
+      anyLineHit = true;
       if (p.exclRe && p.exclRe.test(line)) continue;
+      if (p.codeOnly && maskLangs && !matchesInCode(p, line, maskLangs)) continue;
       const sup = suppressionFor(line, p.id);
       if (sup) {
         lineMatchedAndSuppressed = true;
@@ -332,13 +470,21 @@ function matchContentDetailed(content, filenameOrExt, patterns) {
       add(i + 1, line.trim());
     }
 
-    // Fallback: the pattern spans lines. Only when no single line matched and
-    // nothing was suppressed for this id.
-    if (!lineMatched && !lineMatchedAndSuppressed && p.re.test(content)) {
+    // Fallback: the pattern spans lines (a Terraform block, a chained call).
+    // Only when no single line matched and nothing was suppressed for this id.
+    // Searched in windows of a few lines, anchored where the match starts:
+    // over the whole file, `[^;]*` in a regex happily joined "token" in one
+    // comment to Math.random() forty lines later.
+    if (!anyLineHit && p.re.test(content)) {
       if ((!p.exclRe || !p.exclRe.test(content)) && !fileLines.some(l => isSuppressed(l, p.id))) {
-        const at = content.search(p.re);
-        const lineNo = at >= 0 ? content.slice(0, at).split(/\r?\n/).length : 1;
-        add(lineNo, (fileLines[lineNo - 1] || fileLines[0] || '').trim());
+        for (let i = 0; i < fileLines.length; i++) {
+          const win = fileLines.slice(i, i + FALLBACK_WINDOW).join('\n');
+          const m = p.re.exec(win);
+          if (!m || win.slice(0, m.index).includes('\n')) continue; // starts on a later line
+          if (p.codeOnly && maskLangs && /^\s*(\/\/|#|\/\*|\*)/.test(fileLines[i])) continue;
+          add(i + 1, fileLines[i].trim());
+          break;
+        }
       }
     }
   }
@@ -395,7 +541,9 @@ function matchContentDetailed(content, filenameOrExt, patterns) {
       hits.push({
         id: flow.sink.id,
         section: flow.sink.section,
-        hint: `${flow.sink.hint} (tainted \`${flow.varName}\` from line ${flow.srcLine})`,
+        hint: flow.srcLine === flow.line
+          ? `${flow.sink.hint} (\`${flow.varName}\` on the same line)`
+          : `${flow.sink.hint} (tainted \`${flow.varName}\` from line ${flow.srcLine})`,
         severity: flow.sink.severity,
         line: flow.line,
         snippet: maskSecret(flow.snippet, flow.sink.id),

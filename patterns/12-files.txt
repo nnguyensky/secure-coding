@@ -1,6 +1,6 @@
 # OWASP SCP - File Management [180-193]
 # id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
-# POSIX ERE only - BSD grep has no -P and fails silently on it.
+# JavaScript RegExp, one line; keep lookarounds to the exclusion column (see CONTRIBUTING.md).
 
 dynamic-include	*	(include|require)(_once)?\s*\(?\s*\$_(GET|POST|REQUEST|COOKIE)	never pass user input to include/require		medium
 path-traversal	php	(file_get_contents|fopen|include|require|readfile)\s*\(\s*\$_(GET|POST|REQUEST|COOKIE)	resolve path then confirm inside allowed directory		high

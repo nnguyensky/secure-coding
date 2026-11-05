@@ -26,17 +26,40 @@ const SERVER_NAME = 'secure-coding-mcp';
 // silently reports a stale version to every client after a release bump.
 const SERVER_VERSION = require(path.join(ROOT_DIR, 'package.json')).version;
 
-// JSON-RPC 2.0 reserved error codes (spec section 5.1). Only the two this
-// server actually returns are declared; the rest of the reserved range is
-// documented in the spec, and unused constants are dead code.
+// JSON-RPC 2.0 reserved error codes (spec section 5.1). Only the ones this
+// server actually returns are declared.
 const JSONRPC_PARSE_ERROR = -32700;
+const JSONRPC_INVALID_REQUEST = -32600;
 const JSONRPC_METHOD_NOT_FOUND = -32601;
-const PROTOCOL_VERSION = '2024-11-05';
+const JSONRPC_INTERNAL_ERROR = -32603;
+// Protocol versions this server can speak. initialize answers with the
+// client's version when it is one of these, else the newest.
+const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
+const PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[0];
+
+// Every child process gets a deadline. Without one, a hung package manager in
+// security_dependency_audit blocked the server — and every later request —
+// forever. Audit runs one tool per ecosystem, so it gets longer.
+const CHILD_TIMEOUT_MS = Number(process.env.SECURE_CODING_MCP_TIMEOUT_MS) || 120000;
+const AUDIT_TIMEOUT_MS = Number(process.env.SECURE_CODING_MCP_AUDIT_TIMEOUT_MS) || 300000;
+
+function run(script, args, opts = {}) {
+  const res = spawnSync(process.execPath, [script, ...args], {
+    encoding: 'utf8', timeout: CHILD_TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024, ...opts,
+  });
+  if (res.error && res.error.code === 'ETIMEDOUT') {
+    res.stderr = `${res.stderr || ''}\n${path.basename(script)} timed out after ${Math.round((opts.timeout || CHILD_TIMEOUT_MS) / 1000)}s`;
+    res.timedOut = true;
+  } else if (res.error) {
+    res.stderr = `${res.stderr || ''}\n${path.basename(script)} could not run: ${res.error.message}`;
+  }
+  return res;
+}
 
 const TOOLS = [
   {
     name: 'secure_code_scan',
-    description: 'Scans source code or files against 376 OWASP, Secure by Design, IoT, LLM, and Shannon entropy secret patterns. Returns precise line numbers, code snippets, and remediation guidance.',
+    description: 'Scans source code or files against 393 OWASP, Secure by Design, IoT, LLM, and Shannon entropy secret patterns. Returns precise line numbers, code snippets, and remediation guidance.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -212,15 +235,14 @@ function handleToolCall(name, args) {
     case 'record_security_decision': {
       // Shell out rather than reimplement: gate.js owns the filler rejection,
       // the N/A rule and the per-commit expiry. A second copy would drift.
-      const res = spawnSync('node', [GATE_SCRIPT, '--answer', String(args.question || ''), String(args.answer || '')],
-        { encoding: 'utf8' });
+      const res = run(GATE_SCRIPT, ['--answer', String(args.question || ''), String(args.answer || '')]);
       const text = (res.stdout || '') + (res.stderr || '');
       return { content: [{ type: 'text', text: text.trim() || 'No output.' }], isError: res.status !== 0 };
     }
 
     case 'check_done_gate': {
       const mode = args.format === 'adr' ? '--adr' : '--status';
-      const res = spawnSync('node', [GATE_SCRIPT, mode], { encoding: 'utf8' });
+      const res = run(GATE_SCRIPT, [mode]);
       const text = (res.stdout || '') + (res.stderr || '');
       return { content: [{ type: 'text', text: text.trim() || 'No output.' }] };
     }
@@ -235,9 +257,9 @@ function handleToolCall(name, args) {
     }
 
     case 'secure_code_scan': {
-      if (args.code) {
+      if (args.code !== undefined && args.code !== null && args.code !== '') {
         const patterns = loadPatterns();
-        const hits = matchContent(args.code, args.filename || 'sample.js', patterns);
+        const hits = matchContent(String(args.code), String(args.filename || 'sample.js'), patterns);
         if (hits.length === 0) {
           return { content: [{ type: 'text', text: '✅ Code is clean. Zero security findings.' }] };
         }
@@ -258,10 +280,9 @@ function handleToolCall(name, args) {
       const scanArgs = [];
       if (args.staged) scanArgs.push('--staged');
       else if (args.diff) scanArgs.push('--diff');
-      else if (args.files && args.files.length) scanArgs.push('--files', '--', ...args.files.map(String));
+      else if (args.files && args.files.length) scanArgs.push('--files', '--', ...[].concat(args.files).map(String));
 
-      const res = spawnSync('node', [SCAN_SCRIPT, ...scanArgs], {
-        encoding: 'utf8',
+      const res = run(SCAN_SCRIPT, scanArgs, {
         env: { ...process.env, SECURE_CODING_REPORT: 'off' },
       });
       const output = res.stdout || res.stderr || (res.status === 0 ? '✅ Code is clean. Zero security findings.' : 'Scan completed.');
@@ -274,21 +295,21 @@ function handleToolCall(name, args) {
       else if (args.dryRun) fixArgs.push('--dry-run');
       else if (args.apply) fixArgs.push('--apply');
 
-      const res = spawnSync('node', [FIX_SCRIPT, ...fixArgs], { encoding: 'utf8' });
+      const res = run(FIX_SCRIPT, fixArgs);
       return { content: [{ type: 'text', text: res.stdout || res.stderr || 'No fixes required.' }] };
     }
 
     case 'security_dependency_audit': {
-      const res = spawnSync('node', [AUDIT_SCRIPT], {
-        cwd: args.targetDir || process.cwd(),
-        encoding: 'utf8',
+      const res = run(AUDIT_SCRIPT, [], {
+        cwd: args.targetDir ? String(args.targetDir) : process.cwd(),
+        timeout: AUDIT_TIMEOUT_MS,
       });
       return { content: [{ type: 'text', text: res.stdout || res.stderr || 'Audit completed.' }] };
     }
 
     case 'clean_code_lint': {
       if (args.listRules) {
-        const res = spawnSync('node', [CLEAN_SCRIPT, '--list'], { encoding: 'utf8' });
+        const res = run(CLEAN_SCRIPT, ['--list']);
         return { content: [{ type: 'text', text: res.stdout || res.stderr }] };
       }
       // Mirror the CLI: one file, several files, or the whole repository.
@@ -301,7 +322,7 @@ function handleToolCall(name, args) {
       else {
         return { content: [{ type: 'text', text: 'Error: clean_code_lint needs one of file, files or all' }], isError: true };
       }
-      const res = spawnSync('node', [CLEAN_SCRIPT, ...cleanArgs], { encoding: 'utf8' });
+      const res = run(CLEAN_SCRIPT, cleanArgs);
       return { content: [{ type: 'text', text: res.stdout || res.stderr || '✅ No clean code violations found.' }] };
     }
 
@@ -311,12 +332,12 @@ function handleToolCall(name, args) {
       if (args.includeVex !== false) sbomArgs.push('--vex');
       if (args.outFile) sbomArgs.push('--out', args.outFile);
 
-      const res = spawnSync('node', [SBOM_SCRIPT, ...sbomArgs], { encoding: 'utf8' });
+      const res = run(SBOM_SCRIPT, sbomArgs);
       return { content: [{ type: 'text', text: res.stdout || res.stderr || 'SBOM generated successfully.' }] };
     }
 
     case 'security_summary': {
-      const res = spawnSync('node', [SUMMARY_SCRIPT], { encoding: 'utf8' });
+      const res = run(SUMMARY_SCRIPT, []);
       return { content: [{ type: 'text', text: (res.stdout || res.stderr || 'Status unknown.').trim() }] };
     }
 
@@ -339,7 +360,8 @@ function processMessage(message) {
         jsonrpc: '2.0',
         id,
         result: {
-          protocolVersion: PROTOCOL_VERSION,
+          protocolVersion: SUPPORTED_PROTOCOL_VERSIONS.includes(params.protocolVersion)
+            ? params.protocolVersion : PROTOCOL_VERSION,
           capabilities: {
             tools: {},
           },
@@ -367,8 +389,17 @@ function processMessage(message) {
 
     case 'tools/call': {
       const toolName = params.name;
-      const toolArgs = params.arguments || {};
-      const result = handleToolCall(toolName, toolArgs);
+      const toolArgs = params.arguments && typeof params.arguments === 'object' ? params.arguments : {};
+      // A tool that throws is a tool error, reported in the result with the
+      // request's id (MCP: isError). It used to escape to the line handler and
+      // come back as "Parse error" with id null, so the client never got an
+      // answer to its request and waited forever.
+      let result;
+      try {
+        result = handleToolCall(toolName, toolArgs);
+      } catch (e) {
+        result = { content: [{ type: 'text', text: `${toolName} failed: ${e && e.message ? e.message : String(e)}` }], isError: true };
+      }
       return {
         jsonrpc: '2.0',
         id,
@@ -398,26 +429,31 @@ function startServer() {
     terminal: false,
   });
 
+  const send = obj => process.stdout.write(JSON.stringify(obj) + '\n');
   rl.on('line', (line) => {
     line = line.trim();
     if (!line) return;
 
+    let message;
     try {
-      const message = JSON.parse(line);
-      const response = processMessage(message);
-      if (response) {
-        process.stdout.write(JSON.stringify(response) + '\n');
-      }
+      message = JSON.parse(line);
     } catch (e) {
-      const errResponse = {
-        jsonrpc: '2.0',
-        id: null,
-        error: {
-          code: JSONRPC_PARSE_ERROR,
-          message: 'Parse error: invalid JSON',
-        },
-      };
-      process.stdout.write(JSON.stringify(errResponse) + '\n');
+      send({ jsonrpc: '2.0', id: null, error: { code: JSONRPC_PARSE_ERROR, message: 'Parse error: invalid JSON' } });
+      return;
+    }
+    if (!message || typeof message !== 'object' || Array.isArray(message)) {
+      send({ jsonrpc: '2.0', id: null, error: { code: JSONRPC_INVALID_REQUEST, message: 'Invalid request' } });
+      return;
+    }
+    // Only a parse failure is a parse error. Anything else that goes wrong
+    // still answers the request it belongs to.
+    try {
+      const response = processMessage(message);
+      if (response) send(response);
+    } catch (e) {
+      if (message.id !== undefined) {
+        send({ jsonrpc: '2.0', id: message.id, error: { code: JSONRPC_INTERNAL_ERROR, message: `Internal error: ${e && e.message ? e.message : String(e)}` } });
+      }
     }
   });
 }

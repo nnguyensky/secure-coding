@@ -1,6 +1,6 @@
 # OWASP Top 10 for LLM Applications Patterns
 # id	exts	regex	!exclude	hint	severity  (ONE regex: !a|b|c, never !a|!b|!c)
-# POSIX ERE only - BSD grep has no -P and fails silently on it.
+# JavaScript RegExp, one line; keep lookarounds to the exclusion column (see CONTRIBUTING.md).
 
 llm-output-html	js,ts	(innerHTML|dangerouslySetInnerHTML)\s*[:=]\s*[^;]*(completion|response|message)\.(content|text)	sanitize or escape LLM output before injecting into DOM		critical
 llm-rag-no-filter	py,js,ts	\.(similarity_search|similaritySearch|as_retriever|asRetriever|max_marginal_relevance_search)\s*\(	!(filter|where|metadata|tenant|namespace)	enforce tenant and user access control metadata filter on vector search	high
