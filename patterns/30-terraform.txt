@@ -8,3 +8,6 @@ provisioner-remote	tf,tfvars	provisioner\s*["']remote-exec["']	avoid remote-exec
 
 # password in connection block — using password instead of SSH key
 tf-password	tf,tfvars	connection\s*\{[^}]*password\s*=	use SSH key authentication; never hardcode passwords		high
+tf-public-access	tf,tfvars	\bacl\s*=\s*"public-read(-write)?"	keep buckets private; serve public files through a CDN with origin access control		high
+tf-public-access	tf,tfvars	ingress\s*\{[^}]*cidr_blocks\s*=\s*\[[^\]]*"0\.0\.0\.0/0"	restrict ingress to known ranges; 0.0.0.0/0 only for a public load balancer, never SSH/RDP/databases		high
+tf-public-access	tf,tfvars	\b(block_public_acls|block_public_policy|ignore_public_acls|restrict_public_buckets)\s*=\s*false|\bpublicly_accessible\s*=\s*true	turn S3 public access blocks on; keep databases off the public internet		high

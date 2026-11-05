@@ -12,3 +12,5 @@ docker-digest	Dockerfile	^FROM\s+\S+:(?!latest)[a-zA-Z0-9._-]+\s*$	!slim|alpine|
 
 npm-audit	yml,yaml	npm\s+install.*--production|npm\s+ci\s+--production	supply chain: production install without audit — run npm audit before deploy		medium
 npm-audit	yml,yaml	npm\s+ci\b.*--ignore-scripts	supply chain: --ignore-scripts skips lifecycle hooks — verify scripts are safe before disabling		medium
+gha-script-injection	yml,yaml	\$\{\{\s*github\.(event\.(issue\.(title|body)|pull_request\.(title|body|head\.ref|head\.label)|comment\.body|review\.body|review_comment\.body|head_commit\.(message|author\.(name|email))|commits|pages|discussion\.(title|body)|workflow_run\.head_branch)|head_ref)	!^\s*(-\s*)?(?!run\s*:|script\s*:)[A-Za-z_][\w-]*\s*:\s*["']?\$\{\{	pass untrusted event text through env: and quote "$VAR"; never expand it inside run:	high
+gha-pull-request-target	yml,yaml	^\s*(-\s*)?pull_request_target\s*:?\s*$|^\s*on\s*:\s*\[?[^#]*\bpull_request_target\b	pull_request_target runs with secrets on fork PRs; never check out or run the PR's code in it		medium

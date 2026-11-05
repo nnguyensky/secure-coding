@@ -1,9 +1,10 @@
 # OWASP SCP - Access Control [77-100]
 # id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
-# POSIX ERE only - BSD grep has no -P and fails silently on it.
+# JavaScript RegExp, one line; keep lookarounds to the exclusion column (see CONTRIBUTING.md).
 
 jwt	*	algorithms?\s*[:=]\s*\[?\s*["']none["']	never accept "none" algorithm — require a real signature	never accept "none" algorithm — require a real signature	high
 jwt	*	verify\s*[:=]\s*false			high
 jwt	*	verify_signature[^)]*False			high
 cors	*	Access-Control-Allow-Origin["']?\s*[,:]\s*["']\*	never allow all origins with credentials — use explicit origin list	never allow all origins with credentials	high
 cors	*	origin\s*:\s*true.*credentials\s*:\s*true			high
+assert-security-check	py	^\s*assert\s+[^#]*\b(is_admin|is_superuser|is_staff|is_authenticated|has_perm|has_permission|is_owner|is_authorized|authorized|can_access|check_permission)\b	assert is removed under python -O; raise an exception or return 403		high

@@ -11,7 +11,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath, helpRequested } = require('./config');
+const { statePath, helpRequested, normalizeSeverity } = require('./config');
 const { randomUUID } = require('crypto');
 
 // --help must print help, never run the tool. reset.js used to wipe the
@@ -38,6 +38,17 @@ const SELF_VERSION = SELF_PKG.version || '0.0.0';
 const FINDINGS_FILE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
 const AUDIT_FILE = statePath('audit.json', 'SECURE_CODING_AUDIT');
 
+// --- Package URLs ---
+// purl spec: each namespace/name segment percent-encoded on its own, the
+// version after '@' only when it is known. `@scope/pkg` is namespace
+// "%40scope" + name "pkg" — encoding the whole string turned the separator
+// into %2F, which no purl consumer resolves.
+function purl(type, name, version) {
+  const segs = String(name).split('/').filter(Boolean).map(encodeURIComponent);
+  const v = version ? `@${encodeURIComponent(String(version))}` : '';
+  return `pkg:${type}/${segs.join('/')}${v}`;
+}
+
 // --- Ecosystem Parsers ---
 
 function parsePackageLock() {
@@ -49,21 +60,24 @@ function parsePackageLock() {
     if (data.packages) {
       for (const [pPath, pInfo] of Object.entries(data.packages)) {
         if (!pPath || pPath === '') continue;
-        const name = pInfo.name || pPath.replace(/^node_modules\//, '');
+        // node_modules/a/node_modules/lodash is lodash, nested under a.
+        // Paths outside node_modules are workspace packages, not dependencies.
+        if (!pPath.includes('node_modules/') || pInfo.link) continue;
+        const name = pInfo.name || pPath.slice(pPath.lastIndexOf('node_modules/') + 'node_modules/'.length);
         pkgs.push({
           name,
-          version: pInfo.version || '0.0.0',
+          version: pInfo.version || undefined,
           ecosystem: 'npm',
-          purl: `pkg:npm/${name.startsWith('@') ? encodeURIComponent(name) : name}@${pInfo.version || '0.0.0'}`,
+          purl: purl('npm', name, pInfo.version),
         });
       }
     } else if (data.dependencies) {
       for (const [name, pInfo] of Object.entries(data.dependencies)) {
         pkgs.push({
           name,
-          version: pInfo.version || '0.0.0',
+          version: pInfo.version || undefined,
           ecosystem: 'npm',
-          purl: `pkg:npm/${name.startsWith('@') ? encodeURIComponent(name) : name}@${pInfo.version || '0.0.0'}`,
+          purl: purl('npm', name, pInfo.version),
         });
       }
     }
@@ -88,7 +102,7 @@ function parsePnpmLock() {
           name,
           version,
           ecosystem: 'npm',
-          purl: `pkg:npm/${name.startsWith('@') ? encodeURIComponent(name) : name}@${version}`,
+          purl: purl('npm', name, version),
         });
       }
     }
@@ -114,7 +128,7 @@ function parseYarnLock() {
           name,
           version,
           ecosystem: 'npm',
-          purl: `pkg:npm/${name.startsWith('@') ? encodeURIComponent(name) : name}@${version}`,
+          purl: purl('npm', name, version),
         });
       }
     }
@@ -129,17 +143,19 @@ function parseRequirementsTxt() {
     const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
     const pkgs = [];
     for (const line of lines) {
-      const clean = line.split('#')[0].trim();
-      if (!clean) continue;
-      const m = clean.match(/^([A-Za-z0-9_.-]+)(?:==|>=|<=|~=)(.+)$/);
-      if (m) {
-        pkgs.push({
-          name: m[1],
-          version: m[2].trim(),
-          ecosystem: 'pypi',
-          purl: `pkg:pypi/${m[1]}@${m[2].trim()}`,
-        });
-      }
+      // Drop comments and environment markers (; python_version < "3.9").
+      const clean = line.split('#')[0].split(';')[0].trim();
+      if (!clean || clean.startsWith('-')) continue;
+      const m = clean.match(/^([A-Za-z0-9_.-]+)(\[[^\]]*\])?\s*(.*)$/);
+      if (!m) continue;
+      const name = m[1].toLowerCase().replace(/[_.]+/g, '-'); // PEP 503 name
+      const spec = m[3].trim();
+      // Only an exact pin names the installed version. `>=2.0` is a range:
+      // recording it as version 2.0 claimed a version that is not installed.
+      const pin = spec.match(/^===?\s*([^,\s]+)$/);
+      const comp = { name, version: pin ? pin[1] : undefined, ecosystem: 'pypi', purl: purl('pypi', name, pin ? pin[1] : undefined) };
+      if (!pin && spec) comp.versionRange = spec;
+      pkgs.push(comp);
     }
     return pkgs;
   } catch { return []; }
@@ -160,7 +176,7 @@ function parsePoetryLock() {
           name,
           version,
           ecosystem: 'pypi',
-          purl: `pkg:pypi/${name}@${version}`,
+          purl: purl('pypi', name, version),
         });
       }
     }
@@ -183,7 +199,7 @@ function parseCargoLock() {
           name,
           version,
           ecosystem: 'cargo',
-          purl: `pkg:cargo/${name}@${version}`,
+          purl: purl('cargo', name, version),
         });
       }
     }
@@ -210,7 +226,7 @@ function parseGoSum() {
             name,
             version: ver,
             ecosystem: 'golang',
-            purl: `pkg:golang/${name}@${ver}`,
+            purl: purl('golang', name, ver),
           });
         }
       }
@@ -230,7 +246,7 @@ function parseComposerLock() {
         name: p.name,
         version: p.version || '0.0.0',
         ecosystem: 'composer',
-        purl: `pkg:composer/${p.name}@${p.version || '0.0.0'}`,
+        purl: purl('composer', p.name, p.version),
       });
     }
     return pkgs;
@@ -253,7 +269,7 @@ function parseGemfileLock() {
             name: m[1],
             version: m[2],
             ecosystem: 'gem',
-            purl: `pkg:gem/${m[1]}@${m[2]}`,
+            purl: purl('gem', m[1], m[2]),
           });
         }
       }
@@ -274,7 +290,7 @@ function parseDotnetLock() {
             name,
             version: info.resolved || '0.0.0',
             ecosystem: 'nuget',
-            purl: `pkg:nuget/${name}@${info.resolved || '0.0.0'}`,
+            purl: purl('nuget', name, info.resolved),
           });
         }
       }
@@ -399,6 +415,7 @@ function generateAiClusters(opts = {}) {
   return [
     {
       type: 'machine-learning-model',
+      'bom-ref': 'ai-model-primary',
       name: 'primary-ai-model',
       version: '1.0.0',
       description:
@@ -429,48 +446,82 @@ function countAiTodos(components) {
 
 // --- ACSC & CISA VEX Generation ---
 
-function generateVexVulnerabilities() {
+// bom-ref of the application itself; findings in its own code point here.
+const ROOT_REF = 'root-application';
+
+// Audit ecosystems use the package manager's name; purl uses its own.
+const PURL_TYPE = { npm: 'npm', pnpm: 'npm', yarn: 'npm', pip: 'pypi', pypi: 'pypi', cargo: 'cargo',
+  go: 'golang', golang: 'golang', ruby: 'gem', bundler: 'gem', gem: 'gem', php: 'composer',
+  composer: 'composer', nuget: 'nuget', dotnet: 'nuget' };
+
+// A CVE or GHSA id when the advisory text carries one.
+function advisoryId(f) {
+  const text = [f.id, f.title, f.advisory, f.url].filter(Boolean).join(' ');
+  const m = text.match(/\b(CVE-\d{4}-\d{4,}|GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}|RUSTSEC-\d{4}-\d{4}|PYSEC-\d{4}-\d+|GO-\d{4}-\d{4})\b/i);
+  if (!m) return null;
+  // GHSA ids are canonically lower-case after the prefix; the others upper.
+  return /^ghsa-/i.test(m[1]) ? 'GHSA-' + m[1].slice(5).toLowerCase() : m[1].toUpperCase();
+}
+
+// VEX statements. Each `affects` ref is the bom-ref of a component in this
+// BOM: refs to anything else (a file path, a purl with no matching
+// component) leave the statement attached to nothing.
+function generateVexVulnerabilities(components = []) {
   const vulns = [];
+  const byKey = new Map();
+  for (const c of components) {
+    if (c.ecosystem) byKey.set(`${PURL_TYPE[c.ecosystem] || c.ecosystem}|${String(c.name).toLowerCase()}|${c.version || ''}`, c.purl);
+  }
+  const refFor = (eco, name, version) => {
+    const type = PURL_TYPE[String(eco).toLowerCase()] || String(eco).toLowerCase();
+    const n = String(name).toLowerCase();
+    return byKey.get(`${type}|${n}|${version || ''}`)
+      || [...byKey.entries()].find(([k]) => k.startsWith(`${type}|${n}|`))?.[1]
+      || null;
+  };
 
   // Load audit findings
   if (fs.existsSync(AUDIT_FILE)) {
     try {
       const audit = JSON.parse(fs.readFileSync(AUDIT_FILE, 'utf8'));
       for (const f of audit.findings || []) {
+        const ref = refFor(f.ecosystem, f.package, f.installed);
         vulns.push({
-          id: f.title ? f.title.slice(0, 50) : `VULN-${f.package}`,
-          ratings: [{ severity: f.severity || 'medium' }],
+          id: advisoryId(f) || `ADVISORY-${f.ecosystem}-${f.package}`,
+          description: f.title || undefined,
+          ratings: [{ severity: normalizeSeverity(f.severity) }],
           analysis: {
             state: 'in_triage',
-            detail: `Advisory detected in ${f.package}@${f.installed}`,
-            responses: ['update'],
+            detail: `Advisory reported by the ${f.ecosystem} audit for ${f.package}@${f.installed || 'unknown'}`,
+            response: ['update'],
           },
-          affects: [{ ref: `pkg:${f.ecosystem}/${f.package}@${f.installed}` }],
+          affects: [{ ref: ref || ROOT_REF }],
         });
       }
-    } catch {}
+    } catch { /* unreadable audit file: no audit statements */ }
   }
 
-  // Load findings.jsonl open items
+  // Open findings in the application's own code.
   if (fs.existsSync(FINDINGS_FILE)) {
     try {
       const lines = fs.readFileSync(FINDINGS_FILE, 'utf8').split(/\r?\n/).filter(Boolean);
       for (const line of lines) {
         const item = JSON.parse(line);
         if (item.status === 'open') {
+          const where = path.relative(DIR, item.file || '') || item.file || 'source';
           vulns.push({
             id: `RULE-${item.id}`,
-            ratings: [{ severity: item.severity || 'high' }],
+            ratings: [{ severity: normalizeSeverity(item.severity) }],
             analysis: {
-              state: 'affected',
-              detail: item.note || `Code pattern violation: ${item.id}`,
-              responses: ['workaround_available'],
+              state: 'exploitable',
+              detail: `${where}${item.line ? ':' + item.line : ''} — ${item.note || `code pattern violation: ${item.id}`}`,
+              response: ['update'],
             },
-            affects: [{ ref: path.relative(process.cwd(), item.file || 'source') }],
+            affects: [{ ref: ROOT_REF }],
           });
         }
       }
-    } catch {}
+    } catch { /* unreadable findings file: no code statements */ }
   }
 
   return vulns;
@@ -481,13 +532,16 @@ function generateVexVulnerabilities() {
 function generateCycloneDX(components, options = {}) {
   const { includeAi = false, includeVex = false } = options;
 
-  let allComponents = components.map(c => ({
-    type: 'library',
-    name: c.name,
-    version: c.version,
-    purl: c.purl,
-    scope: 'required',
-  }));
+  // bom-ref = purl: unique after de-duplication, and what VEX `affects`
+  // points at. A requirement range is kept as a property, not as a version.
+  let allComponents = components.map(c => {
+    const comp = { type: 'library', 'bom-ref': c.purl, name: c.name };
+    if (c.version) comp.version = c.version;
+    comp.purl = c.purl;
+    comp.scope = 'required';
+    if (c.versionRange) comp.properties = [{ name: 'secure-coding:requirement', value: c.versionRange }];
+    return comp;
+  });
 
   if (includeAi || detectAiComponents(components)) {
     allComponents.push(...generateAiClusters());
@@ -509,6 +563,7 @@ function generateCycloneDX(components, options = {}) {
       ],
       component: {
         type: 'application',
+        'bom-ref': ROOT_REF,
         name: path.basename(DIR),
         version: '1.0.0',
       },
@@ -517,7 +572,7 @@ function generateCycloneDX(components, options = {}) {
   };
 
   if (includeVex) {
-    cdx.vulnerabilities = generateVexVulnerabilities();
+    cdx.vulnerabilities = generateVexVulnerabilities(components);
   }
 
   return cdx;
@@ -537,7 +592,7 @@ function generateSPDX(components) {
     packages: components.map((c, idx) => ({
       name: c.name,
       SPDXID: `SPDXRef-Package-${idx + 1}`,
-      versionInfo: c.version,
+      ...(c.version ? { versionInfo: c.version } : {}),
       downloadLocation: 'NOASSERTION',
       filesAnalyzed: false,
       externalRefs: [

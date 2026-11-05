@@ -67,95 +67,173 @@ function loadFixBlocks() {
   return blocks;
 }
 
+// --- Autofix ---
+// Each rule rewrites ONE line: a line the scanner reports for that id right
+// now (re-scanned, so stale line numbers after an edit do not matter, and a
+// suppressed line is never touched). A rule returns the new line, or null
+// when it cannot fix that line safely — the finding then stays manual.
+//
+// The previous engine ran a global regex over the whole file. It rewrote
+// lines that were never flagged (Math.random() in a dice roll became a hex
+// string, so the roll was NaN), put timeout= inside a nested call
+// (requests.get(build_url(host, timeout=10.0))), and appended Python keyword
+// syntax to JavaScript calls.
+
+const JS_EXT = new Set(['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs']);
+const PY_EXT = new Set(['py']);
+const extOf = f => path.extname(f).slice(1).toLowerCase();
+
+// Index of the ')' that closes the '(' at `open`, skipping strings; -1 when
+// the call does not close on this line.
+function closeParen(line, open) {
+  let depth = 0;
+  for (let i = open; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"' || c === "'" || c === '`') {
+      let j = i + 1;
+      while (j < line.length && line[j] !== c) j += line[j] === '\\' ? 2 : 1;
+      i = j;
+      continue;
+    }
+    if (c === '(') depth++;
+    else if (c === ')' && --depth === 0) return i;
+  }
+  return -1;
+}
+
+// Add an argument before the closing paren of the first call matching `callRe`.
+function addArgument(line, callRe, arg, alreadyRe) {
+  const m = callRe.exec(line);
+  if (!m) return null;
+  const open = m.index + m[0].length - 1;
+  const close = closeParen(line, open);
+  if (close === -1) return null;
+  const inside = line.slice(open + 1, close);
+  if (alreadyRe.test(inside)) return null;
+  const sep = inside.trim() ? ', ' : '';
+  return line.slice(0, close).replace(/\s*$/, '') + sep + arg + line.slice(close);
+}
+
 const AUTOFIX_RULES = {
-  'weak-rng': [
-    {
-      regex: /Math\.random\s*\(\)/g,
-      replace: "require('crypto').randomBytes(16).toString('hex')",
-    },
-  ],
-  'set-hide-error': [
-    {
-      regex: /set\s+\+e/g,
-      replace: 'set -euo pipefail',
-    },
-  ],
-  'jwt-no-verify': [
-    {
-      regex: /verify\s*=\s*False/g,
-      replace: 'verify=True',
-    },
-    {
-      regex: /verifySignature\s*:\s*false/g,
-      replace: 'verifySignature: true',
-    },
-  ],
-  'llm-unbounded-tokens': [
-    {
-      regex: /(client|openai|anthropic)\.(chat|completions|messages)\.create\s*\(([^)]+)\)/g,
-      replace: (match, p1, p2, p3) => {
-        if (p3.includes('max_tokens') || p3.includes('maxOutputTokens')) return match;
-        return `${p1}.${p2}.create(${p3.trim()}, max_tokens=1000)`;
-      },
-    },
-  ],
-  'sbd-legacy-tls': [
-    {
-      regex: /PROTOCOL_TLSv1(_[01])?/g,
-      replace: 'PROTOCOL_TLS_CLIENT',
-    },
-    {
-      regex: /min_version\s*=\s*ssl\.TLSVersion\.TLSv1(_[01])?/g,
-      replace: 'min_version=ssl.TLSVersion.TLSv1_3',
-    },
-  ],
-  'iot-debug-interface': [
-    {
-      regex: /(DEBUG_UART|ENABLE_JTAG|CONFIG_BOOT_SWD)\s*[:=]\s*(1|true|TRUE|enabled)/g,
-      replace: '$1 = false',
-    },
-    {
-      regex: /(#define\s+(?:DEBUG_UART|ENABLE_JTAG|CONFIG_BOOT_SWD)\s+)1/g,
-      replace: '$1 0',
-    },
-  ],
-  'sbd-missing-timeout': [
-    {
-      regex: /(requests\.(?:get|post|put|delete|patch)\s*\([^)]+)(\))/g,
-      replace: (match, p1, p2) => {
-        if (p1.includes('timeout')) return match;
-        return `${p1}, timeout=10.0${p2}`;
-      },
-    },
-  ],
+  // Same type as Math.random() (a float in [0, 1)), from the CSPRNG — so
+  // Math.floor(Math.random() * 6) keeps working.
+  'weak-rng': (line, ext) => {
+    if (JS_EXT.has(ext)) {
+      if (!/Math\.random\s*\(\s*\)/.test(line)) return null;
+      return line.replace(/Math\.random\s*\(\s*\)/g, "(require('crypto').randomBytes(6).readUIntBE(0, 6) / 2 ** 48)");
+    }
+    if (PY_EXT.has(ext)) {
+      if (!/\brandom\.(random|randint|choice|randrange|uniform|sample|shuffle)\s*\(/.test(line)) return null;
+      return line.replace(/\brandom\.(random|randint|choice|randrange|uniform|sample|shuffle)\s*\(/g, 'secrets.SystemRandom().$1(');
+    }
+    return null;
+  },
+  'jwt-no-verify': (line) => {
+    if (!/jwt|decode|verify/i.test(line)) return null;
+    const out = line
+      .replace(/(["']?verify_signature["']?\s*:\s*)False/g, '$1True')
+      .replace(/\bverify\s*=\s*False/g, 'verify=True')
+      .replace(/verifySignature\s*:\s*false/g, 'verifySignature: true');
+    return out === line ? null : out;
+  },
+  'llm-unbounded-tokens': (line, ext) => {
+    const already = /max_tokens|max_completion_tokens|max_output_tokens|maxOutputTokens|maxTokens/;
+    const call = /\b(client|openai|anthropic)\s*\.\s*(chat\s*\.\s*completions|completions|messages|responses)\s*\.\s*create\s*\(/;
+    if (PY_EXT.has(ext)) return addArgument(line, call, 'max_tokens=1024', already);
+    if (JS_EXT.has(ext)) {
+      // Only an inline options object can take the key safely.
+      const m = call.exec(line);
+      if (!m) return null;
+      const open = m.index + m[0].length - 1;
+      const close = closeParen(line, open);
+      if (close === -1) return null;
+      const inside = line.slice(open + 1, close);
+      if (already.test(inside) || !/^\s*\{/.test(inside)) return null;
+      const brace = line.indexOf('{', open);
+      return line.slice(0, brace + 1) + ' max_tokens: 1024,' + line.slice(brace + 1);
+    }
+    return null;
+  },
+  'sbd-legacy-tls': (line, ext) => {
+    if (!PY_EXT.has(ext)) return null;
+    const out = line
+      .replace(/PROTOCOL_TLSv1(_[01])?\b/g, 'PROTOCOL_TLS_CLIENT')
+      .replace(/(min(imum)?_version\s*=\s*ssl\.TLSVersion\.)TLSv1(_[01])?\b/g, '$1TLSv1_2');
+    return out === line ? null : out;
+  },
+  'iot-debug-interface': (line) => {
+    const out = line
+      .replace(/\b(DEBUG_UART|ENABLE_JTAG|CONFIG_BOOT_SWD)(\s*[:=]\s*)(1|true|TRUE|enabled)\b/g, '$1$2false')
+      .replace(/(#define\s+(?:DEBUG_UART|ENABLE_JTAG|CONFIG_BOOT_SWD)\s+)1\b/g, '$10');
+    return out === line ? null : out;
+  },
+  'sbd-missing-timeout': (line, ext) => {
+    if (!PY_EXT.has(ext)) return null;
+    return addArgument(line, /\brequests\s*\.\s*(get|post|put|delete|patch|head|request)\s*\(/, 'timeout=10', /\btimeout\s*=/);
+  },
 };
+
+// `import secrets` for the Python weak-rng rewrite, after any shebang,
+// encoding line, module docstring and __future__ imports.
+function ensurePythonImport(lines, mod) {
+  if (lines.some(l => new RegExp(`^\\s*(import\\s+${mod}\\b|from\\s+${mod}\\s+import)`).test(l))) return -1;
+  let at = 0;
+  while (at < lines.length && /^#/.test(lines[at])) at++;
+  if (at < lines.length && /^\s*[rRuU]?("""|''')/.test(lines[at])) {
+    const q = lines[at].match(/("""|''')/)[1];
+    const rest = lines[at].slice(lines[at].indexOf(q) + 3);
+    if (!rest.includes(q)) { at++; while (at < lines.length && !lines[at].includes(q)) at++; }
+    at++;
+  }
+  while (at < lines.length && /^from\s+__future__\s+import/.test(lines[at])) at++;
+  lines.splice(at, 0, `import ${mod}`);
+  return at; // 0-based line the import went in at
+}
+
+let _scanner = null;
+function scanner() {
+  if (!_scanner) {
+    const s = require('./scan');
+    _scanner = { matchContent: s.matchContent, patterns: s.loadPatterns() };
+  }
+  return _scanner;
+}
 
 function applyAutofix(file, ruleId, dryRun) {
   if (!fs.existsSync(file)) return false;
-  const rules = AUTOFIX_RULES[ruleId];
-  if (!rules) return false;
+  const rule = AUTOFIX_RULES[ruleId];
+  if (!rule) return false;
+  const ext = extOf(file);
+  const content = fs.readFileSync(file, 'utf8');
+  const eol = content.includes('\r\n') ? '\r\n' : '\n';
+  const lines = content.split(/\r?\n/);
+  const { matchContent, patterns } = scanner();
+  const targets = [...new Set(matchContent(content, file, patterns)
+    .filter(h => h.id === ruleId).map(h => h.line))];
 
-  let content = fs.readFileSync(file, 'utf8');
-  let modified = content;
-
-  for (const r of rules) {
-    if (typeof r.replace === 'function') {
-      modified = modified.replace(r.regex, r.replace);
-    } else {
-      modified = modified.replace(r.regex, r.replace);
-    }
+  const changes = [];
+  for (const n of targets) {
+    const before = lines[n - 1];
+    if (before === undefined) continue;
+    const after = rule(before, ext);
+    if (after == null || after === before) continue;
+    lines[n - 1] = after;
+    changes.push({ n, before, after });
   }
+  if (changes.length === 0) return false;
 
-  if (modified !== content) {
-    if (!dryRun) {
-      fs.writeFileSync(file, modified);
-      console.log(`✅ [Autofix Applied] ${ruleId} -> ${path.relative(process.cwd(), file)}`);
-    } else {
-      console.log(`🔍 [Autofix Dry-Run] ${ruleId} -> ${path.relative(process.cwd(), file)}`);
-    }
-    return true;
+  const importAt = ruleId === 'weak-rng' && PY_EXT.has(ext) ? ensurePythonImport(lines, 'secrets') : -1;
+
+  const rel = path.relative(process.cwd(), file) || file;
+  console.log(`${dryRun ? '🔍 [Autofix Dry-Run]' : '✅ [Autofix Applied]'} ${ruleId} -> ${rel}`);
+  if (importAt >= 0) console.log(`  + ${importAt + 1}: import secrets`);
+  for (const c of changes) {
+    const n = importAt >= 0 && importAt < c.n ? c.n + 1 : c.n;
+    console.log(`  - ${n}: ${c.before.trim()}`);
+    console.log(`  + ${n}: ${c.after.trim()}`);
   }
-  return false;
+  if (!dryRun) fs.writeFileSync(file, lines.join(eol));
+  return true;
 }
 
 function main() {

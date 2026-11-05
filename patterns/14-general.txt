@@ -1,6 +1,6 @@
 # OWASP SCP - General Coding Practices [202-213]
 # id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
-# POSIX ERE only - BSD grep has no -P and fails silently on it.
+# JavaScript RegExp, one line; keep lookarounds to the exclusion column (see CONTRIBUTING.md).
 
 insecure-deserialization	*	pickle\.loads?\s*\(	use JSON or a safe format; validate shape after parsing		critical
 insecure-deserialization	*	cPickle\.loads?\s*\(			critical
@@ -47,3 +47,7 @@ llm-unsafe-exec	js,ts	(eval|new\s+Function)\s*\(\s*(response|completion|result|o
 
 # React Server Components & Server Actions Security
 rsc-unvalidated-action	js,ts	['"]use\s+server['"][\s\S]*?(export\s+)?(async\s+)?function\s+\w+\s*\([^)]*\)	!z\.|parse|validate|safeParse	validate all Server Action arguments using a schema parser (e.g. Zod) before processing	high
+eval	js,ts	\bvm\.(runInNewContext|runInThisContext|runInContext|compileFunction)\s*\(|\bnew\s+vm\.Script\s*\(	the vm module is not a sandbox; never run request data as code		critical
+prototype-pollution	js,ts	\b(Object\.assign|_\.merge|_\.mergeWith|_\.defaultsDeep|lodash\.merge|deepmerge|\$\.extend)\s*\([^;]*req\.(body|query|params)	copy only allowlisted keys; reject __proto__, constructor and prototype		high
+xxe	py	XMLParser\s*\([^)]*(resolve_entities\s*=\s*True|no_network\s*=\s*False)	disable entity resolution, or parse with defusedxml		high
+xxe	java,kt	\b(DocumentBuilderFactory|SAXParserFactory|XMLInputFactory|TransformerFactory|SchemaFactory)\.newInstance\s*\(	!!FEATURE_SECURE_PROCESSING|disallow-doctype-decl|SUPPORT_DTD|IS_SUPPORTING_EXTERNAL_ENTITIES|ACCESS_EXTERNAL_DTD|external-general-entities	disable DTDs: setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)	high

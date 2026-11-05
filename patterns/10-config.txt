@@ -1,6 +1,6 @@
 # OWASP SCP - System Configuration [151-166]
 # id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
-# POSIX ERE only - BSD grep has no -P and fails silently on it.
+# JavaScript RegExp, one line; keep lookarounds to the exclusion column (see CONTRIBUTING.md).
 # Targets config, container, and CI files - not application source.
 
 debug-on	*	(DEBUG|debug)\s*[:=]\s*(True|true|1|on)["']?\s*$	set to false for production		low

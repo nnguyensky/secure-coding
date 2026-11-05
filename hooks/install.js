@@ -15,7 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const os = require('os');
-const { execSync, exec } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
 const DIR = path.resolve(__dirname, '..');
 
@@ -716,10 +716,12 @@ async function runInteractive() {
     if (process.env.SECURE_CODING_NO_SELFTEST) {
       console.log(`\n${YELLOW}ℹ️  Self-check skipped (SECURE_CODING_NO_SELFTEST).${NC}`);
     } else if (fs.existsSync(syncScript) && fs.existsSync(testScript)) {
-      execSync(`node "${syncScript}"`, { stdio: 'ignore' });
+      // execFile with an argument list: no shell, so a quote or $ in the
+      // install path cannot break out of the command.
+      execFileSync(process.execPath, [syncScript], { stdio: 'ignore' });
         // Report the real count and only claim PASSED when it is. execSync
         // throws on a non-zero exit, so a broken suite reaches the catch.
-        const out = execSync(`node "${testScript}"`, { encoding: 'utf8' });
+        const out = execFileSync(process.execPath, [testScript], { encoding: 'utf8' });
         const m = out.match(/pass=(\d+)\s+fail=(\d+)/);
         if (m && m[2] === '0') {
         console.log(`\n${GREEN}✅ Self-check: all ${m[1]} tests and pattern validations PASSED.${NC}`);
@@ -745,9 +747,7 @@ async function runInteractive() {
   if (launchUi) {
     const configScript = path.join(DIR, 'hooks', 'config.js');
     if (fs.existsSync(configScript)) {
-      const start = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
-      const wizardHtml = path.join(DIR, 'reports', 'config-wizard.html');
-      exec(`${start} "${wizardHtml}"`);
+      require('./config').openPath(path.join(DIR, 'reports', 'config-wizard.html'));
     }
   }
 }
@@ -795,9 +795,7 @@ function runNonInteractive(args) {
   console.log(`\n${GREEN}${BOLD}🎉 Installation Complete!${NC}\n`);
 
   if (launchUi) {
-    const wizardHtml = path.join(DIR, 'reports', 'config-wizard.html');
-    const start = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
-    exec(`${start} "${wizardHtml}"`);
+    require('./config').openPath(path.join(DIR, 'reports', 'config-wizard.html'));
   }
 }
 

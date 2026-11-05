@@ -1,6 +1,6 @@
 # OWASP SCP - Error Handling [107-130] / OWASP Top 10:2025 A10 Mishandling of Exceptional Conditions
 # id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
-# POSIX ERE only - BSD grep has no -P and fails silently on it.
+# JavaScript RegExp, one line; keep lookarounds to the exclusion column (see CONTRIBUTING.md).
 swallowed-exception	py	except[^:\n]*:[ \t]*(\n[ \t]+)?(pass|\.\.\.)[ \t]*(\n|$)		never swallow an exception — log it and fail closed, or let it propagate	high
 swallowed-exception	js,ts,java,kt,cs,php	catch\s*\([^)]*\)\s*\{\s*\}		empty catch block hides the failure — log and re-throw, or handle explicitly	high
 swallowed-exception	rb	rescue[^\n]*\n\s*end		empty rescue hides the failure — log and re-raise, or handle explicitly	high

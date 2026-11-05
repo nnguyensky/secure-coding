@@ -1,6 +1,6 @@
 # OWASP SCP - Session Management [58-76]
 # id <TAB> extensions (* = any) <TAB> regex <TAB> !exclude <TAB> fix hint  (ONE regex: !a|b|c, never !a|!b|!c)
-# POSIX ERE only - BSD grep has no -P and fails silently on it.
+# JavaScript RegExp, one line; keep lookarounds to the exclusion column (see CONTRIBUTING.md).
 
 cookie	*	httpOnly\s*:\s*false	set httpOnly: true to prevent XSS cookie theft		high
 cookie	*	secure\s*:\s*false	set secure: true to require HTTPS		high

@@ -95,7 +95,7 @@ Run verification to confirm zero open issues:
    used in a file, HTTP, process, or query call is reported as `taint-*`.
    Disable with `"taintTracking": false` in `.securecodingrc.json`.
 2. **Review Guidance:** Fix any flagged patterns using the provided `When / Wrong / Right / Watch` blocks.
-3. **Autofix:** Run `node hooks/fix.js --apply` to automatically refactor common deterministic issues.
+3. **Autofix:** Run `node hooks/fix.js --dry-run` to see the line-by-line change, then `--apply`. Only a handful of rules are automatic; everything else prints the manual fix.
 4. **Audit Dependencies:** `node hooks/audit.js` (scans package lockfiles).
 5. **Quality Check:** `node hooks/clean.js <path>` (or `--all` for the whole repo).
 6. **Done Gate:** Run `node hooks/summary.js && node hooks/audit.js && node hooks/gate.js --check`.
@@ -223,8 +223,10 @@ Three SQL injections in one file are **three findings**, tracked separately by
 so a partial fix can never silently clear a live vulnerability.
 
 - Scan output, `stats.js`, and SARIF all report every occurrence with its line.
-- `fix.js --apply` still runs **once per file per id**: an autofix rewrites the
-  whole file, so applying it per occurrence would be redundant.
+- `fix.js --apply` rewrites **only the lines the scanner reports right now** for
+  that id (it re-scans first, so stale line numbers do not matter). Unflagged
+  and suppressed lines are never touched; a line it cannot rewrite safely is
+  left for a manual fix.
 - Occurrences per id per file are capped at **20** (override with
   `SECURE_CODING_MAX_OCCURRENCES`) so a generated or minified file cannot flood
   the report. The finding is still reported; only the line list is truncated.

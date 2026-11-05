@@ -106,6 +106,7 @@ function main() {
       if (patternId && p.id !== patternId) continue;
       if (re && p.re.source !== re.source) continue;
       if (p.exts !== '*' && !p.exts.split(',').includes(ext)) continue;
+      if (p.exclFileRe && p.exclFileRe.test(content)) continue;
 
       for (let i = 0; i < lines.length; i++) {
         if (!p.re.test(lines[i])) continue;
@@ -161,19 +162,24 @@ function loadPatterns() {
       const extsLower = exts ? exts.toLowerCase() : exts;
       // 4th col: exclusion (!re) or hint; 5th col: hint if 4th is exclusion
       let exclRe = null;
+      let exclFileRe = null;
       let hint = '';
       if (cols.length >= 4 && cols[3]) {
-        if (cols[3].startsWith('!')) {
+        if (cols[3].startsWith('!!')) {
+          // File-level exclusion, as in scan.js.
+          try { exclFileRe = new RegExp(cols[3].slice(2)); } catch (e) { exclFileRe = null; }
+          if (cols[4]) hint = cols[4];
+        } else if (cols[3].startsWith('!')) {
           try { exclRe = new RegExp(cols[3].slice(1)); } catch (e) { exclRe = null; }
           if (cols[4]) hint = cols[4];
         } else {
           hint = cols[3];
         }
       }
-      if (!hint && cols[5]) hint = cols[5];
+      if (!hint && cols[5] && !/^(critical|high|medium|low)$/i.test(cols[5].trim())) hint = cols[5];
       let re;
       try { re = new RegExp(regex); } catch (e) { continue; }
-      out.push({ id, exts: extsLower, re, exclRe, section, hint });
+      out.push({ id, exts: extsLower, re, exclRe, exclFileRe, section, hint });
     }
   }
   return out;

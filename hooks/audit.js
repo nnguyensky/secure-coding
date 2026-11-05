@@ -8,7 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath, writeState, helpRequested, loadConfig } = require('./config');
+const { statePath, writeState, helpRequested, loadConfig, normalizeSeverity } = require('./config');
 const { execFileSync } = require('child_process');
 
 // --help must print help, never run the tool. reset.js used to wipe the
@@ -313,6 +313,10 @@ function main() {
     }
 
     const findings = eco.parse(raw);
+    for (const f of findings) {
+      f.reportedSeverity = f.severity;
+      f.severity = normalizeSeverity(f.severity);
+    }
     results.push(...findings);
   }
 
@@ -339,13 +343,10 @@ function main() {
   }
 
   const failThreshold = (cfg && cfg.audit && cfg.audit.failOnAdvisory) || (cfg && cfg.failOn) || 'high';
-  const sevRank = { critical: 4, high: 3, medium: 2, low: 1, vulnerable: 3, unknown: 1 };
-  const minFailRank = sevRank[failThreshold.toLowerCase()] || 3;
+  const sevRank = { critical: 4, high: 3, medium: 2, low: 1 };
+  const minFailRank = sevRank[normalizeSeverity(failThreshold)] || 3;
 
-  const hasFailing = results.some(r => {
-    const rank = sevRank[(r.severity || 'unknown').toLowerCase()] || 1;
-    return rank >= minFailRank;
-  });
+  const hasFailing = results.some(r => (sevRank[r.severity] || 3) >= minFailRank);
 
   if (hasFailing) {
     process.exit(2);

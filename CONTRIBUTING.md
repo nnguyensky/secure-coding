@@ -22,18 +22,28 @@ deser	py	pickle\.loads?\s*\(	use JSON or a safe format	critical
 |---|----------|---------|
 | 1 | yes | Pattern id (unique, lowercase, hyphenated) |
 | 2 | yes | Extensions: `*` for all, or comma list (`py,js,go`) |
-| 3 | yes | Regex (POSIX ERE, no lookaheads) |
-| 4 | no | Exclusion regex (starts with `!`) or fix hint |
+| 3 | yes | Regex (JavaScript `RegExp`, one line) |
+| 4 | no | Exclusion regex (`!re` for the line, `!!re` for the whole file) or fix hint |
 | 5 | no | Fix hint (when column 4 is an exclusion) |
 | 6 | no | Severity: `critical`, `high`, `medium`, `low` |
 
 **Rules:**
 
-- POSIX ERE only. No `(?=...)`, `(?!...)`, `(?<=...)`, `(?<!...)`.
-  BSD grep and macOS don't support them. Use the exclusion column.
+- Keep the regex column to plain syntax — no lookarounds. If you need "but
+  not when…", put it in the exclusion column, where lookarounds are allowed.
 - Precision over recall. If the regex fires on safe code, it's wrong.
-- Test against the full file content, not individual lines.
-- The exclusion column (`!re`) skips files matching that regex.
+- Each line of the file is tested on its own. A regex that can only match
+  across lines (e.g. `ingress\s*\{[^}]*0\.0\.0\.0/0`) falls back to the whole
+  file, anchored at the first line it touches.
+- `!re` skips a matching line. `!!re` skips the whole file when the fix lives
+  on another line — an XML factory hardened with `setFeature(...)` later on.
+- A call-shaped regex (it contains `\(`, no quote, no `://`, not a secret) is
+  matched only in code: a hit inside a string literal or a comment is
+  ignored. A regex that mentions a quote is about string contents and sees
+  inside literals.
+- Never `!a|!b` in the exclusion column — that is two negations; write `!a|b`.
+- Use [0-9] rather than `\d` only if you want the pattern to stay readable
+  in `grep -E` for manual checks; the scanner itself accepts both.
 
 ## 2. Add a fix block
 
