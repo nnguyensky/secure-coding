@@ -22,6 +22,7 @@ const SBOM_SCRIPT = path.join(ROOT_DIR, 'hooks', 'sbom.js');
 const SUMMARY_SCRIPT = path.join(ROOT_DIR, 'hooks', 'summary.js');
 const DEPS_SCRIPT = path.join(ROOT_DIR, 'hooks', 'deps.js');
 const HISTORY_SCRIPT = path.join(ROOT_DIR, 'hooks', 'history.js');
+const SERVE_SCRIPT = path.join(ROOT_DIR, 'hooks', 'serve.js');
 const FIXES_FILE = path.join(ROOT_DIR, 'checks', 'fixes.md');
 const CHECKS_DIR = path.join(ROOT_DIR, 'checks');
 
@@ -259,6 +260,14 @@ const TOOLS = [
         allRefs: { type: 'boolean', description: 'Every branch and tag, not just the current branch.' },
       },
     },
+  },
+  {
+    name: 'open_dashboard',
+    description: 'Starts the local security dashboard (React, 3D views of the findings, live rescan) and returns its URL. It listens on 127.0.0.1 only and the URL carries a one-time token; give the link to the user rather than fetching it.',
+    inputSchema: {
+      type: 'object',
+      properties: { open: { type: 'boolean', description: 'Also open it in the default browser (default false).' } },
+    },
   }
 ];
 
@@ -457,6 +466,17 @@ function handleToolCall(name, args) {
       if (args.allRefs) hArgs.push('--all-refs');
       const res = run(HISTORY_SCRIPT, hArgs, { timeout: AUDIT_TIMEOUT_MS });
       return { content: [{ type: 'text', text: (res.stdout || res.stderr || 'No output.').trim() }], isError: res.status !== 0 && res.status !== 2 };
+    }
+
+    case 'open_dashboard': {
+      // serve.js --background starts a detached server (it stops itself after
+      // an hour without requests) and prints its URL.
+      const res = run(SERVE_SCRIPT, ['--background', ...(args.open ? [] : ['--no-open'])], { timeout: 20000 });
+      const url = (res.stdout || '').trim();
+      if (res.status !== 0 || !/^http:\/\/127\.0\.0\.1:\d+\//.test(url)) {
+        return { content: [{ type: 'text', text: (res.stderr || 'The dashboard did not start.').trim() }], isError: true };
+      }
+      return { content: [{ type: 'text', text: `Dashboard: ${url}\nLocal only. The token in the link is the key to it — share it with the user, not elsewhere. It stops after an hour without use.` }] };
     }
 
     default:

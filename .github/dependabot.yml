@@ -17,3 +17,13 @@ updates:
     labels:
       - "dependencies"
       - "security"
+
+  # The dashboard's build toolchain (React, Vite). Only the built
+  # reports/dashboard.html ships; CI rebuilds it and checks it matches.
+  - package-ecosystem: "npm"
+    directory: "/dashboard"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "security"

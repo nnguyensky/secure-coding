@@ -38,6 +38,24 @@ jobs:
           git config --global user.name ci
           node hooks/test.js
 
+  # reports/dashboard.html is a build output committed so the package needs no
+  # runtime dependencies. Rebuild it from dashboard/ with the locked versions
+  # and fail if it differs: the shipped bundle must be what the source says.
+  dashboard:
+    name: Dashboard bundle matches source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Build
+        run: npm --prefix dashboard ci --ignore-scripts --no-audit --no-fund && npm --prefix dashboard run build
+      - name: Bundle is up to date
+        run: git diff --exit-code -- reports/dashboard.html
+
   security-audit:
     name: OWASP Secure Coding & Dependency Audit
     runs-on: ubuntu-latest

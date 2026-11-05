@@ -10,7 +10,7 @@
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-626%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-635%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -33,7 +33,7 @@ carry findings. What static analysis genuinely cannot see — a missing ownershi
 check, an absent guard, a fail-open `catch` — it asks as four written questions
 before the change lands.
 
-13 language templates · 403 patterns mapped to CWE and OWASP Top 10:2025 · 626
+13 language templates · 403 patterns mapped to CWE and OWASP Top 10:2025 · 635
 self-tests · zero dependencies.
 
 ## 💡 The Inverted Architecture
@@ -200,6 +200,32 @@ matching `"deps": { "private": ["@acme/*", "acme-*"] }`, npm scopes that
 default registry), and all Python names when pip uses a private index
 (`--index-url`, `PIP_INDEX_URL`, `pip.conf`). These are listed as `NOT SENT`.
 `SECURE_CODING_DEPS_OFFLINE=1` or `"deps": { "enabled": false }` sends nothing.
+
+### The dashboard
+
+```bash
+node hooks/serve.js                 # live: opens http://127.0.0.1:<port>/#token=…
+node hooks/report.js --dashboard    # one offline HTML file with this run's data
+```
+
+A React 19 view of the results: the overall posture score, a 3D "risk
+skyline" of open findings by section (drag to turn, click a tower to filter),
+findings over time, dependency advisories, and a searchable list grouped by
+file. Each finding opens its fix — wrong code, right code, what to watch, CWE.
+In live mode it refreshes every few seconds and can rescan the project.
+
+It is built once into `reports/dashboard.html`, a single self-contained file,
+so the package still installs **no dependencies** and the page works offline.
+The source is in `dashboard/` (`npm run dashboard:build`); CI rebuilds it and
+fails if the committed file does not match.
+
+The live server shows source snippets, so it is reachable only by you: it
+listens on `127.0.0.1`, every API call needs a random per-run token (passed
+in the URL fragment, which is never sent to a server or logged), requests
+naming any other `Host` are refused (DNS rebinding), cross-site posts are
+refused, and the page runs under a strict Content-Security-Policy. Its only
+action is a rescan; it never writes source files. Agents can start it with
+the `open_dashboard` MCP tool.
 
 ### Secrets already in history
 
@@ -396,7 +422,7 @@ node install.js --agent all --mcp
 ### 2. Verify it works
 
 ```bash
-node hooks/test.js     # expect: pass=626 fail=0
+node hooks/test.js     # expect: pass=635 fail=0
 node hooks/sync.js     # expect: 0 errors, 0 warnings
 ```
 
@@ -529,7 +555,7 @@ pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js
 | | `node hooks/detect.js` | Reports which languages a project uses. |
 | | `node hooks/grep.js <pattern-id> [path]` | Finds every occurrence of one rule across the project. |
 | | `node hooks/reset.js` | Clears findings state for a new session. |
-| | `node hooks/test.js` | Executes the full 626-test self-check suite. |
+| | `node hooks/test.js` | Executes the full 635-test self-check suite. |
 
 ---
 
@@ -713,7 +739,7 @@ MCP lets an IDE or agent call the scanner directly instead of shelling out to
 the CLI. Same engine, same results — it returns findings as structured data the
 agent can act on.
 
-`secure-coding` includes a native, zero-dependency JSON-RPC 2.0 MCP server ([`mcp/server.js`](mcp/server.js)). It gives AI agents direct access to 12 security tools without running subshells or polluting chat context, and serves the guidance itself as MCP **resources** (`secure-coding://skill`, `secure-coding://checks/<name>`, `secure-coding://fix/<id>`) and two **prompts** (`secure_design_review`, `fix_finding`).
+`secure-coding` includes a native, zero-dependency JSON-RPC 2.0 MCP server ([`mcp/server.js`](mcp/server.js)). It gives AI agents direct access to 13 security tools without running subshells or polluting chat context, and serves the guidance itself as MCP **resources** (`secure-coding://skill`, `secure-coding://checks/<name>`, `secure-coding://fix/<id>`) and two **prompts** (`secure_design_review`, `fix_finding`).
 
 ### 🛠️ Available MCP Tools
 
@@ -731,6 +757,7 @@ agent can act on.
 | `explain_finding` | Why one finding id is dangerous, the wrong and right code, and its CWE/OWASP mapping. | *"Explain taint-ssrf."* |
 | `check_dependencies` | Checks packages a change adds: missing (hallucinated), brand new, install scripts. | *"Do the packages I just added actually exist?"* |
 | `scan_git_history` | Finds secrets in past commits, including ones already deleted from the code. | *"Has a key ever been committed to this repo?"* |
+| `open_dashboard` | Starts the local dashboard and returns its token-protected link. | *"Show me the scan results."* |
 
 ---
 
@@ -819,7 +846,7 @@ trust a change:
 | `node hooks/sync.js` | Patterns, templates and remediation blocks agree with each other. |
 | `node hooks/coverage.js` | All 213 OWASP SCP items are accounted for. |
 
-Verify all 626 test assertions, pattern compilation, secret masking, and MCP tools:
+Verify all 635 test assertions, pattern compilation, secret masking, and MCP tools:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js

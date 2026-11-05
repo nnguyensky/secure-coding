@@ -1,6 +1,6 @@
 {
   "name": "secure-coding",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Scans every file an AI agent writes against 403 OWASP, Secure-by-Design and CWE patterns in ~1ms. Blocks commits on findings, and on the ownership and authorization questions no pattern can answer.",
   "keywords": [
     "security",
@@ -45,7 +45,8 @@
     "secure-coding-fix": "./hooks/fix.js",
     "secure-coding-config": "./hooks/config.js",
     "secure-coding-deps": "./hooks/deps.js",
-    "secure-coding-history": "./hooks/history.js"
+    "secure-coding-history": "./hooks/history.js",
+    "secure-coding-dashboard": "./hooks/serve.js"
   },
   "files": [
     "AGENTS.md",
@@ -59,6 +60,7 @@
     "templates/",
     "reports/security.html",
     "reports/config-wizard.html",
+    "reports/dashboard.html",
     "mcp/",
     "install.js",
     "install.sh"
@@ -74,7 +76,9 @@
     "fix": "node hooks/fix.js",
     "sbom": "node hooks/sbom.js --format cyclonedx --ai --vex",
     "mcp": "node mcp/server.js",
-    "wizard": "node hooks/config.js --ui"
+    "wizard": "node hooks/config.js --ui",
+    "dashboard": "node hooks/serve.js",
+    "dashboard:build": "npm --prefix dashboard ci && npm --prefix dashboard run build"
   },
   "engines": {
     "node": ">=18.0.0"

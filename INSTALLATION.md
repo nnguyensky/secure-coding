@@ -6,7 +6,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A521.0.0-green?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![MCP Protocol](https://img.shields.io/badge/MCP%202024--11--05-Compatible-purple?style=for-the-badge&logo=probot&logoColor=white)](mcp/server.js)
-[![Tests](https://img.shields.io/badge/Tests-626%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-635%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 
 <p align="center">
   <a href="#-quickstart-options">⚡ Quickstart</a> •
@@ -88,7 +88,7 @@ node hooks/config.js --ui
 
 ## 🔌 Model Context Protocol (MCP) Setup
 
-`secure-coding` includes a native, zero-dependency JSON-RPC 2.0 MCP server ([`mcp/server.js`](mcp/server.js)) exposing 12 standard security tools directly to AI editors and agent runtimes:
+`secure-coding` includes a native, zero-dependency JSON-RPC 2.0 MCP server ([`mcp/server.js`](mcp/server.js)) exposing 13 standard security tools directly to AI editors and agent runtimes:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -106,6 +106,7 @@ node hooks/config.js --ui
 │  • explain_finding           • Why a finding matters, wrong vs right code   │
 │  • check_dependencies        • Catch hallucinated or brand-new packages     │
 │  • scan_git_history          • Secrets in past commits, even deleted ones   │
+│  • open_dashboard            • Local 3D dashboard, token-protected link     │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 It also serves the guidance as MCP resources (`secure-coding://skill`,
@@ -336,7 +337,7 @@ repos:
 
 ## 🧪 Verification
 
-Verify all 626 test fixtures, pattern compilations, secret masking, and MCP tool handlers:
+Verify all 635 test fixtures, pattern compilations, secret masking, and MCP tool handlers:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js
