@@ -3326,6 +3326,67 @@ good('ux_queryselector', 'js', 'document.querySelector(req.query.sel);');
   try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
 })();
 
+// --- every pattern id has a test (2026-11 review: 19 had none) ---
+bad('cov_autocomplete', 'html', '<input type="password" name="pw" autocomplete="on">', 'autocomplete-on');
+good('cov_autocomplete_ok', 'html', '<input type="password" name="pw" autocomplete="new-password">');
+bad('cov_upload_exec', 'conf', 'location /uploads { fastcgi_pass php; }', 'upload-exec');
+bad('cov_api2', 'js', 'app.get("/admin/users", function (req, res) { res.json(users); });', 'API-2');
+bad('cov_api4', 'js', 'const all = await prisma.user.findMany();', 'API-4');
+bad('cov_api5', 'js', 'router.delete("/users/:id", handler);', 'API-5');
+good('cov_api5_ok', 'js', 'router.delete("/users/:id", requireAuth, handler);');
+bad('cov_api6', 'js', 'app.use(express.json());', 'API-6');
+good('cov_api6_ok', 'js', 'app.use(express.json({ limit: "100kb" }));');
+bad('cov_api7', 'js', 'const rows = await repo.find({ pagination: false });', 'API-7');
+bad('cov_api10', 'py', 'data = requests.get(url, timeout=5).json()', 'API-10');
+bad('cov_c4', 'yaml', 'securityContext:\n  readOnlyRootFilesystem: false\n', 'C-4');
+good('cov_c4_ok', 'yaml', 'securityContext:\n  readOnlyRootFilesystem: true\n');
+bad('cov_c9', 'yaml', 'spec:\n  automountServiceAccountToken: true\n', 'C-9');
+bad('cov_k8s_np', 'yaml', 'networkPolicy: {}\n', 'k8s-np');
+good('cov_k8s_np_ok', 'yaml', 'apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: deny-all\n');
+bad('cov_k8s_psa', 'yaml', 'metadata:\n  labels:\n    pod-security.kubernetes.io/enforce: privileged\n', 'k8s-psa');
+bad('cov_k8s_seccomp', 'yaml', 'securityContext:\n  seccompProfile: {}\n', 'k8s-seccomp');
+bad('cov_logging_off', 'py', 'logging.disable(logging.CRITICAL)', 'logging-disabled');
+bad('cov_logging_level', 'js', 'const cfg = { logLevel: "silent" };', 'logging-disabled');
+bad('cov_auth_no_log', 'js', 'try { verify(t); } catch (e) { return res.status(401).end(); }', 'auth-no-log');
+good('cov_auth_no_log_ok', 'js', 'try { verify(t); } catch (e) { log.warn("bad token"); return res.status(401).end(); }');
+bad('cov_log_truncated', 'js', 'logger.info(event.message.slice(0, 20));', 'log-truncated');
+bad('cov_docker_digest', 'Dockerfile', 'FROM node:20-alpine\n', 'docker-digest');
+good('cov_docker_digest_ok', 'Dockerfile', 'FROM node:20-alpine@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n');
+bad('cov_npm_audit', 'yml', 'run: npm install --production\n', 'npm-audit');
+good('cov_npm_ignore_scripts_ok', 'yml', 'run: npm ci --ignore-scripts\n');
+bad('cov_temp_race', 'sh', 'f=$(mktemp -u)\n', 'temp-race');
+
+// --- the gaps found by the language x vulnerability matrix ---
+bad('gap_java_sqli_quotes', 'java', 'stmt.executeQuery("SELECT * FROM u WHERE n = \'" + name + "\'");', 'sql-concat');
+bad('gap_kt_sqli_template', 'kt', 'stmt.executeQuery("SELECT * FROM u WHERE n = \'$name\'")', 'sql-concat');
+bad('gap_go_sqli_quotes', 'go', 'db.Query("SELECT * FROM u WHERE n = \'" + name + "\'")', 'sql-concat');
+bad('gap_php_sqli_interp', 'php', '$db->query("SELECT * FROM u WHERE n = \'$name\'");', 'sql-concat');
+good('gap_php_sqli_bound', 'php', '$st = $db->prepare("SELECT * FROM u WHERE n = ?"); $st->execute([$name]);');
+bad('gap_cs_cmd', 'cs', 'Process.Start("cmd.exe", "/c ping " + host);', 'shell');
+bad('gap_c_system_var', 'c', 'system(cmd);', 'shell');
+good('gap_c_system_literal', 'c', 'execv("/usr/bin/ping", argv);');
+bad('gap_go_md5', 'go', 'h := md5.Sum(data)', 'weak-hash');
+bad('gap_js_des', 'js', 'crypto.createCipheriv("des-ede3-cbc", key, iv)', 'weak-crypto');
+bad('gap_rb_des', 'rb', 'OpenSSL::Cipher.new("des-ecb")', 'weak-crypto');
+bad('gap_c_ecb', 'c', 'EVP_EncryptInit_ex(ctx, EVP_aes_128_ecb(), NULL, key, NULL);', 'weak-crypto');
+bad('gap_kt_tls', 'kt', 'conn.hostnameVerifier = HostnameVerifier { _, _ -> true }', 'tls-off');
+bad('gap_cs_tls', 'cs', 'handler.ServerCertificateCustomValidationCallback = (m, c, ch, e) => true;', 'tls-off');
+bad('gap_rs_tls', 'rs', 'let c = ClientBuilder::new().danger_accept_invalid_certs(true).build()?;', 'tls-off');
+bad('gap_swift_trust', 'swift', 'completionHandler(.useCredential, URLCredential(trust: challenge.protectionSpace.serverTrust!))', 'tls-off');
+bad('gap_sh_curl_k', 'sh', 'curl -k https://api.example.com/install', 'tls-off');
+bad('gap_rb_const_secret', 'rb', 'PASSWORD = "Sup3rS3cretPassw0rd"', 'secret');
+good('gap_secret_field_name', 'py', 'PASSWORD_FIELD = "password_confirmation"\nSECRET_NAME = "prod/db/credentials"\n');
+good('gap_secret_env_ref', 'sh', 'DB_PASSWORD="${DB_PASSWORD}"\n');
+bad('gap_cs_xxe', 'cs', 'var s = new XmlReaderSettings { DtdProcessing = DtdProcessing.Parse };', 'xxe');
+bad('gap_php_xxe', 'php', '$x = simplexml_load_string($xml, "SimpleXMLElement", LIBXML_NOENT);', 'xxe');
+bad('gap_rb_xxe', 'rb', 'doc = Nokogiri::XML(xml) { |c| c.noent }', 'xxe');
+bad('gap_js_xxe', 'js', 'const doc = libxmljs.parseXml(xml, { noent: true });', 'xxe');
+bad('gap_cs_redirect', 'cs', 'return Redirect(Request.Query["next"]);', 'open-redirect');
+bad('gap_php_redirect', 'php', 'header("Location: " . $_GET["next"]);', 'open-redirect');
+bad('gap_java_path', 'java', 'File f = new File("/data/" + request.getParameter("f"));', 'path-traversal');
+bad('gap_cs_path', 'cs', 'var t = File.ReadAllText("/data/" + Request.Query["f"]);', 'path-traversal');
+bad('gap_py_log_concat', 'py', 'logger.info("login " + request.args["user"])', 'log-inject');
+
 // --- fix.js --apply autofix engine ---
 const fixTestFile = path.join(TMP, 'autofix-test.js');
 fs.writeFileSync(fixTestFile, 'const token = Math.random();\n');

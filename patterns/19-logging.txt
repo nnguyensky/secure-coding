@@ -27,3 +27,5 @@ logging-disabled	java,kt	<root\s+level\s*=\s*"(OFF|NONE)"|Level\.OFF		root logge
 logging-disabled	py	logging\.disable\s*\(|logging\.CRITICAL\s*\+\s*1		logging.disable() suppresses records globally — security events are lost	high
 auth-no-log	*	(catch|except)[^)]*\)?\s*[:{][^}]{0,80}(return|res\.)\s*(status\s*\(\s*)?(401|403)	!(log|Log|audit|trace|warn|error)	auth failure returned without logging — an attacker probes silently	medium
 log-truncated	*	(log|logger|Log|Logger|console|syslog|audit)\w*\.\w+\s*\([^\n]*\.(slice|substring|substr|Substring)\s*\(\s*0\s*,\s*([0-9]|[1-4][0-9])\s*\)	!(preview|display|ui|render|title|debug)	truncating a log field to a few characters destroys the evidence it was written to preserve	low
+log-inject	py	(log|logging|logger)\.(debug|info|warning|error|critical|exception)\s*\([^)]*\+\s*request\.	pass values as arguments and strip CR/LF		medium
+log-inject	cs	(_?[Ll]og(ger)?)\.(Log)?(Debug|Information|Warning|Error|Critical|Trace)\s*\([^)]*\+\s*Request\.	use structured logging placeholders, not concatenation		medium

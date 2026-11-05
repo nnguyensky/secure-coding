@@ -19,3 +19,7 @@ zip-slip	py	\.extractall\s*\(|(tarfile|zipfile|TarFile|ZipFile)\.extract\s*\(	!i
 zip-slip	js,ts	(unzipper|adm-zip|decompress|tar\.extract|tar\.x)\s*\(|Extract\s*\(\s*\{\s*path:	validate extracted entry path is contained in target directory		high
 zip-slip	go	(zip\.Reader|tar\.Reader).*(Copy|Write)	validate file path does not escape destination directory using filepath.Clean		high
 zip-slip	java,kt	ZipInputStream.*\.getNextEntry|ZipFile.*\.getEntry	validate entry.getName() stays within target destination directory		high
+open-redirect	cs	Redirect\s*\(\s*Request\.(Query|Form|QueryString)\s*\[	redirect only to a local URL (Url.IsLocalUrl) or an allowlist		medium
+open-redirect	php	header\s*\(\s*["']Location:[^"']*["']\s*\.\s*\$_(GET|POST|REQUEST|COOKIE)	redirect only to an allowlisted path		medium
+path-traversal	java,kt	(new\s+)?File\s*\([^)]*(getParameter\s*\(|call\.parameters|call\.receive)|Paths\.get\s*\([^)]*getParameter\s*\(	resolve the path and check it stays inside the base directory		high
+path-traversal	cs	(File\.(ReadAll\w*|Open\w*|WriteAll\w*|Delete|Exists|Copy|Move)|new\s+FileStream|Path\.Combine)\s*\([^;]*Request\.(Query|Form|QueryString|RouteValues|Headers)	Path.GetFullPath, then check it starts with the base directory		high

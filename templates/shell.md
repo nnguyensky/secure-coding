@@ -160,3 +160,15 @@ else
   echo "already running" >&2; exit 1
 fi
 ```
+
+## XML parsing — no external entities (XXE)
+```bash
+xmllint --nonet --noout "$file"
+# never: xmllint --noent or --dtdvalid on files you did not write
+```
+
+## Deserialization — parse data, never execute it
+```bash
+name=$(jq -r '.name' < "$json")
+# never: source / eval / . a file that was downloaded or uploaded
+```

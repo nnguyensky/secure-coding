@@ -300,3 +300,26 @@ fn sanitize_log(value: &str) -> String {
 info!("user_action user={} input={}", user, sanitize_log(&user_input));
 // never: logging unsanitized user input — CR/LF can forge log entries
 ```
+
+## XML parsing — no external entities (XXE)
+```rust
+// roxmltree and quick-xml never fetch external entities; keep DTDs off.
+let opts = roxmltree::ParsingOptions { allow_dtd: false, ..Default::default() };
+let doc = roxmltree::Document::parse_with_options(&xml, opts)?;
+```
+
+## Deserialization — typed serde with strict fields
+```rust
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Order { id: Uuid, qty: u32 }
+let order: Order = serde_json::from_slice(&body)?;   // bound body size at the server
+```
+
+## JWT verification — fixed algorithm, issuer and audience
+```rust
+let mut v = Validation::new(Algorithm::RS256);      // jsonwebtoken crate
+v.set_issuer(&["https://id.example.com"]);
+v.set_audience(&["orders-api"]);
+let data = decode::<Claims>(&token, &DecodingKey::from_rsa_pem(pem)?, &v)?;
+```

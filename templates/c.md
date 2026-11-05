@@ -1,6 +1,6 @@
-# C / C++ — secure snippets
+# C — secure snippets
 
-Load only when writing C or C++. Copy the right shape; adapt names.
+Load only when writing C. For C++ use `templates/cpp.md`. Copy the right shape; adapt names.
 
 ## Bounded string copy
 ```c
@@ -193,4 +193,32 @@ unsigned char hash[crypto_hash_sha256_BYTES];
 crypto_hash_sha256(hash, data, data_len);
 // compare against a known-good hash stored separately
 // never: deploying without verifying integrity of interpreted code, libraries, or config
+```
+
+## Format strings — always a literal format
+```c
+printf("%s", user_text);
+fprintf(stderr, "%s\n", msg);
+syslog(LOG_ERR, "%s", msg);
+// never: printf(user_text), fprintf(stderr, msg), syslog(LOG_ERR, msg)
+// compile with -Wformat -Wformat-security -Werror=format-security
+```
+
+## Integer overflow — check sizes before allocating
+```c
+if (count != 0 && size > SIZE_MAX / count) return ENOMEM;   // count * size would wrap
+void *p = calloc(count, size);                                  // calloc checks too
+if (len > buf_cap - used) return ERANGE;                        // not: used + len > buf_cap
+```
+
+## XML parsing — no external entities (XXE)
+```c
+xmlDocPtr doc = xmlReadMemory(buf, len, NULL, NULL, XML_PARSE_NONET);
+// never: XML_PARSE_NOENT or XML_PARSE_DTDLOAD on input you did not write
+```
+
+## Deserialization — check every length field
+```c
+if (hdr.len > (size_t)(end - p)) return EINVAL;   // a length from the wire is a claim, not a fact
+memcpy(dst, p, hdr.len);
 ```

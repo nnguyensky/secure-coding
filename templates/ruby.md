@@ -250,3 +250,23 @@ end
 Rails.logger.info("user_action user=#{user} input=#{sanitize_log(user_input)}")
 # never: logging unsanitized user input — CR/LF can forge log entries
 ```
+
+## XML parsing — no external entities (XXE)
+```ruby
+doc = Nokogiri::XML(xml) { |config| config.strict.nonet }
+# never: config.noent, or ParseOptions::NOENT / DTDLOAD
+```
+
+## Deserialization — JSON and safe YAML only
+```ruby
+data = JSON.parse(body)
+cfg  = YAML.safe_load(text, permitted_classes: [])
+# never on untrusted input: Marshal.load, YAML.load (Psych < 4), Oj.load in object mode
+```
+
+## JWT verification — fixed algorithm, issuer and audience
+```ruby
+claims, = JWT.decode(token, public_key, true,
+  { algorithm: "RS256", iss: "https://id.example.com", verify_iss: true,
+    aud: "orders-api", verify_aud: true })
+```

@@ -28,3 +28,8 @@ weak-crypto	rb	OpenSSL::Cipher[^)]*(DES|RC4|Blowfish)|(DES|RC4|Blowfish)\.new			
 weak-crypto	php	mcrypt_\w+\s*\(|MCRYPT_(DES|RC4|BLOWFISH)|openssl_encrypt\s*\([^,]*,\s*["'](des|rc4|blowfish)			medium
 weak-crypto	cs	(DES|RC2|TripleDES)\.Create\s*\(|DESCryptoServiceProvider|RC2CryptoServiceProvider			medium
 weak-crypto	rs	(des|rc4|blowfish)::|Des::new|Rc4::new|Blowfish::new			medium
+weak-crypto	js,ts	create(Cipheriv|Decipheriv|Cipher|Decipher)\s*\(\s*["'](des|des-ede3?|des3|rc4|rc2|bf|blowfish|cast)[-"']	use aes-256-gcm or chacha20-poly1305		medium
+weak-crypto	rb	OpenSSL::Cipher(::\w+)?\.new\s*\(\s*["'](des|DES|rc4|RC4|rc2|RC2|bf|BF|blowfish)	use aes-256-gcm		medium
+weak-crypto	swift,m,mm	kCCAlgorithm(DES|3DES|RC4|RC2|Blowfish|CAST)\b|kCCOptionECBMode	use CryptoKit AES.GCM or ChaChaPoly		medium
+weak-crypto	c,h,cpp,cc,hpp,cxx	\bEVP_(des|rc4|rc2|bf|cast5)\w*\s*\(|\bEVP_aes_\d+_ecb\s*\(|\bDES_(ecb|ncbc|ede3)\w*\s*\(	use EVP_aes_256_gcm or libsodium AEAD		medium
+secret	*	\b[A-Z_]*(PASSWORD|PASSWD|SECRET|API_?KEY|ACCESS_?KEY|AUTH_?TOKEN|PRIVATE_?KEY)[A-Z_]*\s*[:=]\s*["'][^"'\s$]{8,}["']	!(?:[Yy][Oo][Uu][Rr]|[Ee][Xx][Aa][Mm][Pp][Ll][Ee]|[Pp][Ll][Aa][Cc][Ee][Hh][Oo][Ll][Dd][Ee][Rr]|[Cc][Hh][Aa][Nn][Gg][Ee][Mm][Ee]|[Dd][Uu][Mm][Mm][Yy]|[Xx]{3,}|<|\$\{|\$\(|getenv|environ|ENV\[|process\.env|(FIELD|HEADER|NAME|PARAM|ENV|VAR|PATH|FILE|URL|LABEL|PROMPT|REGEX|PATTERN|LENGTH|LEN|MIN|MAX|ID|TYPE|KEY_NAME)\s*[:=])	load secrets from the environment or a secret manager, never source	critical

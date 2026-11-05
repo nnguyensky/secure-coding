@@ -235,3 +235,26 @@ function sanitizeLog(value) {
 console.info("user_action user=%s input=%s", user, sanitizeLog(userInput));
 // never: logging unsanitized user input — CR/LF can forge log entries
 ```
+
+## XML parsing — no external entities (XXE)
+```js
+const { XMLParser } = require("fast-xml-parser");   // never resolves external entities
+const doc = new XMLParser({ processEntities: false }).parse(xml);
+// libxmljs: parseXml(xml, { noent: false, nonet: true }) — never noent: true
+```
+
+## Deserialization — plain data formats only
+```js
+const body = JSON.parse(raw);           // then validate with a schema (zod, ajv)
+const cfg = yaml.load(text);            // js-yaml >= 4 has no code-executing types
+// never: node-serialize unserialize(), eval(), vm.run*() on input
+```
+
+## JWT verification — fixed algorithm, issuer and audience
+```js
+const jwt = require("jsonwebtoken");
+const claims = jwt.verify(token, publicKey, {
+  algorithms: ["RS256"], issuer: "https://id.example.com", audience: "orders-api",
+});
+// never: jwt.decode(token) to authorize — it does not check the signature
+```

@@ -7,10 +7,8 @@ unpinned-action	yml,yaml	uses:\s+\S+/\S+@\s*(v\d|main|master|latest|HEAD|develop
 unpinned-action	yml,yaml	uses:\s+\S+/\S+@[^a-f0-9\s]{7,}	supply chain: GitHub Action pinned to tag, not commit SHA — pin to full SHA for immutability		high
 unpinned-action	yml,yaml	uses:\s+actions/checkout@v\d|uses:\s+actions/setup-\w+@v\d	supply chain: first-party action pinned to tag — still pin to SHA for defense in depth		high
 
-docker-digest	Dockerfile	^FROM\s+\S+:[^@\s]+\s*$	!slim|alpine|bookworm|distroless|dockerio	docker: base image pinned to tag only — consider pinning to digest (image@sha256:...) for immutable builds	medium
-docker-digest	Dockerfile	^FROM\s+\S+:(?!latest)[a-zA-Z0-9._-]+\s*$	!slim|alpine|bookworm|distroless|dockerio	docker: pin to digest for reproducible builds: image:tag@sha256:...	medium
+docker-digest	Dockerfile	^FROM\s+(--platform=\S+\s+)?[^@\s]+:[^@\s]+(\s+[Aa][Ss]\s+\S+)?\s*$		docker: base image pinned to tag only — consider pinning to digest (image@sha256:...) for immutable builds	medium
 
 npm-audit	yml,yaml	npm\s+install.*--production|npm\s+ci\s+--production	supply chain: production install without audit — run npm audit before deploy		medium
-npm-audit	yml,yaml	npm\s+ci\b.*--ignore-scripts	supply chain: --ignore-scripts skips lifecycle hooks — verify scripts are safe before disabling		medium
 gha-script-injection	yml,yaml	\$\{\{\s*github\.(event\.(issue\.(title|body)|pull_request\.(title|body|head\.ref|head\.label)|comment\.body|review\.body|review_comment\.body|head_commit\.(message|author\.(name|email))|commits|pages|discussion\.(title|body)|workflow_run\.head_branch)|head_ref)	!^\s*(-\s*)?(?!run\s*:|script\s*:)[A-Za-z_][\w-]*\s*:\s*["']?\$\{\{	pass untrusted event text through env: and quote "$VAR"; never expand it inside run:	high
 gha-pull-request-target	yml,yaml	^\s*(-\s*)?pull_request_target\s*:?\s*$|^\s*on\s*:\s*\[?[^#]*\bpull_request_target\b	pull_request_target runs with secrets on fork PRs; never check out or run the PR's code in it		medium

@@ -271,7 +271,7 @@ function maskSecret(snippet, id) {
 
 // Request-controlled values. Anchored to the framework accessors the pattern
 // files already treat as untrusted.
-const TAINT_SOURCE = /(?:\breq(?:uest)?\s*\.\s*(?:query|body|params|args|form|json|get_json|values|GET|POST|cookies|headers)\b|\$_(?:GET|POST|REQUEST|COOKIE)\s*\[|\br\s*\.\s*(?:FormValue|PostFormValue|PathValue)\s*\(|\br\s*\.\s*URL\s*\.\s*Query\s*\(\s*\)|\bmux\s*\.\s*Vars\s*\(|\bc\s*\.\s*(?:Query|Param|PostForm|FormValue|QueryParam|DefaultQuery)\s*\(|\bctx\s*\.\s*(?:query|params|request\s*\.\s*body)\b|\bparams\s*\[|getParameter\s*\()/;
+const TAINT_SOURCE = /(?:\breq(?:uest)?\s*\.\s*(?:query|body|params|args|form|json|get_json|values|GET|POST|cookies|headers)\b|\$_(?:GET|POST|REQUEST|COOKIE)\s*\[|\br\s*\.\s*(?:FormValue|PostFormValue|PathValue)\s*\(|\br\s*\.\s*URL\s*\.\s*Query\s*\(\s*\)|\bmux\s*\.\s*Vars\s*\(|\bc\s*\.\s*(?:Query|Param|PostForm|FormValue|QueryParam|DefaultQuery)\s*\(|\bctx\s*\.\s*(?:query|params|request\s*\.\s*body)\b|\bRequest\s*\.\s*(?:Query|Form|QueryString|Headers|Cookies|RouteValues)\b|\bcall\s*\.\s*(?:parameters|receive\w*|request\s*\.\s*queryParameters)\b|\bparams\s*\[|getParameter\s*\()/;
 
 // Sinks where request data causes a named vulnerability, and what to call it.
 const TAINT_SINKS = [
@@ -535,12 +535,15 @@ function matchContentDetailed(content, filenameOrExt, patterns) {
     // `["']?` after the key: JSON and dict literals quote it ("token": "...").
     // `\w*` after the keyword: aws_secret_access_key, client_secret_value.
     // The entropy threshold below keeps the wider net from adding noise.
-    const entropyRegex = /(password|passwd|api_?key|secret|token|auth_?key|private_?key|signing_?key|crypto_?key|master_?key)\w*["']?\s*[:=]\s*["']([A-Za-z0-9+/=_-]{20,})["']/i;
+    const entropyRegex = /((?:password|passwd|api_?key|secret|token|auth_?key|private_?key|signing_?key|crypto_?key|master_?key)\w*)["']?\s*[:=]\s*["']([A-Za-z0-9+/=_-]{20,})["']/i;
+    // A name that describes the secret rather than holding it: the form
+    // field, header, env-var name or regex for a password is not one.
+    const NOT_A_SECRET_NAME = /(field|header|name|param|env|var|path|file|url|label|prompt|regex|pattern|length|len|min|max|_id|type)$/i;
     let count = 0;
     for (let i = 0; i < fileLines.length && count < MAX_OCCURRENCES; i++) {
       const line = fileLines[i];
       const m = line.match(entropyRegex);
-      if (!m || !m[2]) continue;
+      if (!m || !m[2] || NOT_A_SECRET_NAME.test(m[1])) continue;
       const secretStr = m[2];
       // A placeholder in .env.example is high-entropy but is not a secret.
       // Flagging it as critical trains people to ignore the whole rule.
