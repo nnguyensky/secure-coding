@@ -1,7 +1,8 @@
 # Changelog
 
-Versions follow [Semantic Versioning](https://semver.org). Install a tagged
-release (`npx github:nnguyensky/secure-coding#v2.2.0`) rather than `main`.
+Versions follow [Semantic Versioning](https://semver.org). To install a
+specific version, pin a tag or commit SHA:
+`npx github:nnguyensky/secure-coding#<tag-or-sha>`.
 
 ## 2.2.0 — 2026-11-05
 

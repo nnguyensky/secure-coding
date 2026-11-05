@@ -322,12 +322,13 @@ confirm the agent is using it.
 The fastest way — no clone, no npm publish needed:
 
 ```bash
-npx github:nnguyensky/secure-coding#v2.2.0 --global --agent all --mcp
+npx github:nnguyensky/secure-coding --global --agent all --mcp
 ```
 
-Pin a release tag (`#v2.2.0`). Without one, npx runs whatever is on `main`
-at that moment — for a tool that installs git hooks and agent rules, pin the
-version you reviewed. Releases are listed in [CHANGELOG.md](CHANGELOG.md).
+This runs whatever is on `main` at that moment. For a tool that installs git
+hooks and agent rules, pin the version you reviewed: append a release tag or a
+commit SHA (`github:nnguyensky/secure-coding#<tag-or-sha>`) once one is
+published. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 `--global` matters. It copies the skill to `~/.secure-coding`, which is where
 the git hooks look for the scanner. Without it the hooks are installed but do
