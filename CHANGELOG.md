@@ -4,6 +4,22 @@ Versions follow [Semantic Versioning](https://semver.org). To install a
 specific version, pin a tag or commit SHA:
 `npx github:nnguyensky/secure-coding#<tag-or-sha>`.
 
+## 2.4.0 — 2026-11-05
+
+### Added
+- **Dashboard** (`node hooks/serve.js`, `npm run dashboard`): a React 19 view
+  of the results — posture score, a 3D risk skyline by section, findings over
+  time, dependency advisories, and a searchable finding list with each fix's
+  wrong/right code. Live mode refreshes and can rescan; `report.js
+  --dashboard` writes the same page as one offline file.
+- Built once into `reports/dashboard.html` (single file, no CDN), so the
+  package still has no runtime dependencies. Source in `dashboard/`; CI
+  rebuilds it and fails if the committed bundle differs.
+- Local-only server: 127.0.0.1, per-run token in the URL fragment, Host and
+  Origin checks (DNS rebinding, cross-site posts), strict CSP with script
+  hashes; the only action is a rescan.
+- MCP tool `open_dashboard`.
+
 ## 2.3.0 — 2026-11-05
 
 ### Added

@@ -1353,13 +1353,14 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
 // were keyed unpadded, so every single-digit section printed as a raw number.
 (function sectionLabels() {
   uniq('padded-section-ids-resolve-to-labels');
-  const rep = fs.readFileSync(path.join(DIR, 'hooks', 'report.js'), 'utf8');
+  // The section map moved to data.js (shared by report.js and serve.js).
+  const rep = fs.readFileSync(path.join(DIR, 'hooks', 'data.js'), 'utf8');
   const sum = fs.readFileSync(path.join(DIR, 'hooks', 'summary.js'), 'utf8');
   const bad = [];
-  if (!/'7': 'Error Handling'/.test(rep)) bad.push('report.js missing section 7');
+  if (!/'7': 'Error Handling'/.test(rep) || require('./data').sectionName('07') !== 'Error Handling') bad.push('data.js missing section 7');
   if (!/'7': 'errors'/.test(sum)) bad.push('summary.js missing section 7');
   // Both lookups must strip the zero pad, or the map entries never match.
-  if (!/replace\(\/\^0\+\/, ''\)/.test(rep)) bad.push('report.js does not strip zero pad');
+  if (!/replace\(\/\^0\+\/, ''\)/.test(rep)) bad.push('data.js does not strip zero pad');
   if (!/replace\(\/\^0\+\/, ''\)/.test(sum)) bad.push('summary.js does not strip zero pad');
   if (bad.length === 0) pass++;
   else { fail++; console.log(`padded-section-ids-resolve-to-labels: ${bad.join(', ')}`); }
@@ -3229,6 +3230,100 @@ good('ux_queryselector', 'js', 'document.querySelector(req.query.sel);');
   }
   if (ok) pass++;
   else { fail++; console.log('MISS  report-trend-series'); }
+})();
+
+// --- dashboard server: local only, token, Host/Origin checks, CSP ---
+(function dashboardServer() {
+  const script = `
+    const http = require('http');
+    const { createServer } = require(${JSON.stringify(path.join(DIR, 'hooks', 'serve.js'))});
+    const token = 'tok_' + 'a'.repeat(30);
+    let port = 0;
+    const srv = createServer({ token, getPort: () => port });
+    const req = (method, p, headers = {}) => new Promise(res => {
+      const r = http.request({ host: '127.0.0.1', port, method, path: p, headers: { host: '127.0.0.1:' + port, ...headers } }, x => {
+        let b = ''; x.on('data', d => { b += d; }); x.on('end', () => res({ status: x.statusCode, headers: x.headers, body: b }));
+      });
+      r.end();
+    });
+    srv.listen(0, '127.0.0.1', async () => {
+      port = srv.address().port;
+      const out = {};
+      out.page = await req('GET', '/');
+      out.noToken = await req('GET', '/api/snapshot');
+      out.badToken = await req('GET', '/api/snapshot', { 'x-sc-token': 'nope' });
+      out.ok = await req('GET', '/api/snapshot', { 'x-sc-token': token });
+      out.rebind = await req('GET', '/api/snapshot', { 'x-sc-token': token, host: 'evil.example' });
+      out.formPost = await req('POST', '/api/scan', { 'x-sc-token': token, 'content-type': 'text/plain' });
+      out.crossOrigin = await req('POST', '/api/scan', { 'x-sc-token': token, 'content-type': 'application/json', origin: 'https://evil.example' });
+      out.noTokenPost = await req('POST', '/api/scan', { 'content-type': 'application/json' });
+      for (const k of Object.keys(out)) { out[k] = { status: out[k].status, csp: out[k].headers['content-security-policy'] || '', acao: out[k].headers['access-control-allow-origin'] || '', body: out[k].body.slice(0, 200) }; }
+      srv.close();
+      process.stdout.write(JSON.stringify({ addr: '127.0.0.1', out }));
+    });`;
+  const r = spawnSync(process.execPath, ['-e', script], { encoding: 'utf8', timeout: 30000, cwd: DIR });
+  let o = {};
+  try { o = JSON.parse(r.stdout).out; } catch { o = {}; }
+
+  uniq('dashboard-api-needs-token');
+  if (o.noToken && o.noToken.status === 401 && o.badToken.status === 401 && o.ok.status === 200 && /"findings"/.test(o.ok.body) && o.noTokenPost.status === 401) pass++;
+  else { fail++; console.log(`MISS  dashboard-api-needs-token: ${JSON.stringify(o).slice(0, 300)} ${r.stderr.slice(0, 200)}`); }
+
+  uniq('dashboard-blocks-dns-rebinding');
+  if (o.rebind && o.rebind.status === 421) pass++;
+  else { fail++; console.log('MISS  dashboard-blocks-dns-rebinding'); }
+
+  uniq('dashboard-blocks-cross-site-post');
+  if (o.formPost && o.formPost.status === 415 && o.crossOrigin.status === 403 && !Object.values(o).some(x => x.acao)) pass++;
+  else { fail++; console.log('MISS  dashboard-blocks-cross-site-post'); }
+
+  uniq('dashboard-page-has-strict-csp');
+  const csp = (o.page && o.page.csp) || '';
+  if (o.page && o.page.status === 200 && /default-src 'none'/.test(csp) && /script-src 'sha256-/.test(csp) && !/script-src[^;]*unsafe-inline/.test(csp) && /frame-ancestors 'none'/.test(csp)) pass++;
+  else { fail++; console.log(`MISS  dashboard-page-has-strict-csp: ${o.page && o.page.status} ${csp}`); }
+})();
+
+// --- the server binds 127.0.0.1 only, and --background reports its URL ---
+(function dashboardBackground() {
+  uniq('dashboard-background-local-url');
+  const r = spawnSync('node', [path.join(DIR, 'hooks', 'serve.js'), '--background', '--no-open', '--idle-minutes', '0.05'], { cwd: DIR, encoding: 'utf8', timeout: 20000 });
+  const url = (r.stdout || '').trim();
+  if (r.status === 0 && /^http:\/\/127\.0\.0\.1:\d+\/#token=[A-Za-z0-9_-]{20,}$/.test(url)) pass++;
+  else { fail++; console.log(`MISS  dashboard-background-local-url: ${r.status} ${url} ${r.stderr}`); }
+  const src = fs.readFileSync(path.join(DIR, 'hooks', 'serve.js'), 'utf8');
+  uniq('dashboard-listens-on-loopback-only');
+  if (/\.listen\(port, '127\.0\.0\.1'/.test(src) && !/\.listen\(port\)/.test(src)) pass++;
+  else { fail++; console.log('MISS  dashboard-listens-on-loopback-only'); }
+})();
+
+// --- offline dashboard export, and the shipped bundle ---
+(function dashboardExport() {
+  const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-dash-')));
+  const st = path.join(d, 'st.jsonl');
+  fs.writeFileSync(st, JSON.stringify({ file: path.join(d, 'a.js'), id: 'xss-sink', section: '02', severity: 'high', status: 'open', line: 3, note: 'Line 3: el.innerHTML = "</script><script>alert(1)</script>"', first_seen: '2026-11-01T00:00:00Z' }) + '\n');
+  const out = path.join(d, 'dash.html');
+  const r = spawnSync('node', [REPORT, '--dashboard', '--out', out], { cwd: d, encoding: 'utf8', env: { ...process.env, SECURE_CODING_STATE: st } });
+  const html = fs.existsSync(out) ? fs.readFileSync(out, 'utf8') : '';
+  const m = html.match(/<script id="sc-snapshot" type="application\/json">([\s\S]*?)<\/script>/);
+  let snap = null;
+  try { snap = JSON.parse(m[1]); } catch { snap = null; }
+
+  uniq('dashboard-export-embeds-snapshot');
+  if (r.status === 0 && snap && snap.findings.length === 1 && snap.findings[0].file === 'a.js' && snap.fixes['xss-sink']) pass++;
+  else { fail++; console.log(`MISS  dashboard-export-embeds-snapshot: ${r.status} ${r.stderr.slice(0, 120)}`); }
+
+  uniq('dashboard-export-cannot-break-out');
+  // The note contains </script>; it must stay inside the JSON block.
+  if (m && !/<\/script>/i.test(m[1]) && (html.match(/<script/gi) || []).length === (fs.readFileSync(path.join(DIR, 'reports', 'dashboard.html'), 'utf8').match(/<script/gi) || []).length) pass++;
+  else { fail++; console.log('MISS  dashboard-export-cannot-break-out'); }
+
+  uniq('dashboard-bundle-self-contained');
+  const bundle = fs.readFileSync(path.join(DIR, 'reports', 'dashboard.html'), 'utf8');
+  const pkgFiles = require(path.join(DIR, 'package.json')).files;
+  if (!/<script[^>]+src=|<link[^>]+href=["']https?:/i.test(bundle) && !/https?:\/\/(unpkg|cdn|esm\.sh)/i.test(bundle)
+      && bundle.includes('<script id="sc-snapshot" type="application/json"></script>') && pkgFiles.includes('reports/dashboard.html')) pass++;
+  else { fail++; console.log('MISS  dashboard-bundle-self-contained'); }
+  try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
 })();
 
 // --- fix.js --apply autofix engine ---

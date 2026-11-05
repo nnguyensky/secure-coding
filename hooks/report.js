@@ -10,17 +10,18 @@ const { statePath, helpRequested, projectRoot } = require('./config');
 
 // --help must print help, never run the tool. reset.js used to wipe the
 // findings file when asked for help; audit.js and sbom.js ran in full.
-const USAGE = `Usage: node hooks/report.js [--sarif] [--markdown] [--out <file>]
+const USAGE = `Usage: node hooks/report.js [--sarif] [--markdown] [--dashboard] [--out <file>]
 
 Renders the findings file into an HTML report, SARIF v2.1.0, or Markdown.
 Defaults to self-contained HTML under reports/.
+  --dashboard   the interactive dashboard as one offline HTML file
+                (live version: node hooks/serve.js)
 
 Env: SECURE_CODING_STATE (default: <project>/checks/findings.jsonl)`;
 if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 const DIR = path.resolve(__dirname, '..');
 const STATE = statePath('findings.jsonl', 'SECURE_CODING_STATE');
-const FIXES = path.join(DIR, 'checks', 'fixes.md');
 const AUDIT = statePath('audit.json', 'SECURE_CODING_AUDIT');
 const SCAFFOLD = path.join(DIR, 'reports', 'security.html');
 
@@ -38,86 +39,9 @@ function reportPath() {
   return path.join(dir, `security-${date}.html`);
 }
 
-const SECTION_NAMES = {
-  '2': 'Output Encoding', '3': 'Authentication & Password', '4': 'Session Management',
-  '5': 'Access Control', '6': 'Cryptographic Practices', '7': 'Error Handling', '8': 'Data Protection',
-  '9': 'Communication Security', '10': 'System Configuration', '11': 'Database Security',
-  '12': 'File Management', '13': 'Memory Management', '14': 'General Coding',
-  '15': 'API Security', '16': 'Container Security', '19': 'Logging Security',
-  '20': 'Password Storage', '21': 'SSRF Prevention', '22': 'File Upload',
-  '23': 'NoSQL Injection', '24': 'OAuth2 Security', '25': 'Session Fixation',
-  '26': 'WebSocket Security', '27': 'Dockerfile Security', '28': 'Supply Chain',
-  '29': 'Shell Scripting', '30': 'Terraform & IaC',
-  '31': 'JWT Security', '32': 'Secrets & Credentials', '33': 'OWASP LLM Applications',
-  '34': 'Secure by Design Architecture', '35': 'IoT & Embedded Security (AS ETSI EN 303 645)',
-};
-
-const SEVERITY_COLORS = {
-  critical: '#dc2626',
-  high: '#ea580c',
-  medium: '#ca8a04',
-  low: '#65a30d',
-};
-
-function sectionName(sec) {
-  return SECTION_NAMES[String(sec).replace(/^0+/, '')] || 'Other';
-}
-
-// fixes.md is ~55KB and was re-read for every finding, twice (cweFor and
-// fixText). Read and split it once per process.
-let _fixText = null;
-function fixesRaw() {
-  if (_fixText === null) _fixText = fs.existsSync(FIXES) ? fs.readFileSync(FIXES, 'utf8') : '';
-  return _fixText;
-}
-
-// Read "OWASP: ... | CWE-89 | A05:2025" off a fixes.md block. SARIF consumers
-// (GitHub code scanning included) key on CWE, so surface it as a real taxonomy.
-// Read the version from package.json rather than hardcoding it; the literal
-// had already drifted to 2.0.0 while the package was 2.1.0.
-let PKG_VERSION = '0.0.0';
-let PKG_HOMEPAGE = 'https://github.com/nnguyensky/secure-coding';
-try {
-  const pkg = require(path.join(DIR, 'package.json'));
-  PKG_VERSION = pkg.version || PKG_VERSION;
-  PKG_HOMEPAGE = pkg.homepage || PKG_HOMEPAGE;
-} catch { /* defaults above */ }
-
-function cweFor(id) {
-  const text = fixesRaw();
-  if (!text) return null;
-  // \r?: a Windows checkout with autocrlf has CRLF line endings.
-  const m = text.match(new RegExp('^## ' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\r?\\n([^\\r\\n]*)', 'm'));
-  if (!m) return null;
-  const cwe = m[1].match(/CWE-(\d+)/);
-  const cat = m[1].match(/(A\d\d):2025/);
-  return cwe ? { cwe: cwe[1], category: cat ? cat[1] + ':2025' : null } : null;
-}
-
-function fixText(id) {
-  const text = fixesRaw();
-  if (!text) return '';
-  const parts = text.split(/^## /m);
-  for (const part of parts) {
-    const header = part.match(/^([^\n]+)/);
-    if (header && header[1].trim() === id) {
-      return part.replace(/^[^\n]*\n/, '').replace(/^#.*$/m, '').trim().replace(/\s+/g, ' ');
-    }
-  }
-  return '';
-}
-
-function loadFindings() {
-  if (!fs.existsSync(STATE)) return [];
-  return fs.readFileSync(STATE, 'utf8').split(/\r?\n/).filter(Boolean)
-    .map(line => { try { return JSON.parse(line); } catch (e) { return null; } })
-    .filter(Boolean);
-}
-
-function loadAudit() {
-  if (!fs.existsSync(AUDIT)) return null;
-  try { return JSON.parse(fs.readFileSync(AUDIT, 'utf8')); } catch { return null; }
-}
+const { PKG_VERSION, PKG_HOMEPAGE, cweFor, fixText, loadFindings: loadState, loadAudit: loadAuditState, buildRows } = require('./data');
+const loadFindings = () => loadState(STATE);
+const loadAudit = () => loadAuditState(AUDIT);
 
 function generateMarkdown(rows, audit) {
   const openRows = rows.filter(r => r.status === 'open');
@@ -257,21 +181,7 @@ function generateSarif(rows) {
 function main() {
   const findings = loadFindings();
   const audit = loadAudit();
-  const rows = findings.map(f => ({
-    id: f.id || '',
-    section: f.section || '',
-    secName: sectionName(f.section),
-    severity: f.severity || 'medium',
-    sevColor: SEVERITY_COLORS[f.severity] || SEVERITY_COLORS.medium,
-    status: f.status || '',
-    line: Number(f.line) || 0,
-    reason: f.reason || '',
-    run_id: f.run_id || (f.first_seen ? f.first_seen.slice(0, 10) : 'run-1'),
-    file: f.file || '',
-    first: f.first_seen || '',
-    resolved: f.resolved_at || '',
-    fix: f.note || fixText(f.id),
-  }));
+  const rows = buildRows(findings);
 
   if (process.argv.includes('--sarif')) {
     const sarif = generateSarif(rows);
@@ -282,6 +192,30 @@ function main() {
   if (process.argv.includes('--markdown') || process.argv.includes('-m')) {
     const md = generateMarkdown(rows, audit);
     process.stdout.write(md);
+    return;
+  }
+
+  if (process.argv.includes('--dashboard')) {
+    // The React dashboard with this run's data embedded: one file that opens
+    // offline. The JSON goes in a type="application/json" script, which the
+    // browser never executes; '<' is escaped so the data cannot close the tag.
+    let page;
+    try { page = fs.readFileSync(path.join(DIR, 'reports', 'dashboard.html'), 'utf8'); } catch {
+      process.stderr.write('secure-coding: reports/dashboard.html is missing — build it with npm --prefix dashboard run build\n');
+      process.exit(1);
+    }
+    const snap = JSON.stringify(require('./data').snapshot()).replace(/</g, '\\u003c');
+    const marker = '<script id="sc-snapshot" type="application/json"></script>';
+    if (!page.includes(marker)) {
+      process.stderr.write('secure-coding: dashboard.html has no snapshot slot — rebuild it\n');
+      process.exit(1);
+    }
+    const outIdx = process.argv.indexOf('--out');
+    const out = outIdx >= 0 && process.argv[outIdx + 1] ? path.resolve(process.argv[outIdx + 1])
+      : path.join(projectRoot(), 'reports', `dashboard-${new Date().toISOString().slice(0, 10)}.html`);
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, page.replace(marker, () => `<script id="sc-snapshot" type="application/json">${snap}</script>`));
+    process.stderr.write(`secure-coding: dashboard written to ${out}\n`);
     return;
   }
 

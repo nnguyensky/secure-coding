@@ -211,6 +211,7 @@ Even when no automated pattern flags, check for these design smells:
 | **`deps.js`** | Before installing a package you suggested: does it exist, is it brand new, does it run install scripts | `node hooks/deps.js` |
 | **`scan.js --history`** | Secrets in past commits, including deleted ones | `node hooks/scan.js --history` |
 | **`scan.js --baseline`** | Adopting on an existing repo: record current findings so only new ones block | `node hooks/scan.js --baseline` |
+| **`serve.js`** | Local dashboard of the results (give the user the printed link) | `node hooks/serve.js` |
 | **`sbom.js`** | CycloneDX v1.5 & SPDX v2.3 SBOM with AI-SBOM & VEX | `node hooks/sbom.js --ai --vex` |
 | **`clean.js`** | Universal clean code linter (14 rules) | `node hooks/clean.js <f>` / `--all` |
 | **`report.js`** | Export HTML report, PR Markdown, or SARIF v2.1.0 | `node hooks/report.js --sarif` |
