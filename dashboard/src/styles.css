@@ -148,7 +148,10 @@ body::before { content: ""; position: fixed; inset: 0; z-index: -2; pointer-even
 .dot.accent { background: var(--accent); } .dot.ok { background: var(--ok); }
 
 /* ---------- posture gyroscope ---------- */
-.posture { display: grid; grid-template-columns: 170px 1fr; gap: 18px; align-items: center; min-height: 290px; }
+/* The grid goes on .tilt-inner: TiltCard wraps its children in it, so a grid
+   on .posture itself stacked the gyroscope above the text. */
+.posture { min-height: 250px; display: flex; }
+.posture .tilt-inner { display: grid; grid-template-columns: 170px 1fr; gap: 18px; align-items: center; width: 100%; }
 .posture-stage { perspective: 700px; display: grid; place-items: center; height: 170px; }
 .gyro { position: relative; width: 140px; height: 140px; transform-style: preserve-3d; animation: gyro 14s linear infinite; }
 .ring { position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--tone); box-shadow: 0 0 22px -4px var(--tone), inset 0 0 22px -8px var(--tone); }
@@ -168,7 +171,7 @@ body::before { content: ""; position: fixed; inset: 0; z-index: -2; pointer-even
 .chip-good { color: var(--ok); } .chip-ok { color: var(--accent-2); } .chip-warn { color: var(--medium); } .chip-bad { color: var(--critical); }
 .chip-filter { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); cursor: pointer; }
 .posture p { margin: 12px 0 0; font-size: 13.5px; }
-@media (max-width: 480px) { .posture { grid-template-columns: 1fr; text-align: center; } }
+@media (max-width: 480px) { .posture .tilt-inner { grid-template-columns: 1fr; text-align: center; } }
 
 /* ---------- 3D skyline ---------- */
 .skyline-wrap { display: grid; grid-template-columns: 1fr 200px; gap: 12px; align-items: center; }
