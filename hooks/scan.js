@@ -9,7 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath, writeState, projectRoot, loadConfig, helpRequested } = require('./config');
+const { statePath, writeState, withFileLock, projectRoot, loadConfig, helpRequested } = require('./config');
 const { execFileSync } = require('child_process');
 
 const DIR = path.resolve(__dirname, '..');
@@ -23,7 +23,12 @@ const MAX_HITS = 4;
 const MAX_OCCURRENCES = Number(process.env.SECURE_CODING_MAX_OCCURRENCES) || 20;
 
 // Extensions we never scan (non-code).
-const SKIP_EXT = new Set(['md', 'txt', 'json', 'lock', 'csv', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'pdf', 'min.js']);
+const SKIP_EXT = new Set(['md', 'txt', 'lock', 'csv', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'pdf']);
+// Data files scanned for leaked credentials only. credentials.json,
+// appsettings.json and GCP service-account keys are where secrets actually
+// get committed; code patterns on JSON would only produce noise.
+const SECRETS_ONLY_EXT = new Set(['json']);
+const isSecretPattern = id => /^secret(?:-|$)/.test(id);
 // Path segments we never scan (vendored / generated).
 const SKIP_SEG = ['node_modules', 'vendor', '.git', 'dist', 'build', 'target'];
 
@@ -35,6 +40,12 @@ const SKIP_SEG = ['node_modules', 'vendor', '.git', 'dist', 'build', 'target'];
 const SUPERSEDES = {
   'eval': ['sbd-dynamic-eval-reflection'],
   'secret-aws-key': ['secret', 'secret-entropy'],
+  'secret-github-token': ['secret', 'secret-entropy'],
+  'secret-stripe-key': ['secret', 'secret-entropy'],
+  'secret-google-key': ['secret', 'secret-entropy'],
+  'secret-private-key': ['secret', 'secret-entropy'],
+  'secret-slack-webhook': ['secret', 'secret-entropy'],
+  'secret-db-url': ['secret', 'secret-entropy'],
   'secret-entropy': ['secret'],
   'jwt-none-alg': ['jwt'],
 };
@@ -81,7 +92,9 @@ function loadPatterns() {
           hint = cols[3];
         }
       }
-      if (!hint && cols[5]) hint = cols[5];
+      // Column 5 is the severity. Only fall back to it as a hint when it is
+      // not one — otherwise the hint printed was the bare word "critical".
+      if (!hint && cols[5] && !/^(critical|high|medium|low)$/i.test(cols[5].trim())) hint = cols[5];
       const sevCol = (cols[5] || cols[4] || '').trim().toLowerCase();
       if (/^(critical|high|medium|low)$/.test(sevCol)) {
         severity = sevCol;
@@ -94,11 +107,25 @@ function loadPatterns() {
   return out;
 }
 
+// Inline suppression: `// secure-coding-ignore: <id>[, <id>] [-- reason]`.
+// Returns the suppression ({ reason }) when this line silences `id`, else null.
+//
+// Ids must be named. `all` used to silence every rule on the line, which let
+// the agent this tool polices switch the scanner off with one comment. Each
+// suppression is recorded (status "suppressed") so it shows in the report and
+// in SARIF instead of disappearing.
+function suppressionFor(line, id) {
+  if (!line) return null;
+  const m = line.match(/(?:\/\/|#|\/\*|<!--)\s*(?:secure-coding-ignore|nosec):\s*(.*?)(?:\*\/|-->|$)/i);
+  if (!m) return null;
+  const [idPart, ...rest] = m[1].split('--');
+  const ignored = idPart.split(/[,\s]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
+  if (!ignored.includes(id.toLowerCase())) return null;
+  return { reason: rest.join('--').trim() };
+}
+
 function isSuppressed(line, id) {
-  const m = line.match(/(?:\/\/|#|\/\*)\s*(?:secure-coding-ignore|nosec):\s*([A-Za-z0-9_,\s-]+?)(?:\*\/|$)/i);
-  if (!m) return false;
-  const ignored = m[1].split(/[,\s]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
-  return ignored.includes(id.toLowerCase()) || ignored.includes('all');
+  return suppressionFor(line, id) !== null;
 }
 
 function calculateShannonEntropy(str) {
@@ -237,18 +264,32 @@ function findTaintFlows(fileLines) {
   return found;
 }
 
-function matchContent(content, filenameOrExt, patterns) {
+// Returns { hits, suppressed }. `suppressed` lists every finding an inline
+// comment silenced, with the reason given, so reports can show them.
+function matchContentDetailed(content, filenameOrExt, patterns) {
   const fileLines = content.split(/\r?\n/);
   const ext = (path.extname(filenameOrExt || '').slice(1) || filenameOrExt || '').toLowerCase();
   const base = path.basename(filenameOrExt || '');
   const seen = new Set();
   const hits = [];
+  const suppressed = new Map(); // `${id}@${line}` -> record
   const cfg = loadConfig();
+  const secretsOnly = SECRETS_ONLY_EXT.has(ext);
 
-  // Pattern matching
+  const noteSuppressed = (id, section, severity, lineNo, sup) => {
+    const key = `${id}@${lineNo}`;
+    if (!suppressed.has(key)) suppressed.set(key, { id, section, severity, line: lineNo, reason: sup.reason });
+  };
+
+  // Several regexes share one id (e.g. eight `secret` lines). Occurrences are
+  // collected per id across all of them: stopping at the first regex that
+  // matched hid every other match — a Stripe key went unreported because a
+  // private key header further down had already satisfied `secret`.
+  const occById = new Map(); // id -> Map(line -> hit)
+
   for (const p of patterns) {
-    if (seen.has(p.id)) continue;
     if (cfg && Array.isArray(cfg.ignorePatterns) && cfg.ignorePatterns.includes(p.id)) continue;
+    if (secretsOnly && !isSecretPattern(p.id)) continue;
     // exts are lowercased at load; match the basename case-insensitively so
     // `Dockerfile` scoping works. Extensionless files (Dockerfile, Makefile)
     // must still be filtered — matching on basename only, not skipped.
@@ -260,104 +301,93 @@ function matchContent(content, filenameOrExt, patterns) {
       if (!want.includes(ext) && !named) continue;
     }
 
-    let matchedLineNum = null;
-    let matchedSnippet = '';
+    if (!occById.has(p.id)) occById.set(p.id, new Map());
+    const occ = occById.get(p.id);
+    const add = (lineNo, snippet) => {
+      if (occ.has(lineNo) || occ.size >= MAX_OCCURRENCES) return;
+      occ.set(lineNo, {
+        id: p.id,
+        section: p.section,
+        hint: p.hint || '',
+        severity: p.severity || 'medium',
+        line: lineNo,
+        snippet: maskSecret(snippet, p.id),
+      });
+    };
+
+    let lineMatched = false;
     let lineMatchedAndSuppressed = false;
-    // Every line this pattern hits, not just the first — one finding per occurrence.
-    const occurrences = [];
 
     for (let i = 0; i < fileLines.length; i++) {
       const line = fileLines[i];
-      if (p.re.test(line)) {
-        if (p.exclRe && p.exclRe.test(line)) continue;
-        if (isSuppressed(line, p.id)) {
-          lineMatchedAndSuppressed = true;
-          continue;
-        }
-        if (matchedLineNum === null) {
-          matchedLineNum = i + 1;
-          matchedSnippet = line.trim();
-        }
-        if (occurrences.length < MAX_OCCURRENCES) {
-          occurrences.push({ line: i + 1, snippet: line.trim() });
-        }
+      if (!p.re.test(line)) continue;
+      if (p.exclRe && p.exclRe.test(line)) continue;
+      const sup = suppressionFor(line, p.id);
+      if (sup) {
+        lineMatchedAndSuppressed = true;
+        noteSuppressed(p.id, p.section, p.severity, i + 1, sup);
+        continue;
       }
+      lineMatched = true;
+      add(i + 1, line.trim());
     }
 
-    // Fallback: check whole content only if pattern spans multiple lines and was not suppressed on single lines
-    if (!matchedLineNum && !lineMatchedAndSuppressed && p.re.test(content)) {
-      if (!p.exclRe || !p.exclRe.test(content)) {
-        // Check if content has suppression for this id
-        if (!content.split(/\r?\n/).some(l => isSuppressed(l, p.id))) {
-          for (let i = 0; i < fileLines.length; i++) {
-            if (p.re.test(fileLines[i])) {
-              matchedLineNum = i + 1;
-              matchedSnippet = fileLines[i].trim();
-              break;
-            }
-          }
-          if (!matchedLineNum) {
-            const at = content.search(p.re);
-            const line = at >= 0 ? content.slice(0, at).split(/\r?\n/).length : 1;
-            matchedLineNum = line;
-            matchedSnippet = (fileLines[line - 1] || fileLines[0] || '').trim();
-          }
-        }
+    // Fallback: the pattern spans lines. Only when no single line matched and
+    // nothing was suppressed for this id.
+    if (!lineMatched && !lineMatchedAndSuppressed && p.re.test(content)) {
+      if ((!p.exclRe || !p.exclRe.test(content)) && !fileLines.some(l => isSuppressed(l, p.id))) {
+        const at = content.search(p.re);
+        const lineNo = at >= 0 ? content.slice(0, at).split(/\r?\n/).length : 1;
+        add(lineNo, (fileLines[lineNo - 1] || fileLines[0] || '').trim());
       }
     }
+  }
 
-    if (matchedLineNum) {
-      seen.add(p.id);
-      // Multi-line fallback matches produce no per-line occurrence; use the anchor.
-      const found = occurrences.length ? occurrences : [{ line: matchedLineNum, snippet: matchedSnippet }];
-      for (const occ of found) {
-        hits.push({
-          id: p.id,
-          section: p.section,
-          hint: p.hint || '',
-          severity: p.severity || 'medium',
-          line: occ.line,
-          snippet: maskSecret(occ.snippet, p.id),
-        });
-      }
-    }
+  for (const [id, occ] of occById) {
+    if (occ.size === 0) continue;
+    seen.add(id);
+    hits.push(...[...occ.values()].sort((a, b) => a.line - b.line));
   }
 
   // Shannon Entropy Secret Detection
   if (!seen.has('secret-entropy') && (!cfg || cfg.entropyDetection !== false)) {
-    const entropyRegex = /(password|passwd|api_?key|secret|token|auth_?key|private_?key|signing_?key|crypto_?key|master_?key)\s*[:=]\s*["']([A-Za-z0-9+/=_-]{20,})["']/i;
-    for (let i = 0; i < fileLines.length; i++) {
+    // `["']?` after the key: JSON and dict literals quote it ("token": "...").
+    // `\w*` after the keyword: aws_secret_access_key, client_secret_value.
+    // The entropy threshold below keeps the wider net from adding noise.
+    const entropyRegex = /(password|passwd|api_?key|secret|token|auth_?key|private_?key|signing_?key|crypto_?key|master_?key)\w*["']?\s*[:=]\s*["']([A-Za-z0-9+/=_-]{20,})["']/i;
+    let count = 0;
+    for (let i = 0; i < fileLines.length && count < MAX_OCCURRENCES; i++) {
       const line = fileLines[i];
       const m = line.match(entropyRegex);
-      if (m && m[2]) {
-        if (isSuppressed(line, 'secret-entropy') || isSuppressed(line, 'secret')) continue;
-        const secretStr = m[2];
-        // A placeholder in .env.example is high-entropy but is not a secret.
-        // Flagging it as critical trains people to ignore the whole rule.
-        if (/(?:^|[-_])(?:[Yy][Oo][Uu][Rr]|[Ee][Xx][Aa][Mm][Pp][Ll][Ee]|[Pp][Ll][Aa][Cc][Ee][Hh][Oo][Ll][Dd][Ee][Rr]|[Cc][Hh][Aa][Nn][Gg][Ee][Mm][Ee]|[Dd][Uu][Mm][Mm][Yy]|[Mm][Oo][Cc][Kk]|[Ff][Aa][Kk][Ee]|[Ss][Aa][Mm][Pp][Ll][Ee]|[Tt][Oo][Dd][Oo]|[Rr][Ee][Pp][Ll][Aa][Cc][Ee]|[Ii][Nn][Ss][Ee][Rr][Tt]|[Xx]{3,})(?:[-_]|$)/.test(secretStr)) continue;
-        const entropy = calculateShannonEntropy(secretStr);
-        if (entropy >= 3.5) {
-          seen.add('secret-entropy');
-          hits.push({
-            id: 'secret-entropy',
-            section: '06',
-            hint: `high-entropy string detected (Shannon entropy ${entropy.toFixed(2)} bits/byte); move to secret manager`,
-            severity: 'critical',
-            line: i + 1,
-            snippet: maskSecret(line.trim(), 'secret-entropy'),
-          });
-          // Every hardcoded secret needs rotating, so report each one.
-          if (hits.filter(h => h.id === 'secret-entropy').length >= MAX_OCCURRENCES) break;
-        }
-      }
+      if (!m || !m[2]) continue;
+      const secretStr = m[2];
+      // A placeholder in .env.example is high-entropy but is not a secret.
+      // Flagging it as critical trains people to ignore the whole rule.
+      if (/(?:^|[-_])(?:[Yy][Oo][Uu][Rr]|[Ee][Xx][Aa][Mm][Pp][Ll][Ee]|[Pp][Ll][Aa][Cc][Ee][Hh][Oo][Ll][Dd][Ee][Rr]|[Cc][Hh][Aa][Nn][Gg][Ee][Mm][Ee]|[Dd][Uu][Mm][Mm][Yy]|[Mm][Oo][Cc][Kk]|[Ff][Aa][Kk][Ee]|[Ss][Aa][Mm][Pp][Ll][Ee]|[Tt][Oo][Dd][Oo]|[Rr][Ee][Pp][Ll][Aa][Cc][Ee]|[Ii][Nn][Ss][Ee][Rr][Tt]|[Xx]{3,})(?:[-_]|$)/.test(secretStr)) continue;
+      const entropy = calculateShannonEntropy(secretStr);
+      if (entropy < 3.5) continue;
+      const sup = suppressionFor(line, 'secret-entropy') || suppressionFor(line, 'secret');
+      if (sup) { noteSuppressed('secret-entropy', '06', 'critical', i + 1, sup); continue; }
+      // Every hardcoded secret needs rotating, so report each one.
+      count++;
+      hits.push({
+        id: 'secret-entropy',
+        section: '06',
+        hint: `high-entropy string detected (Shannon entropy ${entropy.toFixed(2)} bits/byte); move to secret manager`,
+        severity: 'critical',
+        line: i + 1,
+        snippet: maskSecret(line.trim(), 'secret-entropy'),
+      });
     }
+    if (count > 0) seen.add('secret-entropy');
   }
 
   // Multi-line taint: source assigned to a variable, then used in a sink.
-  if (!cfg || cfg.taintTracking !== false) {
+  if (!secretsOnly && (!cfg || cfg.taintTracking !== false)) {
     for (const flow of findTaintFlows(fileLines)) {
       if (seen.has(flow.sink.id)) continue;
-      if (isSuppressed(fileLines[flow.line - 1], flow.sink.id)) continue;
+      const sup = suppressionFor(fileLines[flow.line - 1], flow.sink.id);
+      if (sup) { noteSuppressed(flow.sink.id, flow.sink.section, flow.sink.severity, flow.line, sup); continue; }
       // Skip only when a pattern already reported this same vulnerability on
       // this line; an unrelated finding on the line must not hide the taint.
       if (hits.some(h => h.line === flow.line && h.section === flow.sink.section)) continue;
@@ -373,12 +403,16 @@ function matchContent(content, filenameOrExt, patterns) {
     }
   }
 
-  return dropSupersededHits(hits);
+  return { hits: dropSupersededHits(hits), suppressed: [...suppressed.values()] };
+}
+
+function matchContent(content, filenameOrExt, patterns) {
+  return matchContentDetailed(content, filenameOrExt, patterns).hits;
 }
 
 function matchFile(file, patterns) {
   const content = fs.readFileSync(file, 'utf8');
-  return matchContent(content, file, patterns);
+  return matchContentDetailed(content, file, patterns);
 }
 
 // Match a file against the config's ignorePaths globs (** and * only).
@@ -426,9 +460,7 @@ function repoRoot() {
 // Scan the index copy of a file rather than the working tree, so `--staged`
 // reflects the commit. Falls back to the worktree if the blob cannot be read.
 function scanStagedBlob(file, patterns) {
-  const ext = path.extname(file).slice(1).toLowerCase();
-  if (SKIP_EXT.has(ext)) return [];
-  if (file.split(path.sep).some(s => SKIP_SEG.includes(s))) return [];
+  if (skippedByName(file)) return [];
   if (isIgnoredPath(file)) return [];
   let content;
   try {
@@ -440,8 +472,8 @@ function scanStagedBlob(file, patterns) {
   } catch {
     return scanSingleFile(file, patterns);
   }
-  const hits = matchContent(content, file, patterns);
-  updateState(file, hits);
+  const { hits, suppressed } = matchContentDetailed(content, file, patterns);
+  updateState(file, hits, suppressed);
   return hits;
 }
 
@@ -449,16 +481,22 @@ function scanSingleFile(file, patterns) {
   if (!fs.existsSync(file)) return [];
   // git can list directories (submodules, extensionless dirs); never read one.
   try { if (!fs.statSync(file).isFile()) return []; } catch (e) { return []; }
-  const ext = path.extname(file).slice(1).toLowerCase();
-  if (SKIP_EXT.has(ext)) return [];
-  const segs = file.split(path.sep);
-  if (segs.some(s => SKIP_SEG.includes(s))) return [];
+  if (skippedByName(file)) return [];
   // .securecodingrc.json ignorePaths — documented but previously unenforced.
   if (isIgnoredPath(file)) return [];
 
-  const hits = matchFile(file, patterns);
-  updateState(file, hits);
+  const { hits, suppressed } = matchFile(file, patterns);
+  updateState(file, hits, suppressed);
   return hits;
+}
+
+// Non-code extensions and vendored/generated directories. `.min.js` is checked
+// by suffix: extname() of app.min.js is "js", so the SKIP_EXT entry alone
+// never matched.
+function skippedByName(file) {
+  const ext = path.extname(file).slice(1).toLowerCase();
+  if (SKIP_EXT.has(ext) || /\.min\.js$/i.test(file)) return true;
+  return file.split(/[\\/]/).some(s => SKIP_SEG.includes(s));
 }
 
 const USAGE = `secure-coding scanner
@@ -498,7 +536,7 @@ function main() {
     const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
     const runId = process.env.SECURE_CODING_RUN_ID || now.slice(0, 10);
     const rec = JSON.stringify({ file, id, section: 'manual', severity: 'medium', status: 'open', run_id: runId, first_seen: now, resolved_at: '', note });
-    writeState(STATE, rec + '\n', { append: true });
+    withFileLock(STATE, () => writeState(STATE, rec + '\n', { append: true }));
     if (REPORT) {
       regenerateReport();
     }
@@ -520,30 +558,39 @@ function main() {
 
     if (args[0] === '--staged') {
       try {
-        const out = execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACM'], { encoding: 'utf8' });
+        // R and C included: a renamed or copied file with new content in it
+        // must be scanned too, or `git mv` hides whatever is added alongside.
+        // -z keeps paths with spaces or non-ASCII unquoted.
+        const out = execFileSync('git', ['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR'], { encoding: 'utf8' });
         const root = repoRoot();
-        filesToScan = out.split(/\r?\n/).filter(Boolean).map(f => path.resolve(root, f));
+        filesToScan = out.split('\0').filter(Boolean).map(f => path.resolve(root, f));
       } catch { filesToScan = []; }
     } else if (args[0] === '--diff') {
       try {
-        const out = execFileSync('git', ['diff', '--name-only', '--diff-filter=ACM'], { encoding: 'utf8' });
+        const out = execFileSync('git', ['diff', '--name-only', '-z', '--diff-filter=ACMR'], { encoding: 'utf8' });
         const root = repoRoot();
-        filesToScan = out.split(/\r?\n/).filter(Boolean).map(f => path.resolve(root, f));
+        filesToScan = out.split('\0').filter(Boolean).map(f => path.resolve(root, f));
       } catch { filesToScan = []; }
     } else if (args[0] === '--all') {
       // Baseline scan of everything tracked. git ls-files respects .gitignore,
       // so build output and node_modules stay out without a second filter.
       try {
         const root = repoRoot();
-        const out = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' });
-        filesToScan = out.split(/\r?\n/).filter(Boolean).map(f => path.resolve(root, f));
+        const out = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' });
+        filesToScan = out.split('\0').filter(Boolean).map(f => path.resolve(root, f));
       } catch { filesToScan = []; }
     } else if (args[0] === '--file' && args[1]) {
       filesToScan = [path.resolve(args[1])];
     } else if (args[0] === '--files') {
       // Drop flags: `--files app.js --json` used to resolve '--json' as a
       // filename, silently skip the missing file, and never apply --json.
-      filesToScan = args.slice(1).filter(f => !f.startsWith('-')).map(f => path.resolve(f));
+      // Everything after a bare `--` is a path, even one starting with '-'.
+      // Without this, a file named -x.js was dropped and reported "clean".
+      const rest = args.slice(1);
+      const dd = rest.indexOf('--');
+      const before = dd === -1 ? rest : rest.slice(0, dd);
+      const after = dd === -1 ? [] : rest.slice(dd + 1);
+      filesToScan = before.filter(f => !f.startsWith('-')).concat(after).map(f => path.resolve(f));
     }
 
     let allHits = [];
@@ -606,10 +653,13 @@ function main() {
 
   let payload = '';
   try { payload = fs.readFileSync(0, 'utf8'); } catch (e) { return; }
-  const m = payload.match(/"file_path"\s*:\s*"([^"]*)"/);
-  if (!m) return;
-  const file = m[1];
-  if (!fs.existsSync(file)) return;
+  const file = hookFilePath(payload);
+  if (!file) return;
+  if (!fs.existsSync(file)) {
+    // A deleted or moved file is normal; say so instead of a silent all-clear.
+    process.stderr.write(`secure-coding: ${file} not found — nothing scanned\n`);
+    return;
+  }
 
   const hits = scanSingleFile(file, patterns);
   if (REPORT) {
@@ -633,13 +683,44 @@ function main() {
     .join('\n\n');
   if (!blocks) return;
 
-  process.stdout.write(`Security patterns found in ${path.basename(file)}. Fix these before continuing:\n\n${blocks}\n`);
+  const more = hits.length > MAX_HITS
+    ? `\n\n(+${hits.length - MAX_HITS} more — run: node hooks/scan.js --file ${JSON.stringify(file)})`
+    : '';
+  // stderr, not stdout: on exit code 2 Claude Code feeds only stderr back to
+  // the agent. Written to stdout, the fix blocks never reached it.
+  process.stderr.write(`Security patterns found in ${path.basename(file)}. Fix these before continuing:\n\n${blocks}${more}\n`);
   process.exit(2);
 }
 
+// The file a PostToolUse payload refers to. Parsed as JSON: a regex over the
+// raw text broke on escaped characters and could pick up a "file_path" that
+// appeared inside the written content. Relative paths resolve against the
+// payload's cwd. NotebookEdit names its target notebook_path.
+function hookFilePath(payload) {
+  let data = null;
+  try { data = JSON.parse(payload); } catch { /* fall through to the regex */ }
+  if (data && typeof data === 'object') {
+    const input = data.tool_input || {};
+    const f = input.file_path || input.notebook_path || input.path
+      || (data.tool_response && data.tool_response.filePath);
+    if (typeof f !== 'string' || !f) return null;
+    return path.resolve(typeof data.cwd === 'string' ? data.cwd : process.cwd(), f);
+  }
+  const m = payload.match(/"file_path"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (!m) return null;
+  try { return path.resolve(JSON.parse(`"${m[1]}"`)); } catch { return null; }
+}
+
 // Track findings: open for current hits, fixed for previously-open ids that
-// no longer match. Preserves fixed history. Rewrites the JSONL state file.
-function updateState(file, hits) {
+// no longer match, suppressed for those an inline comment silenced. Preserves
+// fixed history. Rewrites the JSONL state file under a lock: the agent writes
+// files in parallel, and two hooks doing read-modify-write at once lost
+// each other's records.
+function updateState(file, hits, suppressed = []) {
+  withFileLock(STATE, () => updateStateLocked(file, hits, suppressed));
+}
+
+function updateStateLocked(file, hits, suppressed) {
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   const runId = process.env.SECURE_CODING_RUN_ID || now.slice(0, 10);
 
@@ -659,6 +740,8 @@ function updateState(file, hits) {
     let rec;
     try { rec = JSON.parse(line); } catch (e) { continue; }
     if (rec.file !== file) { kept.push(line); continue; }
+    // Suppressions are re-derived from the file on every scan.
+    if (rec.status === 'suppressed') continue;
     if (rec.status === 'open') openRecs.push(rec);
     else fixedRecs.push(rec);
   }
@@ -666,8 +749,13 @@ function updateState(file, hits) {
   const out = [...kept];
   for (const rec of fixedRecs) out.push(JSON.stringify(rec));
 
+  const supByKey = new Map();
+  for (const sp of suppressed) supByKey.set(keyOf(sp.id, sp.line), sp);
+
   const seenKeys = new Set();
   for (const rec of openRecs) {
+    // Silenced, not fixed: the suppressed record below replaces it.
+    if (rec.line != null && supByKey.has(keyOf(rec.id, rec.line))) continue;
     // Records written before per-occurrence tracking have no line; match on id.
     const key = rec.line == null
       ? [...hitByKey.keys()].find(k => k.startsWith(`${rec.id}@`))
@@ -694,6 +782,17 @@ function updateState(file, hits) {
       status: 'open', run_id: runId, first_seen: now, resolved_at: '',
       line: h.line || 0,
       note: h.line && h.snippet ? `Line ${h.line}: ${h.snippet.slice(0, 100)}` : '',
+    }));
+  }
+
+  for (const sp of supByKey.values()) {
+    out.push(JSON.stringify({
+      file, id: sp.id, section: sp.section || '',
+      severity: sp.severity || 'medium',
+      status: 'suppressed', run_id: runId, first_seen: now, resolved_at: '',
+      line: sp.line || 0,
+      reason: sp.reason || '',
+      note: `Line ${sp.line}: suppressed inline${sp.reason ? ' — ' + sp.reason.slice(0, 100) : ' (no reason given)'}`,
     }));
   }
 
@@ -724,4 +823,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, loadPatterns, scanSingleFile, matchContent, fixBlock, dropSupersededHits };
+module.exports = { main, loadPatterns, scanSingleFile, matchContent, matchContentDetailed, suppressionFor, fixBlock, dropSupersededHits, hookFilePath };

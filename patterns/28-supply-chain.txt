@@ -10,5 +10,5 @@ unpinned-action	yml,yaml	uses:\s+actions/checkout@v\d|uses:\s+actions/setup-\w+@
 docker-digest	Dockerfile	^FROM\s+\S+:[^@\s]+\s*$	!slim|alpine|bookworm|distroless|dockerio	docker: base image pinned to tag only — consider pinning to digest (image@sha256:...) for immutable builds	medium
 docker-digest	Dockerfile	^FROM\s+\S+:(?!latest)[a-zA-Z0-9._-]+\s*$	!slim|alpine|bookworm|distroless|dockerio	docker: pin to digest for reproducible builds: image:tag@sha256:...	medium
 
-npm-audit	yml,yaml	.*npm\s+install.*--production|.*npm\s+ci\s+--production	supply chain: production install without audit — run npm audit before deploy		medium
-npm-audit	yml,yaml	.*npm\s+ci\b.*--ignore-scripts	supply chain: --ignore-scripts skips lifecycle hooks — verify scripts are safe before disabling		medium
+npm-audit	yml,yaml	npm\s+install.*--production|npm\s+ci\s+--production	supply chain: production install without audit — run npm audit before deploy		medium
+npm-audit	yml,yaml	npm\s+ci\b.*--ignore-scripts	supply chain: --ignore-scripts skips lifecycle hooks — verify scripts are safe before disabling		medium

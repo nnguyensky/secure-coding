@@ -6,10 +6,18 @@ on:
   pull_request:
     branches: [ main, master, develop ]
 
+# Least privilege: read the code, write code-scanning results. Nothing else.
+permissions:
+  contents: read
+
 jobs:
   security-audit:
     name: OWASP Secure Coding & Dependency Audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # upload-sarif
+      actions: read            # upload-sarif on private repositories
 
     steps:
       - name: Checkout code
@@ -37,15 +45,20 @@ jobs:
       - name: Run Clean Code Quality Linter
         run: node hooks/clean.js --all
 
+      # --strict: a lock file whose audit cannot run fails the job instead of
+      # passing as "no advisories".
       - name: Run Dependency Vulnerability Audit
-        run: node hooks/audit.js
+        run: node hooks/audit.js --strict
 
       - name: Scan PR Changes for Security Smells
         if: github.event_name == 'pull_request'
         run: |
-          git diff --name-only --diff-filter=ACM origin/${{ github.base_ref }}...HEAD > pr_files.txt
+          # ACMR: renamed files are scanned too. mapfile + "--" keeps paths
+          # with spaces or a leading dash intact.
+          git diff --name-only --diff-filter=ACMR origin/${{ github.base_ref }}...HEAD > pr_files.txt
           if [ -s pr_files.txt ]; then
-            node hooks/scan.js --files $(cat pr_files.txt)
+            mapfile -t files < pr_files.txt
+            node hooks/scan.js --files -- "${files[@]}"
           else
             echo "No changed files to scan."
           fi

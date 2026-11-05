@@ -258,7 +258,7 @@ function handleToolCall(name, args) {
       const scanArgs = [];
       if (args.staged) scanArgs.push('--staged');
       else if (args.diff) scanArgs.push('--diff');
-      else if (args.files && args.files.length) scanArgs.push('--files', ...args.files);
+      else if (args.files && args.files.length) scanArgs.push('--files', '--', ...args.files.map(String));
 
       const res = spawnSync('node', [SCAN_SCRIPT, ...scanArgs], {
         encoding: 'utf8',
