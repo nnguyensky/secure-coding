@@ -1,7 +1,7 @@
 {
   "name": "secure-coding",
   "version": "2.5.0",
-  "description": "Scans every file an AI agent writes against 515 OWASP, Secure-by-Design and CWE patterns in ~1ms. Blocks commits on findings, and on the ownership and authorization questions no pattern can answer.",
+  "description": "Scans every file an AI agent writes against 516 OWASP, Secure-by-Design and CWE patterns in ~1ms. Blocks commits on findings, and on the ownership and authorization questions no pattern can answer.",
   "keywords": [
     "security",
     "secure-coding",

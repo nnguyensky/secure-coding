@@ -3489,6 +3489,59 @@ bad('cpp_system', 'cpp', 'std::system(cmd.c_str());', 'shell');
 bad('cpp_rand_token', 'cpp', 'auto token = std::to_string(std::rand());', 'weak-rng');
 good('cpp_safe', 'cpp', 'std::array<unsigned char, 32> token;\nrandombytes_buf(token.data(), token.size());\n');
 
+// --- comments, templates and false-positive regressions ---
+(function commentsAndTemplates() {
+  const { loadPatterns, matchContent } = require('./scan.js');
+  const pats = loadPatterns();
+  const ids = (code, ext) => matchContent(code, 'cm.' + ext, pats).map(h => h.id);
+  const T = (name, cond) => { uniq(name); if (cond) pass++; else { fail++; console.log(`MISS  ${name}`); } };
+
+  // A pattern named in a comment is not code; real code and secrets still count.
+  T('comment-not-flagged-js', !ids('// never: eval(userInput) or el.innerHTML = x\n', 'js').length);
+  T('comment-not-flagged-py', !ids('# never: os.system("rm " + x); hashlib.md5(x)\n', 'py').length);
+  T('comment-secret-still-flagged', ids('// password = "Hunter2Hunter2xyz"\n', 'js').includes('secret'));
+  T('code-before-comment-flagged', ids('eval(x); // fine\n', 'js').includes('eval'));
+  T('cobol-fixed-comment', !ids('      * never: CALL WS-PROG USING WS-DATA.\n', 'cbl').length);
+  T('cobol-code-flagged', ids('           CALL WS-PROG USING WS-DATA.\n', 'cbl').includes('cobol-dynamic-call'));
+  T('deprecated-comment-still-flagged', ids('/** @deprecated */\n', 'js').includes('API-9'));
+
+  // Safe code that used to be flagged.
+  T('py-log-args-ok', !ids('logging.info("login ok user=%s", user)\n', 'py').includes('log-inject'));
+  T('py-log-percent-flagged', ids('logging.info("login " % request.args["u"])\n', 'py').includes('log-inject'));
+  T('rb-system-args-ok', !ids('system("ls", "-l", dir)\n', 'rb').includes('shell'));
+  T('rb-system-string-flagged', ids('system("ls #{dir}")\n', 'rb').includes('shell'));
+  T('go-crypto-rand-ok', !ids('import "crypto/rand"\nfunc f(){ rand.Read(salt) }\n', 'go').includes('weak-rng'));
+  T('go-math-rand-flagged', ids('import "math/rand"\nfunc f(){ salt := rand.Int() }\n', 'go').includes('weak-rng'));
+  T('upload-dir-param-ok', !ids('fn f(data: &[u8], upload_dir: &Path) {}\n', 'rs').includes('file-upload'));
+  T('upload-dir-assign-flagged', ids('UPLOAD_FOLDER = "/var/www/uploads"\n', 'py').includes('file-upload'));
+  T('sql-xp-cmdshell-off-ok', !ids("EXEC sp_configure 'xp_cmdshell', 0;\n", 'sql').includes('shell'));
+  T('sql-xp-cmdshell-on-flagged', ids("EXEC xp_cmdshell @cmd\n", 'sql').includes('shell'));
+  T('groovy-gstring-ok', !ids('sql.rows("SELECT id FROM users WHERE email = ${email}")\n', 'groovy').includes('sql-concat'));
+  T('groovy-concat-flagged', ids('sql.rows("SELECT id FROM users WHERE email = " + email)\n', 'groovy').includes('sql-concat'));
+  T('yaml-schema-ok', !ids('const c = yaml.load(t, { schema: yaml.JSON_SCHEMA });\n', 'js').includes('insecure-deserialization'));
+  T('yaml-plain-flagged', ids('cfg = yaml.load(text)\n', 'py').includes('insecure-deserialization'));
+  T('rb-log-plain-error-ok', !ids('Rails.logger.error("failed: #{e}")\n', 'rb').includes('log-inject'));
+  T('rb-log-params-flagged', ids('Rails.logger.info("q=#{params[:q]}")\n', 'rb').includes('log-inject'));
+
+  // Every secure snippet in every template must scan clean, so a template can
+  // never teach what the scanner rejects. Lines starting a "never" example,
+  // and the few controls that only remind the reader to validate, are skipped.
+  const ext = { typescript: 'ts', javascript: 'js', python: 'py', go: 'go', rust: 'rs', java: 'java', kotlin: 'kt', swift: 'swift', csharp: 'cs', c: 'c', php: 'php', ruby: 'rb', shell: 'sh', cpp: 'cpp', powershell: 'ps1', sql: 'sql', scala: 'scala', dart: 'dart', groovy: 'groovy', cobol: 'cbl', vbnet: 'vb', abap: 'abap', apex: 'cls', objc: 'm', perl: 'pl', lua: 'lua', elixir: 'ex', solidity: 'sol', r: 'r' };
+  const REMINDERS = new Set(['file-upload']); // fires on any upload handler, by design
+  const bad2 = [];
+  for (const [lang, e] of Object.entries(ext)) {
+    const md = fs.readFileSync(path.join(DIR, 'templates', `${lang}.md`), 'utf8');
+    const code = (md.match(/```[\w+-]*\n[\s\S]*?```/g) || [])
+      .map(b => b.replace(/^```[\w+-]*\n/, '').replace(/```$/, ''))
+      .join('\n').split('\n').filter(l => !/\bnever\b/i.test(l)).join('\n');
+    const hits = matchContent(code, `tpl.${e}`, pats).filter(h => !REMINDERS.has(h.id));
+    if (hits.length) bad2.push(`${lang}:${[...new Set(hits.map(h => h.id))].join('/')}`);
+  }
+  uniq('templates-scan-clean');
+  if (bad2.length === 0) pass++;
+  else { fail++; console.log(`MISS  templates-scan-clean: ${bad2.join(' ')}`); }
+})();
+
 // --- fix.js --apply autofix engine ---
 const fixTestFile = path.join(TMP, 'autofix-test.js');
 fs.writeFileSync(fixTestFile, 'const token = Math.random();\n');

@@ -4,7 +4,7 @@
 
 insecure-deserialization	*	pickle\.loads?\s*\(	use JSON or a safe format; validate shape after parsing		critical
 insecure-deserialization	*	cPickle\.loads?\s*\(			critical
-insecure-deserialization	*	yaml\.load\s*\(			critical
+insecure-deserialization	*	yaml\.load\s*\(	!Loader\s*=\s*(yaml\.)?(Safe|CSafe|Base)Loader|schema\s*:\s*\w+\.(JSON|CORE|FAILSAFE)_SCHEMA	use yaml.safe_load, or a data-only schema	critical
 insecure-deserialization	*	\bunserialize\s*\(			critical
 insecure-deserialization	*	readObject\s*\(\s*\)			critical
 insecure-deserialization	*	Marshal\.load\s*\(			critical

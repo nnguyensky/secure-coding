@@ -5,8 +5,8 @@
 # id	exts	regex	!exclude	hint  (ONE regex: !a|b|c, never !a|!b|!c)
 log-inject	*	console\.(log|warn|error|info|debug)\s*\([^)]*\$\{[^}]*(\b(?:req|request|res)\.|\b(?:userInput|user_input|userData|input|body|params|query)\b)	log injection: sanitize user input before logging; strip CR/LF		medium
 log-inject	*	console\.(log|warn|error|info|debug)\s*\([^)]*\+\s*(\b(?:req|request|res)\.|\b(?:userInput|user_input|userData|input|body|params|query)\b)			medium
-log-inject	py	(log|logging|logger)\.(debug|info|warning|error|critical|exception)\s*\([^)]*(?:\.format\s*\(|f["']|%\s*)	log injection: use structured logging, sanitize user input		medium
-log-inject	rb	Rails\.logger\.(debug|info|warn|error|fatal)\s*\([^)]*#\{|logger\.(debug|info|warn|error)\s*\([^)]*#\{			medium
+log-inject	py	(log|logging|logger)\.(debug|info|warning|error|critical|exception)\s*\([^)]*(?:\.format\s*\(|f["']|["']\s*%\s*\w)	log injection: use structured logging, sanitize user input		medium
+log-inject	rb	(Rails\.)?logger\.(debug|info|warn|error|fatal)\s*\([^)]*#\{[^}]*(params|request|req\b|user_input|input|cookies|headers)	!sanitiz\w*\s*\(	strip CR/LF from request data before logging	medium
 log-inject	go	log\.(Print|Printf|Println|Fatal|Fatalf)\s*\([^)]*\+|log\.(Debug|Info|Warn|Error)\s*\([^)]*fmt\.Sprintf			medium
 log-inject	java,kt	(Log|log|logger|Logger)\.(debug|info|warn|error|trace)\s*\([^)]*\+\s*(req\.|request\.|user|input)			medium
 log-inject	cs	(Log|log|Logger|logger)\.(Debug|Information|Warning|Error)\s*\([^)]*\+\s*(req\.|request\.|user|input)			medium

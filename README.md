@@ -4,7 +4,7 @@
 
 **Security checks for code written by AI agents — while it is being written.**
 
-[![Tests](https://img.shields.io/badge/Tests-774%20Passing-brightgreen?style=flat-square)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-798%20Passing-brightgreen?style=flat-square)](hooks/test.js)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025-critical?style=flat-square)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025-blue?style=flat-square)](checks/llm-top10.md)
 [![Dependencies](https://img.shields.io/badge/runtime%20dependencies-0-success?style=flat-square)](package.json)
@@ -20,7 +20,7 @@ package name the model made up — the agent gets the fix before it moves on.
 Before a commit, it asks the questions a scanner cannot answer, such as "who is
 allowed to read this record?".
 
-- **515 patterns** mapped to CWE and the OWASP Top 10:2025, across 29 language templates
+- **516 patterns** mapped to CWE and the OWASP Top 10:2025, across 29 language templates
 - **Taint tracking**: follows request data into SQL, files, shell, URLs, HTML and LLM system prompts
 - **Dependency guard**: blocks packages that do not exist or were published days ago
 - **Secrets**: in code, in `.json` files, and in git history

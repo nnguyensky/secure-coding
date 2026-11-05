@@ -188,24 +188,31 @@ const LEXICAL = {
   lua: { line: ['--'], block: false, quotes: '"\'' },
   sql: { line: ['--'], block: true, quotes: "'" },
   vb: { line: ["'"], block: false, quotes: '"' },
-  cbl: { line: ['*>'], block: false, quotes: '"\'' },
+  cbl: { line: ['*>'], block: false, quotes: '"\'', starLine: true },
   abap: { line: ['"'], block: false, quotes: "'`" },
 };
 
-// Boolean per character: true where the character is code.
-function codeMask(line, lang) {
+// Boolean per character: true where the character is code. With `comments`
+// given (an array), also marks the characters that are comment, not string.
+function codeMask(line, lang, comments) {
   const mask = new Array(line.length).fill(true);
   let i = 0;
+  // COBOL fixed format: `*` in column 7 (or a leading `*`) makes the line a comment.
+  if (lang.starLine && /^[\s\d]{0,6}\*/.test(line)) {
+    mask.fill(false);
+    if (comments) comments.fill(true);
+    return mask;
+  }
   while (i < line.length) {
     const c = line[i];
     if (lang.line.some(t => line.startsWith(t, i))) {
-      for (let k = i; k < line.length; k++) mask[k] = false;
+      for (let k = i; k < line.length; k++) { mask[k] = false; if (comments) comments[k] = true; }
       break;
     }
     if (lang.block && line.startsWith('/*', i)) {
       const end = line.indexOf('*/', i + 2);
       const stop = end === -1 ? line.length : end + 2;
-      for (let k = i; k < stop; k++) mask[k] = false;
+      for (let k = i; k < stop; k++) { mask[k] = false; if (comments) comments[k] = true; }
       i = stop;
       continue;
     }
@@ -220,6 +227,34 @@ function codeMask(line, lang) {
     i++;
   }
   return mask;
+}
+
+// True when every match of `p` on the line starts inside a comment. Secrets
+// are exempt (a key left in a comment is still leaked), and so are rules about
+// string contents, which `codeOnly` already handles separately.
+function blankComments(line, lang) {
+  const comments = new Array(line.length).fill(false);
+  codeMask(line, lang, comments);
+  let out = '';
+  for (let k = 0; k < line.length; k++) out += comments[k] ? ' ' : line[k];
+  return out;
+}
+
+// Rules that exist to read comments (deprecation markers, "remove before prod" notes).
+const COMMENT_RULES = new Set(['API-9', 'test-code']);
+
+function onlyInComment(p, line, lang) {
+  if (!p.reG || COMMENT_RULES.has(p.id)) return false;
+  const comments = new Array(line.length).fill(false);
+  codeMask(line, lang, comments);
+  p.reG.lastIndex = 0;
+  let m, any = false;
+  while ((m = p.reG.exec(line)) !== null) {
+    any = true;
+    if (!comments[m.index]) return false;
+    if (m[0].length === 0) p.reG.lastIndex++;
+  }
+  return any;
 }
 
 function matchesInCode(p, line, lang) {
@@ -509,6 +544,7 @@ function matchContentDetailed(content, filenameOrExt, patterns) {
       anyLineHit = true;
       if (p.exclRe && p.exclRe.test(line)) continue;
       if (p.codeOnly && maskLangs && !matchesInCode(p, line, maskLangs)) continue;
+      if (!p.codeOnly && maskLangs && !/^secret/.test(p.id) && onlyInComment(p, line, maskLangs)) continue;
       const sup = suppressionFor(line, p.id);
       if (sup) {
         lineMatchedAndSuppressed = true;
@@ -526,8 +562,12 @@ function matchContentDetailed(content, filenameOrExt, patterns) {
     // comment to Math.random() forty lines later.
     if (!anyLineHit && p.re.test(content)) {
       if ((!p.exclRe || !p.exclRe.test(content)) && !fileLines.some(l => isSuppressed(l, p.id))) {
+        // Comments are blanked first, so a word in a comment cannot join
+        // code on another line into a match.
+        const blank = maskLangs && !/^secret/.test(p.id) && !COMMENT_RULES.has(p.id);
+        const winLines = blank ? fileLines.map(l => blankComments(l, maskLangs)) : fileLines;
         for (let i = 0; i < fileLines.length; i++) {
-          const win = fileLines.slice(i, i + FALLBACK_WINDOW).join('\n');
+          const win = winLines.slice(i, i + FALLBACK_WINDOW).join('\n');
           const m = p.re.exec(win);
           if (!m || win.slice(0, m.index).includes('\n')) continue; // starts on a later line
           if (p.codeOnly && maskLangs && /^\s*(\/\/|#|\/\*|\*)/.test(fileLines[i])) continue;
