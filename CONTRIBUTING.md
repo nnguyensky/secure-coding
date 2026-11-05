@@ -96,6 +96,22 @@ node hooks/test.js   # run all tests
 
 Both must pass with 0 errors.
 
+## One defect, one finding
+
+Patterns overlap: a broad rule and a language-specific rule often match the
+same line. Each defect must be reported once:
+
+- **Same id** — every regex with that id is checked, and each line is reported
+  once. Reuse an existing id for the same defect in another language.
+- **Different ids, same line** — the more specific one wins through
+  `SUPERSEDES` in `hooks/scan.js` (`secret-aws-key` absorbs `secret`).
+- **Two real defects on one line** — both are reported (TLS verification off
+  and a missing timeout are different bugs).
+
+Each occurrence is its own finding, tracked by `(file, id, line)`, so fixing
+one of three SQL injections closes only that one. Occurrences per rule per file
+are capped at 20 (`SECURE_CODING_MAX_OCCURRENCES`).
+
 ## 5. What not to add
 
 - **Style issues** — naming, formatting, file organization. Not security.
@@ -115,4 +131,7 @@ checks/review.md         manual review checklist
 hooks/test.js            test cases (bad/good)
 hooks/scan.js            scanner (reads patterns/)
 hooks/sync.js            consistency validator
+dashboard/               dashboard source (React); npm run dashboard:build
+                         writes reports/dashboard.html — commit both
+docs/images/             README screenshots
 ```

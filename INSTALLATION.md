@@ -27,16 +27,15 @@
 Run the interactive terminal wizard directly via npm/npx:
 
 ```bash
-# This runs whatever is on main right now. To pin a reviewed version,
-# append #<tag-or-sha>: github:nnguyensky/secure-coding#<tag-or-sha>
+# Pin a release tag (see the repository's tags for the latest).
 # Launch interactive setup wizard
-npx github:nnguyensky/secure-coding --global
+npx github:nnguyensky/secure-coding#v2.4.0 --global
 
 # Or install with MCP server and Antigravity rules non-interactively
-npx github:nnguyensky/secure-coding --global --agent antigravity --mcp --yes
+npx github:nnguyensky/secure-coding#v2.4.0 --global --agent antigravity --mcp --yes
 ```
 
-An install puts nine commands on your PATH. Every one takes `--help`, and
+An install puts twelve commands on your PATH. Every one takes `--help`, and
 `--help` never runs the tool:
 
 | Command | Does |
@@ -50,6 +49,9 @@ An install puts nine commands on your PATH. Every one takes `--help`, and
 | `secure-coding-fix` | Prints remediation guidance; `--apply` rewrites in place. |
 | `secure-coding-config` | Reads or initializes `.securecodingrc.json`, or opens the wizard. |
 | `secure-coding-mcp` | Runs the Model Context Protocol stdio server. |
+| `secure-coding-deps` | Checks dependencies a change adds: missing, brand new, install scripts. |
+| `secure-coding-history` | Finds secrets in past commits. |
+| `secure-coding-dashboard` | Starts the local dashboard. |
 
 ---
 

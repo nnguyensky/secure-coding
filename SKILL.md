@@ -1,278 +1,152 @@
 ---
 name: secure-coding
-description: Use when writing or changing code that handles user input, authentication, sessions, permissions, secrets, databases, files, network calls, AI/LLMs, or raw memory. Applies OWASP, Secure by Design, and Clean Code standards on first write.
+description: Use when writing or changing code that handles user input, authentication, sessions, permissions, secrets, databases, files, network calls, AI/LLM prompts or tools, or raw memory. Write it secure the first time, then scan and answer the review questions before calling it done.
 ---
 
 # Secure Coding
 
-**Rule 1: Never write insecure code to fix later.**
-Apply security standards while writing the code. The first version of any function, route, or module must be secure. The scanner is a safety net, not the primary plan.
+Two rules:
 
-**Rule 2: Fix every finding before shipping.**
-No finding is marked as accepted, deferred, or ignored without an explicit reviewed reason. Fix it immediately or remove the insecure code.
+1. **Write it secure the first time.** Don't plan to fix it later. The scanner is a safety net, not the plan.
+2. **Fix every finding.** Don't defer or ignore one. If a finding is genuinely wrong, suppress that one line with a reason (see below).
 
----
+## Step 0 — Ask before deciding
 
-## 🚀 4-Step Workflow
-
-### Step 0: Before Deciding — Ask, Don't Guess
-
-If the task creates or changes a **route, auth, tenancy, a data model, an
-upload, an outbound call, or an LLM tool**, the security-relevant decisions are
-not yours to assume. Run the interview in
+If the task creates or changes a **route, login or permissions, tenancy, a data
+model, a file upload, an outbound call, or an LLM tool**, some decisions are the
+user's, not yours. Ask them in one message, each with the safe default you
+recommend, then wait. The questions are in
 [`checks/secure-grilling.md`](checks/secure-grilling.md):
-ask the whole frontier in one round, recommend the secure default for each, and
-wait for the answer.
 
-Five frontiers, each pre-answering a Done Gate question: **identity & boundary**,
-**tenancy & ownership**, **data classification**, **failure direction**, and
-**action irreversibility**.
+- **Identity** — who can call this, and how do we know who they are?
+- **Tenancy** — whose data is this, and what stops one user reading another's?
+- **Data** — how sensitive is it: public, internal, personal, secret?
+- **Failure** — if a check errors, do we deny or allow?
+- **Irreversibility** — can the action be undone? Does it need confirmation?
 
-Skip this for a bug fix inside an existing boundary, a pure refactor, docs, or
-tests. Look facts up yourself — only unsettled *decisions* go to the user.
+Look up facts yourself; only ask about decisions. Skip this step for bug fixes
+inside existing code, refactors, docs and tests.
 
-### Step 1: Before Writing — Pick Rules & Architecture
+## Step 1 — Before writing
 
-1. **Check if your task touches a specialized domain:**
-   - **System Architecture & Zero Trust** → [`checks/secure-by-design.md`](checks/secure-by-design.md) (OWASP SbD 36-control checklist, ACSC Modern Defensible Architecture, Ingress Normalization)
-   - **Memory Safety & C/C++ Hardening** → [`checks/memory-safety.md`](checks/memory-safety.md) (Memory safe roadmap, language selection matrix, Safe Intermediary Wrappers, compiler flags)
-   - **Keys & Cryptography** → [`checks/cryptography.md`](checks/cryptography.md) (FIPS 140-3 KMS, envelope encryption, chain of trust & revocation, positions of trust, PQC)
-   - **IoT & Embedded Systems** → [`checks/iot-security.md`](checks/iot-security.md) (AS ETSI EN 303 645 13 principles, Secure Boot, JTAG lockout)
-   - **Release & Deployment Safety** → [`checks/deployment-safety.md`](checks/deployment-safety.md) (Pre-mortem failure analysis, canary rollout pipeline)
-   - **Supply Chain, AI-SBOM & VEX** → [`checks/sbom.md`](checks/sbom.md) (BSI 7 AI clusters, ACSC/CISA VEX exploitability states)
-   - **Adopting a Dependency, Vendor or SaaS** → [`checks/technology-selection.md`](checks/technology-selection.md) (ACSC procurement questions, Secure by Default, supply chain & jurisdiction)
-   - **AI/LLMs & Prompts** → [`checks/llm-top10.md`](checks/llm-top10.md) (Prompt injection, output handling, excessive agency, token caps)
-   - **Settling Architecture Before Coding** → [`checks/secure-grilling.md`](checks/secure-grilling.md) (5 security frontiers, frontier rounds with secure defaults, pre-answers the Done Gate)
-   - **Threat Modeling** → [`checks/threat-model.md`](checks/threat-model.md) (STRIDE & DREAD analysis)
-   - **SSDF Attestation & Coverage** → [`checks/ssdf-mapping.md`](checks/ssdf-mapping.md) (NIST SP 800-218 PO/PS/PW/RV map, and the gaps this skill does not cover)
-   - **Dynamic Testing & Fuzzing** → [`checks/dynamic-testing.md`](checks/dynamic-testing.md) (what to fuzz based on findings, tooling per language, races and authz matrices)
-   - **OWASP Top 10 (2025) & CWE ids** → [`checks/owasp-top10-2025.md`](checks/owasp-top10-2025.md) (category → CWE → pattern map, and which categories patterns cannot cover)
+Read only what the task needs:
 
-2. **Identify which of the 9 code groups apply:**
-   - (1) Data in/out • (2) Identity & Auth • (3) Secrets & Crypto • (4) Errors & Logs • (5) Storage & Transport • (6) Files & System • (7) Deployment & Config • (8) API Security • (9) Containers & Cloud
+| Task | Read |
+|---|---|
+| Any code in a known language | `templates/<language>.md` — copy-ready secure versions of 25 controls |
+| Architecture, trust boundaries | [`checks/secure-by-design.md`](checks/secure-by-design.md) |
+| Threats in a new feature | [`checks/threat-model.md`](checks/threat-model.md) |
+| Keys, encryption, signing | [`checks/cryptography.md`](checks/cryptography.md) |
+| LLM prompts, tools, RAG | [`checks/llm-top10.md`](checks/llm-top10.md) |
+| C, C++, `unsafe` Rust | [`checks/memory-safety.md`](checks/memory-safety.md) |
+| IoT and firmware | [`checks/iot-security.md`](checks/iot-security.md) |
+| Choosing a library, vendor or SaaS | [`checks/technology-selection.md`](checks/technology-selection.md) |
+| Releases and rollouts | [`checks/deployment-safety.md`](checks/deployment-safety.md) |
+| SBOM, AI-SBOM, VEX | [`checks/sbom.md`](checks/sbom.md) |
+| What to fuzz or test dynamically | [`checks/dynamic-testing.md`](checks/dynamic-testing.md) |
+| Mapping to OWASP Top 10, CWE or NIST SSDF | [`checks/owasp-top10-2025.md`](checks/owasp-top10-2025.md), [`checks/ssdf-mapping.md`](checks/ssdf-mapping.md) |
 
-3. **Need a copy-paste secure pattern?** Load `templates/<language>.md` (13 languages supported).
+The nine areas to check in every change are in [`checks/code-groups.md`](checks/code-groups.md):
+data in/out, identity and access, secrets and crypto, errors and logs, storage
+and transport, files and system, config, API limits, containers and cloud.
 
----
-
-### Step 2: While Writing — Build Securely & Cleanly
-
-Write code that is secure by default from line one:
+## Step 2 — While writing
 
 ```python
-# ❌ WRONG: String formatting in queries
+# Wrong: user input inside the SQL text
 cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
 
-# ✅ RIGHT: Parameterized from the start
+# Right: a parameter
 cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
 ```
 
-#### First-Write Security Checklist:
-- **Input:** Validate server-side against an allowlist; check types and lengths.
-- **Output:** Context-escape for HTML, SQL, shell, URL, or JSON.
-- **Auth:** Deny by default, verify ownership on every request, fail closed.
-- **Secrets:** Read from environment or secret manager; never hardcode or log.
-- **Crypto:** Use high-level standard libraries (AES-GCM, Argon2id); never hand-assemble.
-- **Errors:** Hide stack traces and internal details from end-users; log safely.
+- **Input** — validate on the server against an allowlist: type, length, format.
+- **Output** — escape for where it goes: HTML, SQL, shell, URL, JSON.
+- **Access** — deny by default. Check the caller owns every record they ask for.
+- **Secrets** — from the environment or a secret manager. Never in code or logs.
+- **Crypto** — use the standard library's high-level API (AES-GCM, Argon2id). Never build your own.
+- **Errors** — fail closed. Show users a generic message; log the detail without secrets.
+- **Packages** — never guess a package name. Look it up. A made-up name can be registered by an attacker.
 
-#### Clean Code Standards (`checks/clean-code.md`):
-- **N3 (Constants):** Replace magic numbers with named constants.
-- **F1 (Focus):** Functions do one thing. If a name has "And" (`saveAndEmail`), split it.
-- **F2 (Parameters):** Max 2-3 parameters. Bundle larger sets into an options object.
-- **F5 (Flags):** Avoid boolean flags in function arguments; split into separate functions.
-- **T1 (Purity):** Return new values instead of mutating input arguments.
-- **C1/C2 (Hygiene):** Delete dead code and commented-out blocks.
+Keep it readable too ([`checks/clean-code.md`](checks/clean-code.md)): named
+constants instead of magic numbers, one job per function, few parameters, no
+dead code.
 
----
-
-### Step 3: After Writing — Scan, Verify & Fix
-
-Run verification to confirm zero open issues:
-
-1. **Auto-Scan:** `node hooks/scan.js --staged` (~1ms for a typical file,
-   ~20ms for a 2000-line one). This includes
-   multi-line taint tracking: request data assigned to a variable and later
-   used in a file, HTTP, process, or query call is reported as `taint-*`.
-   Disable with `"taintTracking": false` in `.securecodingrc.json`.
-2. **Review Guidance:** Fix any flagged patterns using the provided `When / Wrong / Right / Watch` blocks.
-3. **Autofix:** Run `node hooks/fix.js --dry-run` to see the line-by-line change, then `--apply`. Only a handful of rules are automatic; everything else prints the manual fix.
-4. **Audit Dependencies:** `node hooks/deps.js` before installing any package you added — it fails on names that do not exist (never invent a package name; look it up) and on packages published in the last 30 days. Then `node hooks/audit.js` (known advisories in lockfiles).
-5. **Quality Check:** `node hooks/clean.js <path>` (or `--all` for the whole repo).
-6. **Done Gate:** Run `node hooks/summary.js && node hooks/audit.js && node hooks/gate.js --check`.
-
-#### Done Gate Criteria:
-
-**Tool checks — necessary, not sufficient:**
-- [ ] `summary.js` reports `0 open` findings.
-- [ ] `audit.js` reports `0 critical/high` vulnerabilities.
-- [ ] Every finding is fixed in code (never marked as accepted or deferred).
-- [ ] Tests pass cleanly (`node hooks/test.js`).
-- [ ] `gate.js --check` reports complete.
-
-**Manual review — enforced by `node hooks/gate.js --check`, which exits 2 until
-every question is answered.** A green scan is not a pass on its own. Record each
-answer as you go:
+## Step 3 — After writing
 
 ```bash
-node hooks/gate.js --answer ownership "scoped by db.order.findFirst({where:{id, userId}})"
-node hooks/gate.js --answer authorization "requireAdmin middleware on the router"
-node hooks/gate.js --answer taint "N/A — no new request values"
-node hooks/gate.js --answer failure-direction "catch returns 403; covered by test"
+node hooks/scan.js --staged     # findings in what you changed
+node hooks/deps.js              # packages you added: do they exist? are they new?
+node hooks/fix.js --dry-run     # automatic fixes, if any; --apply to write them
+node hooks/audit.js             # known advisories in lock files
 ```
 
-Enable commit-time blocking with `git config secure-coding.gate true` once the
-git hooks are installed. "N/A" is valid when a question does not apply. `"yes"`, `"ok"` and `"done"` are
-rejected — name the check. Answers are tied to the current commit, so new work
-needs a new review. For every route, handler, or data access you added or
-changed:
+Fix what they report, using the guidance printed with each finding (wrong code,
+right code, what to watch for).
 
-- [ ] **Ownership:** For each record fetched by an ID from the request, what
-      scopes it to the caller? Name the check. `findById(req.params.id)` with
-      no owner predicate is BOLA/IDOR — the single most common API breach, and
-      no pattern can see it. (Smell 1, 4)
-- [ ] **Authorization:** For each new route, which guard denies an
-      unauthenticated or under-privileged caller? Deny-by-default, or a named
-      middleware. An admin route with no guard scans clean. (Smell 2, 4)
-- [ ] **Untrusted input reaching a sink:** Trace each request value to where
-      it lands — query, file path, shell, outbound URL, template. Taint
-      tracking catches the direct cases (`taint-*` findings), but only within
-      one function and one hop; anything through a helper, an object field, or
-      another module is yours to trace. (Smell 1)
-- [ ] **Failure direction:** If the auth or permission check throws, does the
-      request end up denied? (Smell 4)
+## Step 4 — Before saying "done"
 
-If you cannot name the check, it does not exist — go add it.
+```bash
+node hooks/summary.js && node hooks/audit.js && node hooks/gate.js --check
+```
 
----
+`summary.js` must show `0 open`. `gate.js --check` fails until you answer four
+questions that no scanner can check. For every route, handler or data access you
+added or changed:
 
-## 🛡️ The 9 Security Code Groups
+- **ownership** — for each record fetched by an ID from the request, what limits it to the caller? `findById(req.params.id)` with no owner check is the most common API breach.
+- **authorization** — which guard stops an unauthenticated or under-privileged caller on each new route?
+- **taint** — where does each request value end up: query, file path, shell, URL, template, prompt? The scanner follows one function and one hop; the rest is yours to trace.
+- **failure-direction** — if the permission check throws, is the request denied?
 
-Identify which apply, then write to them. Full per-group requirements: [`checks/code-groups.md`](checks/code-groups.md).
+```bash
+node hooks/gate.js --answer ownership "scoped by findFirst({ where: { id, userId } })"
+node hooks/gate.js --answer taint "N/A — no new request values"
+```
 
-1. **Data In/Out** — validate server-side against an allowlist; parameterize every query; no unsafe deserialization; escape per output context.
-2. **Identity & Access** — deny by default; verify ownership on every request; rotate session id on login; CSRF tokens; Argon2id.
-3. **Secrets & Crypto** — env or KMS, never source; CSPRNG; constant-time compare; AES-GCM or ChaCha20-Poly1305.
-4. **Failure & Visibility** — fail closed; generic errors to users; redact secrets and PII from logs; strip CR/LF.
-5. **Storage & Transport** — TLS 1.3, HSTS, `Cache-Control: no-store`; least-privilege DB credentials.
-6. **Files & System** — canonicalize and bound paths; validate uploads by content; argument arrays, never shell strings.
-7. **Deployment & Config** — `DEBUG=False`; no default accounts; non-root containers; pinned lockfiles and Actions.
-8. **API Security** — SSRF allowlists; rate limits; DTOs over mass assignment; max page size and body size.
-9. **Containers & Cloud** — `runAsNonRoot`, drop ALL capabilities, NetworkPolicy, no host namespace sharing.
+Name the actual check. "N/A — reason" is fine; "yes" or "ok" is rejected. If you
+cannot name the check, it does not exist yet: add it.
 
+## What a clean scan does not prove
 
-## ⚠️ What the Scanner Cannot See
+The scanner matches known bad patterns. It cannot see a check that is missing,
+data flowing through helpers or other files, business-logic flaws, or what is
+deployed. Zero findings means nothing known was matched, not that the code is
+safe. That is why Step 0 and Step 4 exist.
 
-The scanner matches regexes line by line. That makes it fast and precise on
-what it covers, and structurally blind to everything below. **A clean scan
-means "no known bad patterns matched" — never "this code is secure."**
+Also watch for:
 
-| Blind spot | Why | Who catches it |
-|---|---|---|
-| **Missing checks** (IDOR/BOLA, absent authz, no rate limit) | A regex sees what is *present*. There is no pattern for a guard that was never written. | Done Gate manual review |
-| **Taint beyond one hop** | The taint pass follows `var = <request data>` into a sink, plus one hop through interpolation, within a single function. Longer chains, helper calls, and object fields are not followed. | Done Gate manual review |
-| **Cross-file / cross-function flow** | Each file is matched in isolation, with no call graph. | Design review, threat model |
-| **Logic and business rules** | Price manipulation, workflow bypass, race conditions in app logic. | `checks/threat-model.md` |
-| **Runtime and config state** | What is actually deployed, which env vars are set, real TLS termination. | Deployment review |
-| **Novel or obfuscated code** | Only known shapes match; renamed or dynamically built calls slip past. | Human review |
+- untrusted data entering a trusted layer with no validation in between;
+- one function serving both admins and normal users — split it;
+- a secret passed through layers that do not need it;
+- a permission check that allows on an empty list or unknown value;
+- a value checked, then used later without a lock (time-of-check to time-of-use).
 
-Corollary: **never treat a finding count of zero as evidence of security.**
-It is evidence that the mechanical layer found nothing — which is exactly
-why Rule 1 puts the security in the first draft rather than the scan.
+## Suppressing a finding
 
----
-
-## 🔍 Security Smells & Baseline Review
-
-Even when no automated pattern flags, check for these design smells:
-
-1. **Hidden Trust Boundary:** Untrusted data moves into trusted layers without visible validation.
-   *Fix:* Validate at the edge, sanitize, and pass typed domain objects.
-2. **Mixed Privilege in One Function:** A function handles both admin and normal user branches.
-   *Fix:* Split into two distinct functions with separate permission guards.
-3. **Over-Scoped Secrets:** A secret is passed through multiple layers that don't need it.
-   *Fix:* Pass only the derived token or perform the operation within a specialized service.
-4. **Implicit Allow:** An auth check allows access when an unknown condition or empty list occurs.
-   *Fix:* Invert the logic to deny access by default.
-5. **Time-of-Check to Time-of-Use (TOCTOU):** A resource state is checked and then modified without a lock.
-   *Fix:* Use atomic operations or acquire a database/file lock.
-
----
-
-## 🧰 Tool & Script Quick Reference
-
-| Tool | Purpose | Primary Command |
-|---|---|---|
-| **`scan.js`** | Fast mechanical scan with line snippets & entropy engine | `node hooks/scan.js --staged` |
-| **`install.js`** | Interactive setup wizard (Git hooks, tasks, agent rules) | `node install.js` |
-| **`gate.js`** | Pre-write frontier questions, and the Done Gate at commit | `node hooks/gate.js --grill` / `--check` |
-| **`summary.js`** | One-line status check & automated done gate | `node hooks/summary.js` |
-| **`audit.js`** | Dependency vulnerability scan across 9 ecosystems | `node hooks/audit.js` |
-| **`fix.js`** | View remediation guidance or apply automated refactors | `node hooks/fix.js --apply` |
-| **`deps.js`** | Before installing a package you suggested: does it exist, is it brand new, does it run install scripts | `node hooks/deps.js` |
-| **`scan.js --history`** | Secrets in past commits, including deleted ones | `node hooks/scan.js --history` |
-| **`scan.js --baseline`** | Adopting on an existing repo: record current findings so only new ones block | `node hooks/scan.js --baseline` |
-| **`serve.js`** | Local dashboard of the results (give the user the printed link) | `node hooks/serve.js` |
-| **`sbom.js`** | CycloneDX v1.5 & SPDX v2.3 SBOM with AI-SBOM & VEX | `node hooks/sbom.js --ai --vex` |
-| **`clean.js`** | Universal clean code linter (14 rules) | `node hooks/clean.js <f>` / `--all` |
-| **`report.js`** | Export HTML report, PR Markdown, or SARIF v2.1.0 | `node hooks/report.js --sarif` |
-| **`config.js`** | Manage policy or launch visual browser UI | `node hooks/config.js --ui` |
-| **`mcp/server.js`** | Native Model Context Protocol (MCP) stdio server | `node mcp/server.js` |
-
----
-
-### One Finding Per Occurrence
-
-Three SQL injections in one file are **three findings**, tracked separately by
-`(file, id, line)`. Fixing one closes only that one — the siblings stay open,
-so a partial fix can never silently clear a live vulnerability.
-
-- Scan output, `stats.js`, and SARIF all report every occurrence with its line.
-- `fix.js --apply` rewrites **only the lines the scanner reports right now** for
-  that id (it re-scans first, so stale line numbers do not matter). Unflagged
-  and suppressed lines are never touched; a line it cannot rewrite safely is
-  left for a manual fix.
-- Occurrences per id per file are capped at **20** (override with
-  `SECURE_CODING_MAX_OCCURRENCES`) so a generated or minified file cannot flood
-  the report. The finding is still reported; only the line list is truncated.
-
----
-
-### One Defect, One Finding
-
-Patterns are layered: a broad catch-all rule and a language-specific rule often
-match the same code. The scanner reports each defect **once**:
-
-- **Same id, same file** — deduplicated automatically (first match wins).
-- **Different ids, same line** — the more specific finding supersedes the
-  generic one via `SUPERSEDES` in `hooks/scan.js` (e.g. `secret-aws-key` absorbs
-  `secret`; `jwt-none-alg` absorbs `jwt`).
-- **Two genuinely different defects on one line** — both are reported. Disabled
-  cert verification and a missing timeout are separate bugs and must both show.
-
-**Adding a pattern?** If it overlaps an existing rule, either reuse that rule's
-id (preferred — keeps one id per defect across languages) or add a `SUPERSEDES`
-entry. Never leave two ids describing the same defect with the same fix; run
-`node hooks/test.js` to confirm nothing double-reports and nothing is lost.
-
----
-
-### Suppressing Reviewed Exceptions
-
-For intentional, reviewed exceptions, suppress a finding on the line itself with an inline comment that names the rule and says why:
+Only when the finding is genuinely wrong. Name the rule and give the reason, on the same line:
 
 ```ts
-const result = eval(sanitizedMathExpression); // secure-coding-ignore: eval -- input is a whitelisted math grammar
+const r = eval(expr); // secure-coding-ignore: eval -- input is a fixed math grammar
 ```
 
 ```python
-data = pickle.loads(trusted_internal_blob)  # nosec: insecure-deserialization -- blob is HMAC-verified first
+data = pickle.loads(blob)  # nosec: insecure-deserialization -- blob is HMAC-verified first
 ```
 
-`all` is not accepted — name each rule. Suppressions are recorded with their reason and shown in the report and SARIF, so do not use them to make a finding go away; fix the code unless the finding is genuinely wrong.
+`all` is not accepted. Suppressions appear in the report and in SARIF, so
+reviewers see them. Test and fixture folders can be excluded in
+`.securecodingrc.json` with `"ignorePaths": ["tests/**"]`.
 
-To exclude test directories or mock files, add paths to `.securecodingrc.json`:
-```json
-{
-  "ignorePaths": ["tests/**", "fixtures/**", "scripts/seed/**"]
-}
-```
+## Tools
+
+| Command | Use |
+|---|---|
+| `node hooks/scan.js --staged` | Scan staged files (`--all`, `--files <paths>`) |
+| `node hooks/deps.js` | Check packages you added |
+| `node hooks/fix.js --suggest <id>` | Fix guidance for one rule |
+| `node hooks/gate.js --grill` | The Step 0 questions for a domain (`api`, `auth`, `storage`, `llm`) |
+| `node hooks/scan.js --history` | Secrets in past commits |
+| `node hooks/scan.js --baseline` | Existing repo: record current findings so only new ones block |
+| `node hooks/serve.js` | Dashboard for the user — give them the printed link |
+| `node hooks/report.js --sarif` | SARIF for code scanning (`--markdown` for a PR comment) |
