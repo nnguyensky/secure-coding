@@ -6,7 +6,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A521.0.0-green?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![MCP Protocol](https://img.shields.io/badge/MCP%202024--11--05-Compatible-purple?style=for-the-badge&logo=probot&logoColor=white)](mcp/server.js)
-[![Tests](https://img.shields.io/badge/Tests-521%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-536%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 
 <p align="center">
   <a href="#-quickstart-options">⚡ Quickstart</a> •
@@ -184,11 +184,11 @@ Add the auto-scan hook to `~/.claude/settings.json`:
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "node $HOME/.claude/skills/secure-coding/hooks/scan.js"
+            "command": "node \"$HOME/.claude/skills/secure-coding/hooks/scan.js\""
           }
         ]
       }
@@ -280,8 +280,9 @@ jobs:
       - name: Scan PR Changes
         if: github.event_name == 'pull_request'
         run: |
-          git diff --name-only origin/${{ github.base_ref }}...HEAD > pr_files.txt
-          node hooks/scan.js --files $(cat pr_files.txt)
+          git diff --name-only --diff-filter=ACMR origin/${{ github.base_ref }}...HEAD > pr_files.txt
+          mapfile -t files < pr_files.txt
+          node hooks/scan.js --files -- "${files[@]}"
 
       - name: Generate SARIF Security Report
         if: always()
@@ -326,7 +327,7 @@ repos:
 
 ## 🧪 Verification
 
-Verify all 521 test fixtures, pattern compilations, secret masking, and MCP tool handlers:
+Verify all 536 test fixtures, pattern compilations, secret masking, and MCP tool handlers:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js

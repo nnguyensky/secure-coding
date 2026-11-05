@@ -144,10 +144,12 @@ if [ "$INSTALL_GLOBAL" = true ]; then
   if [ -d "$HOME/.gemini/config/plugins" ]; then
     mkdir -p "$HOME/.gemini/config/plugins/secure-coding/skills"
     ln -sfn "$GLOBAL_DIR" "$HOME/.gemini/config/plugins/secure-coding/skills/secure-coding"
-    cat << 'PEOF' > "$HOME/.gemini/config/plugins/secure-coding/plugin.json"
+    # Version from package.json, so the manifest cannot drift from the release.
+    SC_VERSION=$(node -p "require(process.argv[1]).version" "$GLOBAL_DIR/package.json" 2>/dev/null || echo "0.0.0")
+    cat << PEOF > "$HOME/.gemini/config/plugins/secure-coding/plugin.json"
 {
   "name": "secure-coding",
-  "version": "2.1.0",
+  "version": "$SC_VERSION",
   "description": "OWASP Secure Coding Practices, ACSC/CISA Secure by Design, Clean Code, and LLM Safety Engine.",
   "author": { "name": "Stephen N." },
   "license": "MIT"

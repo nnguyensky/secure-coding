@@ -516,12 +516,15 @@ When writing code that handles user input, authentication, sessions, permissions
           try { fs.unlinkSync(targetSymlink); } catch {}
           fs.symlinkSync(DIR, targetSymlink, 'dir');
           const manifestPath = path.join(pluginDir, 'plugin.json');
+          // Same source of truth as the global registration above: this copy
+          // still hardcoded the version and named OWASP as the author.
+          const pkg = require(path.join(DIR, 'package.json'));
           fs.writeFileSync(manifestPath, JSON.stringify({
             name: 'secure-coding',
-            version: '2.1.0',
-            description: 'Catches insecure code as it is written, then asks the questions a scanner cannot.',
-            author: { name: 'OWASP' },
-            license: 'MIT',
+            version: pkg.version,
+            description: pkg.description || 'Catches insecure code as it is written, then asks the questions a scanner cannot.',
+            author: pkg.author,
+            license: pkg.license,
           }, null, 2) + '\n');
           console.log(`${GREEN}✅ Registered global Antigravity plugin:${NC} ${pluginDir}`);
         } catch {}
@@ -600,12 +603,27 @@ Always write secure code from the start. Never defer security fixes.
       if (settings) {
         settings.hooks = settings.hooks || {};
         const entries = Array.isArray(settings.hooks.PostToolUse) ? settings.hooks.PostToolUse : [];
-        const cmd = `node ${path.join(DIR, 'hooks', 'scan.js')}`;
-        const already = JSON.stringify(entries).includes(path.join(DIR, 'hooks', 'scan.js'));
-        if (already) {
-          console.log(`${GREEN}✅ Claude Code write-time scan already configured${NC}`);
+        const scanPath = path.join(DIR, 'hooks', 'scan.js');
+        // Quoted: an install path with a space (/Users/Jane Doe/…,
+        // C:\Program Files\…) split into two arguments and the hook never ran.
+        const cmd = `node ${JSON.stringify(scanPath)}`;
+        // MultiEdit and NotebookEdit write files too; Write|Edit missed them.
+        const matcher = 'Write|Edit|MultiEdit|NotebookEdit';
+        // Compare against each command string, not the JSON-escaped settings
+        // text: on Windows the escaped backslashes never matched, so every
+        // re-install appended a duplicate hook.
+        const existing = entries.find(e => Array.isArray(e && e.hooks)
+          && e.hooks.some(h => typeof h.command === 'string' && h.command.includes(scanPath)));
+        if (existing) {
+          existing.matcher = matcher;
+          for (const h of existing.hooks) {
+            if (typeof h.command === 'string' && h.command.includes(scanPath)) h.command = cmd;
+          }
+          settings.hooks.PostToolUse = entries;
+          fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+          console.log(`${GREEN}✅ Claude Code write-time scan already configured (updated)${NC}`);
         } else {
-          entries.push({ matcher: 'Write|Edit', hooks: [{ type: 'command', command: cmd }] });
+          entries.push({ matcher, hooks: [{ type: 'command', command: cmd }] });
           settings.hooks.PostToolUse = entries;
           fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
           fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');

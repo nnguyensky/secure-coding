@@ -10,7 +10,7 @@
 [![IoT Standard](https://img.shields.io/badge/AS%20ETSI%20EN%20303%20645-13%20Principles-success?style=for-the-badge&logo=espressif&logoColor=white)](checks/iot-security.md)
 [![OWASP Top 10](https://img.shields.io/badge/OWASP%20Top%2010-2025%20%2B%20CWE-critical?style=for-the-badge&logo=owasp&logoColor=white)](checks/owasp-top10-2025.md)
 [![LLM Top 10](https://img.shields.io/badge/OWASP%20LLM%20Top%2010-2025%20Ready-green?style=for-the-badge&logo=openai&logoColor=white)](checks/llm-top10.md)
-[![Tests](https://img.shields.io/badge/Tests-521%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
+[![Tests](https://img.shields.io/badge/Tests-536%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](hooks/test.js)
 [![Zero-Token Idle](https://img.shields.io/badge/Idle%20Cost-0%20Tokens-purple?style=for-the-badge&logo=speedtest&logoColor=white)](#-the-inverted-architecture)
 
 <p align="center">
@@ -33,7 +33,7 @@ carry findings. What static analysis genuinely cannot see — a missing ownershi
 check, an absent guard, a fail-open `catch` — it asks as four written questions
 before the change lands.
 
-13 language templates · 376 patterns mapped to CWE and OWASP Top 10:2025 · 521
+13 language templates · 376 patterns mapped to CWE and OWASP Top 10:2025 · 536
 self-tests · zero dependencies.
 
 ## 💡 The Inverted Architecture
@@ -181,8 +181,14 @@ It only asks about code it has questions for. Everything else passes through:
 | Skip every check for one commit (no git flag) | `SECURE_CODING_SKIP=1 git commit` |
 | Turn the Done Gate off for a repository | `git config secure-coding.gate false` |
 | Never scan a path | Add it to `ignorePaths` in `.securecodingrc.json` |
-| Silence one finding on one line | `// secure-coding-ignore: <pattern-id>` |
+| Silence one finding on one line | `// secure-coding-ignore: <pattern-id> -- <reason>` |
 | See what a command does, without running it | `--help` on any hook |
+
+Suppressions name the rule: `secure-coding-ignore: all` (or `nosec: all`) is
+not honoured by the security scanner, so one comment cannot switch it off.
+Every suppression is still recorded — with its reason — as a `suppressed`
+finding in the HTML report, the Markdown summary and SARIF (as an in-source
+suppression), so reviewers can see what was silenced and why.
 
 Every path the tools read or write — `.securecodingrc.json`, `checks/`,
 `reports/`, `false-positives.json` — resolves against the repository root, not
@@ -277,15 +283,14 @@ Each file is loaded only when its topic comes up:
 - **Shannon Entropy Secret Detection**:
   $$H(S) = -\sum_{i=1}^n p(x_i) \log_2 p(x_i)$$
   Calculates string randomness to distinguish true cryptographic keys ($H \ge 3.5\text{ bits/byte}$) from repetitive test strings (`"aaaaaaaaaaaaaaaa"`).
-- **Inline Comment Suppression**: Allows fine-grained exclusions:
+- **Inline Comment Suppression**: Silences one named rule on the line the comment is on, with a reason. Every suppression is recorded and reported:
   ```typescript
-  // secure-coding-ignore: eval
-  const result = eval(sanitizedMathExpression);
+  const result = eval(sanitizedMathExpression); // secure-coding-ignore: eval -- whitelisted math grammar
   ```
 
 ### 🔬 Layer 3: Verification & Auditing
 - **Semantic OWASP Checklist** ([`checks/review.md`](checks/review.md)): 213 verifiable controls.
-- **Multi-Ecosystem Package Audit** ([`hooks/audit.js`](hooks/audit.js)): Scans lockfiles across 9 ecosystems (`npm`, `pnpm`, `yarn`, `pip`, `cargo`, `go`, `bundler`, `composer`, `dotnet`). Restrict it with `audit.ecosystems` in `.securecodingrc.json`; with no list configured, every ecosystem whose lockfile is present is audited. Exits with code `2` on high/critical advisories.
+- **Multi-Ecosystem Package Audit** ([`hooks/audit.js`](hooks/audit.js)): Scans lockfiles across 9 ecosystems (`npm`, `pnpm`, `yarn`, `pip`, `cargo`, `go`, `bundler`, `composer`, `dotnet`). Restrict it with `audit.ecosystems` in `.securecodingrc.json`; with no list configured, every ecosystem whose lockfile is present is audited. Exits with code `2` on high/critical advisories. An ecosystem whose audit cannot run (tool missing, timed out) is reported as skipped and passes by default; add `--strict` or `"audit": { "failOnSkipped": true }` to fail instead — recommended in CI.
 - **Clean Code Linter** ([`hooks/clean.js`](hooks/clean.js)): Flags magic numbers, multi-responsibility functions, and unneeded context. Standards documented in [`checks/clean-code.md`](checks/clean-code.md).
 - **OWASP Top 10:2025 → CWE Map** ([`checks/owasp-top10-2025.md`](checks/owasp-top10-2025.md)): Every category mapped to its key CWEs and the pattern ids that cover it — including the two new 2025 categories (**A03 Software Supply Chain Failures**, **A10 Mishandling of Exceptional Conditions**) and an explicit note on which categories patterns *cannot* cover.
 - **NIST SSDF (SP 800-218) Coverage Map** ([`checks/ssdf-mapping.md`](checks/ssdf-mapping.md)): All 4 practice groups and 20 practices mapped to the skill's tooling, with the gaps stated plainly for attestation purposes.
@@ -335,7 +340,7 @@ node install.js --agent all --mcp
 ### 2. Verify it works
 
 ```bash
-node hooks/test.js     # expect: pass=521 fail=0
+node hooks/test.js     # expect: pass=536 fail=0
 node hooks/sync.js     # expect: 0 errors, 0 warnings
 ```
 
@@ -468,7 +473,7 @@ pre-commit id. Everything else — `fix.js`, `config.js`, `stats.js`, `detect.js
 | | `node hooks/detect.js` | Reports which languages a project uses. |
 | | `node hooks/grep.js <pattern-id> [path]` | Finds every occurrence of one rule across the project. |
 | | `node hooks/reset.js` | Clears findings state for a new session. |
-| | `node hooks/test.js` | Executes the full 521-test self-check suite. |
+| | `node hooks/test.js` | Executes the full 536-test self-check suite. |
 
 ---
 
@@ -518,6 +523,13 @@ needs its own review.
 **On by default.** Disable per repository with `git config secure-coding.gate false`,
 bypass one commit with `git commit --no-verify`, or force a full review of any
 change with `node hooks/gate.js --check --all`.
+
+**What it is not.** The gate records answers; it cannot verify them. When an AI
+agent writes the code, the same agent usually writes the answers (through the
+CLI or the `record_security_decision` MCP tool). That still forces the four
+questions to be considered, but it is self-attestation, not review. For a real
+second pair of eyes, paste `node hooks/gate.js --adr` into the pull request so a
+person reads the answers next to the diff.
 
 ---
 
@@ -586,11 +598,11 @@ Add the auto-scan hook to `~/.claude/settings.json`:
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "node $HOME/.claude/skills/secure-coding/hooks/scan.js"
+            "command": "node \"$HOME/.claude/skills/secure-coding/hooks/scan.js\""
           }
         ]
       }
@@ -748,7 +760,7 @@ trust a change:
 | `node hooks/sync.js` | Patterns, templates and remediation blocks agree with each other. |
 | `node hooks/coverage.js` | All 213 OWASP SCP items are accounted for. |
 
-Verify all 521 test assertions, pattern compilation, secret masking, and MCP tools:
+Verify all 536 test assertions, pattern compilation, secret masking, and MCP tools:
 
 ```bash
 node hooks/sync.js && node hooks/test.js && node hooks/summary.js && node hooks/audit.js

@@ -252,17 +252,17 @@ entry. Never leave two ids describing the same defect with the same fix; run
 
 ### Suppressing Reviewed Exceptions
 
-For intentional, reviewed exceptions, suppress a finding on a single line with an inline comment:
+For intentional, reviewed exceptions, suppress a finding on the line itself with an inline comment that names the rule and says why:
 
 ```ts
-// secure-coding-ignore: eval
-const result = eval(sanitizedMathExpression);
+const result = eval(sanitizedMathExpression); // secure-coding-ignore: eval -- input is a whitelisted math grammar
 ```
 
 ```python
-# nosec: insecure-deserialization
-data = pickle.loads(trusted_internal_blob)
+data = pickle.loads(trusted_internal_blob)  # nosec: insecure-deserialization -- blob is HMAC-verified first
 ```
+
+`all` is not accepted — name each rule. Suppressions are recorded with their reason and shown in the report and SARIF, so do not use them to make a finding go away; fix the code unless the finding is genuinely wrong.
 
 To exclude test directories or mock files, add paths to `.securecodingrc.json`:
 ```json

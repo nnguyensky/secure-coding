@@ -93,9 +93,10 @@ function stagedFiles() {
       root = execFileSync('git', ['rev-parse', '--show-toplevel'],
         { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || process.cwd();
     } catch { /* not a repo */ }
-    return execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACM'],
+    // ACMR: a renamed file can carry a new route; -z keeps odd paths intact.
+    return execFileSync('git', ['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR'],
       { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-      .split(/\r?\n/).filter(Boolean).map(f => path.resolve(root, f));
+      .split('\0').filter(Boolean).map(f => path.resolve(root, f));
   } catch { return []; }
 }
 

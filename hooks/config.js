@@ -151,7 +151,18 @@ function writeState(file, data, { append = false } = {}) {
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     if (append) fs.appendFileSync(file, data);
-    else fs.writeFileSync(file, data);
+    else {
+      // Write a sibling temp file and rename it into place, so a reader (the
+      // report, another hook) never sees a half-written file.
+      const tmp = `${file}.${process.pid}.tmp`;
+      try {
+        fs.writeFileSync(tmp, data);
+        fs.renameSync(tmp, file);
+      } catch (e) {
+        try { fs.unlinkSync(tmp); } catch { /* nothing to clean up */ }
+        throw e;
+      }
+    }
     return true;
   } catch (e) {
     if (!writeState._warned) {
@@ -159,6 +170,40 @@ function writeState(file, data, { append = false } = {}) {
       console.error(`secure-coding: cannot record state at ${file} (${e.code || e.message}) — findings shown but not saved`);
     }
     return false;
+  }
+}
+
+// Run fn while holding an exclusive lock on `file` (a sibling .lock file).
+// Hooks run in parallel when an agent writes several files at once; without
+// this, two read-modify-write cycles on findings.jsonl lost each other's
+// records. Never blocks the scan: a lock that cannot be taken within a few
+// seconds, or cannot be created at all (read-only tree), runs fn unlocked.
+const LOCK_WAIT_MS = 5000;
+const LOCK_STALE_MS = 15000;
+function withFileLock(file, fn) {
+  const lock = `${file}.lock`;
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  const sleeper = new Int32Array(new SharedArrayBuffer(4));
+  let fd = null;
+  try { fs.mkdirSync(path.dirname(file), { recursive: true }); } catch { return fn(); }
+  while (fd === null) {
+    try {
+      fd = fs.openSync(lock, 'wx');
+    } catch (e) {
+      if (e.code !== 'EEXIST') return fn();
+      try {
+        // A holder that crashed leaves its lock behind; reclaim it.
+        if (Date.now() - fs.statSync(lock).mtimeMs > LOCK_STALE_MS) { fs.unlinkSync(lock); continue; }
+      } catch { continue; } // vanished between open and stat: retry now
+      if (Date.now() > deadline) return fn();
+      Atomics.wait(sleeper, 0, 0, 20);
+    }
+  }
+  try {
+    return fn();
+  } finally {
+    try { fs.closeSync(fd); } catch { /* ignore */ }
+    try { fs.unlinkSync(lock); } catch { /* ignore */ }
   }
 }
 
@@ -172,4 +217,4 @@ function helpRequested(argv, usage) {
   return true;
 }
 
-module.exports = { loadConfig, DEFAULT_CONFIG, projectRoot, stateDir, statePath, writeState, helpRequested };
+module.exports = { loadConfig, DEFAULT_CONFIG, projectRoot, stateDir, statePath, writeState, withFileLock, helpRequested };

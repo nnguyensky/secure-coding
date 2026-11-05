@@ -121,8 +121,10 @@ function loadAudit() {
 function generateMarkdown(rows, audit) {
   const openRows = rows.filter(r => r.status === 'open');
   const fixedRows = rows.filter(r => r.status === 'fixed');
+  const supRows = rows.filter(r => r.status === 'suppressed');
   let md = '### 🛡️ Security Scan Summary\n\n';
-  md += `**Findings:** ${openRows.length} open, ${fixedRows.length} resolved.\n\n`;
+  md += `**Findings:** ${openRows.length} open, ${fixedRows.length} resolved`
+    + (supRows.length ? `, ${supRows.length} suppressed inline` : '') + '.\n\n';
 
   if (openRows.length > 0) {
     md += '| Severity | Finding ID | Location | Remediation |\n';
@@ -134,6 +136,18 @@ function generateMarkdown(rows, audit) {
     md += '\n';
   } else {
     md += '✅ **No open security vulnerabilities found.**\n\n';
+  }
+
+  // Suppressions are listed so a reviewer sees what was silenced and why.
+  if (supRows.length > 0) {
+    md += '<details><summary>Suppressed inline (' + supRows.length + ')</summary>\n\n';
+    md += '| Finding ID | Location | Reason |\n|:---|:---|:---|\n';
+    for (const r of supRows) {
+      const fileRel = path.relative(process.cwd(), r.file) || r.file;
+      const reason = (r.reason || '_no reason given_').replace(/\|/g, '\\|').slice(0, 100);
+      md += `| \`${r.id}\` | \`${fileRel}:${r.line || 1}\` | ${reason} |\n`;
+    }
+    md += '\n</details>\n\n';
   }
 
   if (audit && audit.findings && audit.findings.length > 0) {
@@ -149,7 +163,10 @@ function generateMarkdown(rows, audit) {
 }
 
 function generateSarif(rows) {
-  const openRows = rows.filter(r => r.status === 'open');
+  // Suppressed findings are emitted too, marked as in-source suppressions:
+  // code scanning then shows them as dismissed, with the reason, rather than
+  // the finding vanishing without a trace.
+  const openRows = rows.filter(r => r.status === 'open' || r.status === 'suppressed');
   const levelMap = {
     critical: 'error',
     high: 'error',
@@ -182,13 +199,17 @@ function generateSarif(rows) {
   }
 
   const results = openRows.map(r => {
-    let startLine = 1;
-    if (r.fix) {
+    let startLine = r.line > 0 ? r.line : 1;
+    if (!(r.line > 0) && r.fix) {
       const lm = r.fix.match(/Line\s+(\d+)/i);
       if (lm) startLine = parseInt(lm[1], 10);
     }
     const relFile = path.isAbsolute(r.file) ? path.relative(process.cwd(), r.file) : r.file;
+    const suppression = r.status === 'suppressed'
+      ? { suppressions: [{ kind: 'inSource', justification: r.reason || 'no reason given' }] }
+      : {};
     return {
+      ...suppression,
       ruleId: r.id,
       level: levelMap[r.severity] || 'warning',
       message: { text: `[${(r.severity || 'medium').toUpperCase()}] ${r.id}: ${r.fix}` },
@@ -238,6 +259,8 @@ function main() {
     severity: f.severity || 'medium',
     sevColor: SEVERITY_COLORS[f.severity] || SEVERITY_COLORS.medium,
     status: f.status || '',
+    line: Number(f.line) || 0,
+    reason: f.reason || '',
     run_id: f.run_id || (f.first_seen ? f.first_seen.slice(0, 10) : 'run-1'),
     file: f.file || '',
     first: f.first_seen || '',

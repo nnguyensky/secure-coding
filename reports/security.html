@@ -273,6 +273,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .badge.open { background: var(--danger-light); color: #fda4af; border: 1px solid var(--danger-border); }
 .badge.fixed { background: var(--success-light); color: #6ee7b7; border: 1px solid var(--success-border); }
+.badge.suppressed { background: transparent; color: #cbd5e1; border: 1px dashed #64748b; }
 
 .sev {
   display: inline-block;
@@ -395,6 +396,7 @@ tbody tr:last-child td { border-bottom: none; }
     <button class="tab-btn active" onclick="setTab('all', this)">All Findings (<span id="countAll">0</span>)</button>
     <button class="tab-btn" onclick="setTab('open', this)">Open Findings (<span id="countOpen">0</span>)</button>
     <button class="tab-btn" onclick="setTab('fixed', this)">Resolved (<span id="countFixed">0</span>)</button>
+    <button class="tab-btn" onclick="setTab('suppressed', this)">Suppressed (<span id="countSuppressed">0</span>)</button>
     <button class="tab-btn" onclick="setTab('audit', this)">Dependencies (<span id="countAudit">0</span>)</button>
   </div>
 
@@ -468,9 +470,10 @@ function initDashboard() {
   document.getElementById('statAudit').textContent = auditCount;
   document.getElementById('statRate').textContent = rate + '%';
 
-  document.getElementById('countAll').textContent = total;
+  document.getElementById('countAll').textContent = DATA.length;
   document.getElementById('countOpen').textContent = openCount;
   document.getElementById('countFixed').textContent = fixedCount;
+  document.getElementById('countSuppressed').textContent = DATA.filter(d => d.status === 'suppressed').length;
   document.getElementById('countAudit').textContent = auditCount;
 
   document.getElementById('progressText').textContent = `${fixedCount} / ${total} Resolved (${rate}%)`;
@@ -536,6 +539,7 @@ function renderTable() {
   let filtered = DATA.filter(d => {
     if (activeTab === 'open' && d.status !== 'open') return false;
     if (activeTab === 'fixed' && d.status !== 'fixed') return false;
+    if (activeTab === 'suppressed' && d.status !== 'suppressed') return false;
     if (sevFilter && d.severity !== sevFilter) return false;
     if (secFilter && d.secName !== secFilter) return false;
     if (search) {

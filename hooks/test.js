@@ -41,7 +41,8 @@ function runScan(file) {
     env: { ...process.env, SECURE_CODING_STATE: path.join(TMP, 'findings.jsonl'), SECURE_CODING_REPORT: 'off' },
     encoding: 'utf8',
   });
-  return r.stdout || '';
+  // Hook mode reports on stderr (exit 2 feeds only stderr to the agent).
+  return (r.stdout || '') + (r.stderr || '');
 }
 
 function uniq(name) {
@@ -994,15 +995,16 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   const tmp3 = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-state3-'));
   let soft = false;
   try {
-    fs.chmodSync(tmp3, 0o500);
+    // A regular file where the state directory should be: mkdir fails with
+    // ENOTDIR for every user. chmod 0500 did not stop root, so this test
+    // failed in containers and CI runners that run as root.
+    fs.writeFileSync(path.join(tmp3, 'checks'), 'not a directory');
     const errs = [];
     const orig = console.error;
     console.error = (m) => errs.push(String(m));
     soft = writeState(path.join(tmp3, 'checks', 'f.jsonl'), 'x') === false;
     console.error = orig;
-  } catch { soft = false; } finally {
-    try { fs.chmodSync(tmp3, 0o700); } catch { /* ignore */ }
-  }
+  } catch { soft = false; }
   if (soft) pass++;
   else { fail++; console.log('state-write-fails-soft-readonly: threw instead of returning false'); }
   try { fs.rmSync(tmp3, { recursive: true, force: true }); } catch { /* ignore */ }
@@ -2207,8 +2209,9 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
 
   // The agent rule files are what actually make an agent do this.
   uniq('grilling-in-agent-rules');
-  const rules = ['AGENTS.md', '.clinerules', '.windsurfrules',
-                 path.join('.cursor', 'rules', 'secure-coding.mdc')];
+  // .cursor/ is no longer committed; the installers generate it, and
+  // installers-write-identical-agent-rules checks that generated copy.
+  const rules = ['AGENTS.md', '.clinerules', '.windsurfrules'];
   const missing = rules.filter(r => !fs.readFileSync(path.join(DIR, r), 'utf8').includes('secure-grilling'));
   if (missing.length === 0) pass++;
   else { fail++; console.log(`MISS  grilling-in-agent-rules: ${missing.join(', ')}`); }
@@ -2583,7 +2586,8 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   const hookFile = path.join(TMP, 'cli-hook.js');
   fs.writeFileSync(hookFile, 'eval(x);\n');
   const h = runArgs([], JSON.stringify({ tool_input: { file_path: hookFile } }));
-  if (h.status === 2 && /eval/.test(h.stdout)) pass++;
+  // On stderr: with exit 2 Claude Code shows the agent stderr only.
+  if (h.status === 2 && /eval/.test(h.stderr) && !/eval/.test(h.stdout)) pass++;
   else { fail++; console.log(`MISS  cli-hook-mode: status=${h.status}`); }
 })();
 
@@ -2932,6 +2936,176 @@ if (fs.existsSync(preCommitYaml)) {
   fail++; console.log('MISS  pre-commit-yaml-exists');
 }
 
+// --- review fixes (2026-11) ---
+// Fake keys are split with + so GitHub push protection does not block them.
+(function reviewFixes() {
+  // Own directory: TMP is removed earlier in the suite.
+  const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-review-'));
+  const { matchContent, matchContentDetailed, loadPatterns: lp, hookFilePath } = require('./scan');
+  const P = lp();
+  const ids = (code, file) => matchContent(code, file, P).map(h => `${h.id}@${h.line}`);
+  const scanEnv = (state) => ({ ...process.env, SECURE_CODING_STATE: state, SECURE_CODING_REPORT: 'off' });
+
+  // Several regexes share one id. Stopping at the first that matched hid the
+  // rest: a Stripe key went unreported next to a private key header.
+  uniq('same-id-patterns-all-report');
+  const multi = ids([
+    'k2 = "sk_' + 'live_51Habcdefghijklmnopqrstuvwxyz"',
+    'k3 = "xox' + 'b-123456789012-abcdefghijkl"',
+    'k4 = "-----BEGIN RSA PRIVATE KEY-----"',
+  ].join('\n'), 'multi.py');
+  if (multi.some(x => x.endsWith('@1')) && multi.some(x => x.endsWith('@2')) && multi.some(x => x.endsWith('@3'))) pass++;
+  else { fail++; console.log(`MISS  same-id-patterns-all-report: ${multi.join(' ')}`); }
+
+  uniq('same-id-sql-both-lines');
+  const sql = ids('db.query("SELECT * FROM t WHERE a=" + x);\nconst q = "SELECT * FROM t WHERE id=" + uid;\n', 'q.js');
+  if (sql.includes('sql-concat@1') && sql.includes('sql-concat@2')) pass++;
+  else { fail++; console.log(`MISS  same-id-sql-both-lines: ${sql.join(' ')}`); }
+
+  // A specific secret rule supersedes the generic one on the same line.
+  uniq('specific-secret-supersedes-generic');
+  const gh = ids('gh = "gh' + 'p_abcdefghijklmnopqrstuvwxyz0123456789"', 'g.py');
+  if (gh.includes('secret-github-token@1') && !gh.includes('secret@1')) pass++;
+  else { fail++; console.log(`MISS  specific-secret-supersedes-generic: ${gh.join(' ')}`); }
+
+  // The severity column was printed as the hint ("Hint: critical").
+  uniq('hint-is-not-severity');
+  const badHint = P.filter(p => /^(critical|high|medium|low)$/i.test(p.hint));
+  if (badHint.length === 0) pass++;
+  else { fail++; console.log(`MISS  hint-is-not-severity: ${badHint.slice(0, 3).map(p => p.id).join(', ')}`); }
+
+  // Current OpenAI and Anthropic key formats contain '-' after the prefix.
+  uniq('llm-provider-keys');
+  const llm = ['oai = "sk-' + 'proj-abcdefghijklmnopqrstuvwxyz0123456789"',
+    'ant = "sk-' + 'ant-api03-abcdefghijklmnopqrstuvwxyz0123456789"'];
+  const llmMiss = llm.filter(l => matchContent(l, 'k.py', P).length === 0);
+  if (llmMiss.length === 0) pass++;
+  else { fail++; console.log(`MISS  llm-provider-keys: ${llmMiss.join(' | ')}`); }
+
+  // JSON is scanned for secrets, and only for secrets.
+  uniq('json-scanned-for-secrets-only');
+  const js = matchContent('{"aws_secret_access_key": "wJalrXUtnFEMI/' + 'K7MDENG/bPxRfiCYzQ9xKLmn3T",\n "key": "AKI' + 'AIOSFODNN7ABCDEFG",\n "cmd": "eval(req.body.x)"}\n', 'creds.json', P);
+  if (js.length >= 2 && js.every(h => /^secret/.test(h.id))) pass++;
+  else { fail++; console.log(`MISS  json-scanned-for-secrets-only: ${js.map(h => h.id).join(' ')}`); }
+
+  // `all` must not switch the scanner off; a named id still works, and the
+  // suppression is returned with its reason.
+  uniq('suppress-all-not-honoured');
+  const all = matchContent('eval(req.body.x); // nosec: all', 'a.js', P);
+  if (all.some(h => h.id === 'eval')) pass++;
+  else { fail++; console.log('MISS  suppress-all-not-honoured'); }
+
+  uniq('suppression-recorded-with-reason');
+  const det = matchContentDetailed('const r = eval(expr); // secure-coding-ignore: eval -- whitelisted grammar', 'a.js', P);
+  if (!det.hits.some(h => h.id === 'eval') && det.suppressed.some(x => x.id === 'eval' && x.reason === 'whitelisted grammar')) pass++;
+  else { fail++; console.log(`MISS  suppression-recorded-with-reason: ${JSON.stringify(det.suppressed)}`); }
+
+  // Suppressions land in the state file and in SARIF as in-source suppressions.
+  uniq('suppression-in-sarif');
+  const supState = path.join(TMP, 'sup-state.jsonl');
+  const supFile = path.join(TMP, 'sup.js');
+  fs.writeFileSync(supFile, 'const r = eval(expr); // secure-coding-ignore: eval -- reviewed\n');
+  spawnSync('node', [SCAN, '--file', supFile], { env: scanEnv(supState), encoding: 'utf8' });
+  const sarifSup = spawnSync('node', [REPORT, '--sarif'], { env: scanEnv(supState), encoding: 'utf8' });
+  let supOk = false;
+  try {
+    const res = JSON.parse(sarifSup.stdout).runs[0].results;
+    supOk = res.some(r => r.ruleId === 'eval' && r.suppressions && r.suppressions[0].justification === 'reviewed');
+  } catch { supOk = false; }
+  if (supOk) pass++;
+  else { fail++; console.log('MISS  suppression-in-sarif'); }
+
+  // Hook payloads are parsed as JSON: escaped quotes and relative paths.
+  uniq('hook-payload-json');
+  const hp = hookFilePath(JSON.stringify({ cwd: '/proj', tool_input: { file_path: 'src/a "b".js', content: '"file_path": "/etc/passwd"' } }));
+  const nb = hookFilePath(JSON.stringify({ tool_input: { notebook_path: '/n/x.ipynb' } }));
+  if (hp === path.resolve('/proj', 'src/a "b".js') && nb === path.resolve('/n/x.ipynb')) pass++;
+  else { fail++; console.log(`MISS  hook-payload-json: ${hp} ${nb}`); }
+
+  // A renamed file with new content must be scanned by --staged.
+  uniq('staged-scans-renamed-files');
+  const rn = path.join(TMP, 'rename-repo');
+  fs.rmSync(rn, { recursive: true, force: true });
+  fs.mkdirSync(rn, { recursive: true });
+  const git = (...a) => spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd: rn, encoding: 'utf8' });
+  git('init', '-q');
+  fs.writeFileSync(path.join(rn, 'big.js'), Array.from({ length: 200 }, (_, i) => `const v${i} = ${i};`).join('\n') + '\n');
+  git('add', 'big.js'); git('commit', '-qm', 'i');
+  git('mv', 'big.js', 'big2.js');
+  fs.appendFileSync(path.join(rn, 'big2.js'), 'const k = "AKI' + 'AIOSFODNN7ABCDEFG";\n');
+  git('add', 'big2.js');
+  const renamed = /^R/.test(git('status', '--porcelain').stdout);
+  const st = spawnSync('node', [SCAN, '--staged'], { cwd: rn, env: scanEnv(path.join(TMP, 'rn.jsonl')), encoding: 'utf8' });
+  if (renamed && st.status === 2 && /secret-aws-key/.test(st.stdout)) pass++;
+  else { fail++; console.log(`MISS  staged-scans-renamed-files: renamed=${renamed} status=${st.status}`); }
+
+  // A path after `--` is a file even when it starts with '-'.
+  uniq('files-after-double-dash');
+  const dashFile = path.join(TMP, '-dash.js');
+  fs.writeFileSync(dashFile, 'eval(req.body.x);\n');
+  const dd = spawnSync('node', [SCAN, '--files', '--', '-dash.js'], { cwd: TMP, env: scanEnv(path.join(TMP, 'dd.jsonl')), encoding: 'utf8' });
+  if (dd.status === 2) pass++;
+  else { fail++; console.log(`MISS  files-after-double-dash: status=${dd.status}`); }
+
+  // Parallel hooks must not lose each other's records.
+  uniq('state-survives-parallel-hooks');
+  const parState = path.join(TMP, 'par.jsonl');
+  const parFiles = Array.from({ length: 6 }, (_, i) => {
+    const f = path.join(TMP, `par${i}.py`);
+    fs.writeFileSync(f, 'h = hashlib.md5(data)\n');
+    return f;
+  });
+  // Six hooks at once, from a child that waits for all of them.
+  const parScript = `
+    const { spawn } = require('child_process');
+    const [scan, state, ...files] = process.argv.slice(1);
+    let left = files.length;
+    for (const f of files) {
+      const c = spawn(process.execPath, [scan], { env: { ...process.env, SECURE_CODING_STATE: state, SECURE_CODING_REPORT: 'off' } });
+      c.on('close', () => { if (--left === 0) process.exit(0); });
+      c.stdin.end(JSON.stringify({ tool_input: { file_path: f } }));
+    }`;
+  spawnSync(process.execPath, ['-e', parScript, SCAN, parState, ...parFiles], { encoding: 'utf8', timeout: 60000 });
+  let parOpen = new Set();
+  try {
+    const recs = fs.readFileSync(parState, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
+    parOpen = new Set(recs.filter(r => r.status === 'open').map(r => r.file));
+  } catch { /* counted as a miss below */ }
+  if (parFiles.every(f => parOpen.has(f))) pass++;
+  else { fail++; console.log(`MISS  state-survives-parallel-hooks: ${parOpen.size}/${parFiles.length}`); }
+
+  // audit --strict fails when a present lock file could not be audited.
+  uniq('audit-strict-fails-on-skipped');
+  const au = path.join(TMP, 'audit-strict');
+  fs.mkdirSync(au, { recursive: true });
+  fs.writeFileSync(path.join(au, 'Cargo.lock'), '# lock\n');
+  const fakeBin = path.join(TMP, 'empty-bin');
+  fs.mkdirSync(fakeBin, { recursive: true });
+  const auEnv = { ...process.env, PATH: fakeBin, SECURE_CODING_AUDIT: path.join(TMP, 'au.json') };
+  const NODE = process.execPath;
+  const loose = spawnSync(NODE, [path.join(DIR, 'hooks', 'audit.js'), au], { env: auEnv, encoding: 'utf8' });
+  const strict = spawnSync(NODE, [path.join(DIR, 'hooks', 'audit.js'), au, '--strict'], { env: auEnv, encoding: 'utf8' });
+  if (loose.status === 0 && strict.status === 2) pass++;
+  else { fail++; console.log(`MISS  audit-strict-fails-on-skipped: loose=${loose.status} strict=${strict.status}`); }
+
+  // No pattern may go super-linear on a long line (minified bundles, long
+  // YAML values). Leading `.*` and unanchored `\w+` took seconds per line.
+  uniq('patterns-linear-on-long-lines');
+  const inputs = ['a'.repeat(20000), '('.repeat(20000), 'x = "' + 'a'.repeat(20000),
+    'a='.repeat(10000), 'SELECT '.repeat(3000), 'http://' + 'a.'.repeat(10000)];
+  const slow = [];
+  for (const p of P) {
+    const t0 = Date.now();
+    for (const x of inputs) p.re.test(x);
+    const ms = Date.now() - t0;
+    if (ms > 250) slow.push(`${p.id} ${ms}ms`);
+  }
+  if (slow.length === 0) pass++;
+  else { fail++; console.log(`MISS  patterns-linear-on-long-lines: ${slow.join(', ')}`); }
+
+  try { fs.rmSync(TMP, { recursive: true, force: true }); } catch { /* ignore */ }
+})();
+
 // --- Report Generation Test ---
 const reportOut = spawnSync('node', [REPORT, '--markdown'], { encoding: 'utf8' });
 if (reportOut.status === 0 && reportOut.stdout.includes('Security Scan Summary')) {
@@ -2954,5 +3128,3 @@ if (fail === 0) {
 }
 
 process.exit(fail === 0 ? 0 : 1);
-
-

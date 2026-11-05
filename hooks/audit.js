@@ -13,19 +13,24 @@ const { execFileSync } = require('child_process');
 
 // --help must print help, never run the tool. reset.js used to wipe the
 // findings file when asked for help; audit.js and sbom.js ran in full.
-const USAGE = `Usage: node hooks/audit.js [dir] [--help]
+const USAGE = `Usage: node hooks/audit.js [dir] [--strict] [--help]
 
 Audits project dependencies across supported ecosystems (npm, pnpm, yarn,
 pip, cargo, go, dotnet, composer, bundler) for known advisories.
 Prints a JSON array of {ecosystem, package, installed, latest, severity, title}.
+
+--strict   exit 2 when an ecosystem with a lock file could not be audited
+           (tool missing, timed out, failed). Also: "audit.failOnSkipped": true
+           in .securecodingrc.json. Without it a skipped audit passes.
 
 Env: SECURE_CODING_AUDIT (default: <project>/checks/audit.json)`;
 if (helpRequested(process.argv.slice(2), USAGE)) process.exit(0);
 
 // argv[2] is a target directory, not a flag — a stray `--help` would otherwise
 // be treated as a path and have the audit file written into it.
-const ARG = process.argv[2];
-const DIR = ARG && !ARG.startsWith('-') ? ARG : process.cwd();
+const ARG = process.argv.slice(2).find(a => !a.startsWith('-'));
+const DIR = ARG || process.cwd();
+const STRICT = process.argv.includes('--strict');
 const OUT = process.env.AUDIT_OUT || 'json';
 const STATE = statePath('audit.json', 'SECURE_CODING_AUDIT');
 const TIMEOUT = 15000; // 15s per tool
@@ -99,7 +104,13 @@ function run(tool) {
   try {
     const args = tool.split(/\s+/);
     const cmd = args.shift();
-    return execFileSync(cmd, args, { cwd: DIR, encoding: 'utf8', timeout: TIMEOUT, stdio: ['pipe', 'pipe', 'pipe'] });
+    // On Windows npm, pnpm and yarn are .cmd shims that execFile cannot start
+    // without a shell; every audit then "failed" and was silently skipped.
+    // The command lines are the fixed constants above, never user input.
+    return execFileSync(cmd, args, {
+      cwd: DIR, encoding: 'utf8', timeout: TIMEOUT, stdio: ['pipe', 'pipe', 'pipe'],
+      shell: process.platform === 'win32',
+    });
   } catch (e) {
     // npm audit exits non-zero when vulnerabilities found; still outputs JSON
     if (e.stdout) return e.stdout;
@@ -337,6 +348,15 @@ function main() {
   });
 
   if (hasFailing) {
+    process.exit(2);
+  }
+
+  // A lock file whose audit could not run is not a clean result. By default
+  // that still passes (a laptop without cargo should not block a push), but
+  // CI should opt in so a broken toolchain cannot report "no advisories".
+  const failOnSkipped = STRICT || (cfg && cfg.audit && cfg.audit.failOnSkipped === true);
+  if (failOnSkipped && skipped.length > 0) {
+    process.stderr.write(`audit: ${skipped.length} ecosystem(s) not audited: ${skipped.map(s => `${s.ecosystem} (${s.reason})`).join(', ')}\n`);
     process.exit(2);
   }
 }

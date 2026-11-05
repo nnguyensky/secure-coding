@@ -8,7 +8,7 @@ API-1	js,ts	axios\.(get|post|put|delete|patch)\([^)]*req\.(query|body|params)\.	
 API-1	go	http\.Get\([^)]*r\.URL\.Query|http\.Get\([^)]*r\.FormValue		API-1 SSRF: user-supplied URL passed to HTTP client — validate and allowlist target URLs	high
 API-1	java,kt	httpClient\.execute\([^)]*request\.getParameter|httpGet\([^)]*request\.getParameter		API-1 SSRF: user-supplied URL passed to HTTP client — validate and allowlist target URLs	high
 API-2	py,js,ts,go,java,kt	@app\.(route|get|post|put|delete|patch)\(.*\)\ndef |router\.(get|post|put|delete|patch)\(.*\).*=>|app\.(get|post|put|delete|patch)\(.*function	!login|signin|auth	API-2 Auth: endpoint handles sensitive action without rate limiting — add rate limit middleware	high
-API-3	py	__init__\(self, .*kwargs\)|setattr\(self, key, value\)|\.update\(request\.(json|data|form)\)|\w+\(\*{2}request\.(json|data|form)\)		API-3 Mass assignment: user input directly binds to model — allowlist accepted fields	high
+API-3	py	__init__\(self, .*kwargs\)|setattr\(self, key, value\)|\.update\(request\.(json|data|form)\)|\b\w+\(\*{2}request\.(json|data|form)\)		API-3 Mass assignment: user input directly binds to model — allowlist accepted fields	high
 API-3	js,ts	Object\.assign\(.*, req\.(body|data)\)|\.\.\.req\.(body|data)|body: req\.body|data: req\.body		API-3 Mass assignment: user input directly binds to model — allowlist accepted fields	high
 API-4	py	@app\.route.*methods.*GET.*POST|@app\.route.*methods.*POST.*GET		API-4 Overfetch: GET endpoint returns full model — select only needed fields	medium
 API-4	js,ts	router\.(get|post)\(.*res\.json\(.*\)|\.findMany\(\)|\.findAll\(\)	!select|fields	API-4 Overfetch: endpoint returns full model — select only needed fields	medium
