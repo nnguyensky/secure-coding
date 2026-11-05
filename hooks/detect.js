@@ -46,6 +46,16 @@ const EXT_MAP = {
   '.toml': 'toml',
   '.dockerfile': 'docker',
   '.tf': 'terraform', '.tfvars': 'terraform',
+  '.ps1': 'powershell', '.psm1': 'powershell', '.psd1': 'powershell',
+  '.pls': 'sql', '.pks': 'sql', '.pkb': 'sql',
+  '.sc': 'scala', '.dart': 'dart',
+  '.groovy': 'groovy', '.gvy': 'groovy', '.gradle': 'groovy',
+  '.cbl': 'cobol', '.cob': 'cobol', '.cpy': 'cobol',
+  '.vb': 'vbnet', '.abap': 'abap',
+  '.cls': 'apex', '.trigger': 'apex',
+  '.m': 'objc', '.mm': 'objc',
+  '.pl': 'perl', '.pm': 'perl', '.lua': 'lua',
+  '.ex': 'elixir', '.exs': 'elixir', '.sol': 'solidity', '.r': 'r',
 };
 
 // Config file → language/framework mapping

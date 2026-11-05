@@ -284,3 +284,31 @@ fun sanitizeLog(msg: String): String {
 }
 logger.info("Lookup: {}", sanitizeLog(userParam))
 ```
+
+## XML parsing — no external entities (XXE)
+```kotlin
+val dbf = DocumentBuilderFactory.newInstance().apply {
+    setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+    isXIncludeAware = false
+    isExpandEntityReferences = false
+}
+val doc = dbf.newDocumentBuilder().parse(input)
+```
+
+## Deserialization — data into a typed class
+```kotlin
+@Serializable data class Order(val id: String, val qty: Int)
+val order = Json.decodeFromString<Order>(body)
+// never: ObjectInputStream(untrusted).readObject()
+```
+
+## JWT verification — fixed algorithm, issuer and audience
+```kotlin
+val claims = Jwts.parser()                    // jjwt 0.12
+    .verifyWith(publicKey)
+    .requireIssuer("https://id.example.com")
+    .requireAudience("orders-api")
+    .build()
+    .parseSignedClaims(token)
+    .payload
+```

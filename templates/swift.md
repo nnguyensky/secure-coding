@@ -299,3 +299,23 @@ func sanitizeForLog(_ str: String) -> String {
 }
 req.logger.info("Search query: \(sanitizeForLog(searchParam))")
 ```
+
+## XML parsing — no external entities (XXE)
+```swift
+let parser = XMLParser(data: data)
+parser.shouldResolveExternalEntities = false   // the default; never set it to true
+```
+
+## Deserialization — Codable and secure coding
+```swift
+let order = try JSONDecoder().decode(Order.self, from: data)
+let obj = try NSKeyedUnarchiver.unarchivedObject(ofClass: Settings.self, from: blob)
+// never: NSKeyedUnarchiver.unarchiveObject(with:) — it instantiates any class
+```
+
+## JWT verification — on the server, fixed algorithm and claims
+```swift
+// Vapor + JWTKit: the signer fixes the algorithm; check exp, iss and aud in verify(using:)
+let payload = try await req.jwt.verify(as: SessionPayload.self)
+// in an app: send the token to your API; do not trust claims you decoded locally
+```

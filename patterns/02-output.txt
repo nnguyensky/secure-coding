@@ -13,7 +13,8 @@ sql-concat	*	(execute|query|raw)\s*\(\s*f["']	use parameterized query: execute(s
 sql-concat	*	(execute|query|raw)\s*\(\s*["'].*(SELECT|INSERT|UPDATE|DELETE|WHERE).*["']\s*[+%]	use parameterized query: execute(sql, [param])		critical
 sql-concat	*	(const|let|var)\s+\w+\s*=\s*["']\s*(SELECT|INSERT|UPDATE|DELETE)\s.*["']\s*\+	use parameterized query: execute(sql, [param])		critical
 sql-concat	*	\b\w+\s*\+=\s*["']\s*(WHERE|AND|OR|VALUES|SET|FROM|JOIN|ORDER BY|LIMIT)\s.*["']\s*\+	use parameterized query: execute(sql, [param])		critical
-sql-concat	*	(SELECT|INSERT|UPDATE|DELETE).*\$\{			critical
+sql-concat	*	(SELECT|INSERT|UPDATE|DELETE).*\$\{	!sql\.(rows|execute|firstRow|eachRow|query|executeUpdate)\s*\(\s*"	use parameterized query	critical
+sql-concat	groovy,gradle,jenkinsfile	\bsql\.(rows|execute|firstRow|eachRow|executeUpdate)\s*\(\s*"[^"]*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"]*"\s*\+		use a GString with ${} (bound as parameters), never + concatenation	critical
 sql-concat	go	fmt\.Sprintf\s*\(\s*["'][^"']*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"']*["'][^)]*\+|db\.(Query|Exec|QueryRow)\s*\(\s*["'][^"']*(SELECT|INSERT|UPDATE|DELETE)[^"']*["']\s*\+|\.Query\s*\(\s*fmt\.Sprintf			critical
 sql-concat	java,kt	(createStatement|Statement)\s*\([^)]*\)\s*\.execute|\.execute(Query|Update)\s*\(\s*["'][^"']*(SELECT|INSERT|UPDATE|DELETE)[^"']*["']\s*\+|String\.format\s*\(\s*["'][^"']*(SELECT|INSERT|UPDATE|DELETE)			critical
 sql-concat	rb	(execute|query|exec)\s*\(\s*["'][^"']*(SELECT|INSERT|UPDATE|DELETE)[^"']*["']\s*\+|(execute|query)\s*\(\s*["'][^"']*#\{[^"']*(SELECT|INSERT|UPDATE|DELETE)			critical
@@ -24,7 +25,7 @@ shell	*	shell\s*=\s*True	use argument list: subprocess.run([cmd, arg])		critical
 shell	*	os\.system\s*\(			critical
 shell	*	\bpopen\s*\(			critical
 shell	*	child_process\.exec\s*\(	!execFile	use execFile, never exec with a string	critical
-shell	rb	\b(system|exec|`)\s*\(?\s*["'`]|Open3\.(popen|capture)|IO\.popen\s*\(			critical
+shell	rb	\b(system|exec)\s*\(?\s*["\x27`](?![^,\n]*",\s*\S)|`[^`]*#\{|Open3\.(popen|capture)|IO\.popen\s*\(			critical
 shell	php	\b(shell_exec|passthru|system|exec)\s*\(|`[^`]*\$_	PHP has no safe arg-list exec; avoid shell entirely		critical
 shell	go	exec\.Command\s*\(\s*["'](sh|bash)["']|\.arg\s*\(\s*["']-c["']	pass argument list, no shell		critical
 shell	rs	Command::new\s*\(\s*["'](sh|bash)["']|\.arg\s*\(\s*["']-c["']	pass argument list, no shell		critical
@@ -38,3 +39,40 @@ shell	js,ts	\b(exec|execSync)\s*\(\s*(`[^`]*\$\{|["'][^"']*["']\s*\+)	use execFi
 shell	java,kt	Runtime\.getRuntime\s*\(\s*\)\s*\.exec\s*\(|\bnew\s+ProcessBuilder\s*\(\s*"(sh|bash|cmd|cmd\.exe|powershell)"	use ProcessBuilder with a fixed binary and an argument list; never a shell		high
 sql-concat	java,kt	\.(queryFor\w+|query|update|execute|batchUpdate)\s*\(\s*"[^"]*(SELECT|INSERT|UPDATE|DELETE)[^"]*"\s*\+	use ? placeholders: jdbcTemplate.query(sql, mapper, arg)		critical
 sql-concat	swift	sqlite3_(exec|prepare_v2|prepare)\s*\([^,]*,\s*"[^"]*\\\(	bind values with sqlite3_bind_*; never interpolate into SQL text		critical
+sql-concat	java,kt	\.(execute(Query|Update|LargeUpdate)?|prepareStatement|prepareCall|addBatch|createQuery|createNativeQuery)\s*\(\s*"[^"]*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"]*"\s*\+	use ? placeholders with PreparedStatement and set the values		critical
+sql-concat	kt	\.(execute(Query|Update)?|prepareStatement|rawQuery|execSQL|createQuery|createNativeQuery)\s*\(\s*"[^"]*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"]*\$\{?[A-Za-z_]	string templates are not parameters: use ? placeholders		critical
+sql-concat	go	\.(Query|QueryRow|Exec|QueryContext|QueryRowContext|ExecContext|Prepare)\s*\([^;]*"[^"]*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"]*"\s*\+|fmt\.Sprintf\s*\(\s*"[^"]*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"]*%[sdv]	use $1 / ? placeholders: db.Query(sql, args...)		critical
+sql-concat	php	(->query|->exec|->prepare|mysqli_query|pg_query|sqlite_query)\s*\([^;]*"[^"]*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"]*("\s*\.\s*\$|\$[A-Za-z_]|\{\$)	use a prepared statement with bound parameters (PDO / mysqli)		critical
+shell	cs	Process\.Start\s*\(\s*"(cmd(\.exe)?|powershell(\.exe)?|pwsh|/bin/(ba|z)?sh|bash|sh)"|FileName\s*=\s*"(cmd(\.exe)?|powershell(\.exe)?|pwsh|/bin/(ba|z)?sh)"	run the program directly with ArgumentList entries, never through cmd or a shell		critical
+shell	c,h,cpp,cc,hpp,cxx	\b(system|popen)\s*\(\s*[A-Za-z_][\w.>\[\]-]*(\(\))?\s*[,)]|\bexecl?p?\s*\(\s*"/bin/(ba|z)?sh"	fork + execve with an argument vector; never system()/popen() on a built string		critical
+shell	swift	launchPath\s*=\s*"/bin/(ba|z)?sh"|executableURL\s*=\s*URL\s*\(\s*fileURLWithPath:\s*"/bin/(ba|z)?sh"	run the binary directly with an arguments array, not /bin/sh -c		critical
+shell	ps1	\bcmd(\.exe)?\s+/c\s+"[^"]*\$|Start-Process\s+(cmd|powershell|pwsh)(\.exe)?\s+-ArgumentList\s+"[^"]*\$	pass arguments as an array to the program itself		critical
+sql-concat	ps1	(CommandText\s*=|Invoke-Sqlcmd\s+[^|]*-Query)\s*"[^"]*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"]*\$	use SqlCommand parameters (@name)		critical
+sql-concat	sql	\bEXEC(UTE)?\s*\(\s*@\w+\s*\)|\bEXEC(UTE)?\s*\(\s*N?'[^']*'\s*\+|\bEXECUTE\s+IMMEDIATE\s+[^;]*\|\||\bEXECUTE\s+[^;]*'\s*\|\|\s*\w	use sp_executesql / EXECUTE IMMEDIATE ... USING with bind variables		critical
+sql-concat	sql	\bsp_executesql\s+@\w+\s*;	pass parameters to sp_executesql; never run a concatenated string		high
+shell	sql	\bxp_cmdshell\b|\bsp_OACreate\b|\bCOPY\s+\w+\s+(TO|FROM)\s+PROGRAM\b	!xp_cmdshell\W+0|sp_configure|--\s*keep	no OS commands from the database; keep xp_cmdshell disabled	critical
+sql-concat	scala,sc	#\$\{?\w|\bSQL\s*\(\s*s"[^"]*\$|\.(execute(Query|Update)?|prepareStatement)\s*\(\s*s"[^"]*\$	use $value binds (Slick, Doobie, Anorm); #$ splices raw text		critical
+shell	scala,sc	s"[^"]*\$[^"]*"\s*\.\s*!{1,2}|Seq\s*\(\s*"(sh|bash)"\s*,\s*"-c"	run a Seq of arguments, never a built command string		critical
+sql-concat	dart	\b(rawQuery|rawInsert|rawUpdate|rawDelete|execute|query)\s*\(\s*("[^"]*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"]*\$|'[^']*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^']*\$)	use ? placeholders with an arguments list		critical
+shell	dart	runInShell\s*:\s*true|Process\.(run|start)\s*\(\s*["'](sh|bash|cmd)["']\s*,\s*\[\s*["'](-c|/c)	Process.run(program, [args]) without a shell		critical
+jenkins-sh-interpolation	groovy,gradle,jenkinsfile	\b(sh|bat|powershell)\s*\(?\s*"[^"]*\$\{?\s*(params|env|[A-Z_]{3,})	single-quote the script and pass values through environment variables		critical
+shell	groovy,gradle,jenkinsfile	"[^"]*\$\{?\w[^"]*"\s*\.execute\s*\(	use a list: ['cmd', arg].execute()		critical
+sql-concat	cbl,cob,cpy,cobol	\bEXECUTE\s+IMMEDIATE\s+:|\bSTRING\s+['"]\s*(SELECT|INSERT|UPDATE|DELETE)\b	static SQL with host variables, or PREPARE with ? markers and EXECUTE ... USING		critical
+cobol-dynamic-call	cbl,cob,cpy,cobol	\bCALL\s+[A-Z][A-Z0-9-]*\s+(USING|END-CALL|ON|\.)|\bEXEC\s+CICS\s+(LINK|XCTL)\s+PROGRAM\s*\(\s*[A-Z][A-Z0-9-]*\s*\)	!^.{6}\*|^\s*\*	CALL a literal program name; never one chosen by input	high
+sql-concat	vb	(New\s+SqlCommand|\.CommandText\s*=|New\s+OleDbCommand|New\s+OdbcCommand)\s*\(?\s*"[^"]*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"]*"\s*&	use parameters: cmd.Parameters.Add("@x", ...)		critical
+sql-concat	abap	\bWHERE\s*\(\s*\w+\s*\)|\bEXEC\s+SQL\b[^.]*&&	static WHERE with @host variables; escape dynamic parts with cl_abap_dyn_prg		critical
+shell	abap	\bCALL\s+'SYSTEM'	use SXPG_COMMAND_EXECUTE with an SM69 command		critical
+sql-concat	cls,trigger,apex	Database\.(query|countQuery|getQueryLocator)\s*\(\s*[^)]*'\s*\+|Database\.(query|countQuery)\s*\(\s*\w+\s*\+	!String\.escapeSingleQuotes|queryWithBinds	use :bind variables or Database.queryWithBinds	critical
+sql-concat	m,mm	sqlite3_(exec|prepare_v2|prepare)\s*\([^,]*,\s*\[\s*NSString\s+stringWithFormat:	prepare with ? and sqlite3_bind_*		critical
+shell	m,mm	launchPath\s*=\s*@"/bin/(ba|z)?sh"|executableURL\s*=\s*\[\s*NSURL\s+fileURLWithPath:\s*@"/bin/(ba|z)?sh"	run the binary directly with an arguments array		critical
+shell	pl,pm	\b(system|exec)\s*\(?\s*"[^"]*\$|`[^`]*\$\w|\bqx\s*[({/][^)}/]*\$|\bopen\s*\(?\s*\w+\s*,\s*"[^"]*\$[^"]*\|?"	use the list form: system('cmd', $arg); three-argument open		critical
+sql-concat	pl,pm	->\s*(do|prepare|selectall_\w+|selectrow_\w+)\s*\(\s*"[^"]*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"]*\$	use ? placeholders and execute($value)		critical
+shell	lua	\b(os\.execute|io\.popen)\s*\(\s*[^)]*\.\.	never build a shell command from input		critical
+sql-concat	lua	\b(query|execute)\s*\(\s*("[^"]*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^"]*"|'[^']*(SELECT|INSERT|UPDATE|DELETE|WHERE)[^']*')\s*\.\.\s*[a-zA-Z_]	!quote_sql_str|quote_literal	use ngx.quote_sql_str or $1 placeholders	critical
+sql-concat	ex,exs	\bfragment\s*\(\s*"[^"]*#\{|\bSQL\.query!?\s*\([^,]*,\s*"[^"]*#\{	pin values with ^ or pass them as query parameters		critical
+shell	ex,exs	:os\.cmd\s*\(|System\.cmd\s*\(\s*"(sh|bash)"\s*,\s*\[\s*"-c"	System.cmd(program, [args]) without a shell		critical
+atom-exhaustion	ex,exs	\bString\.to_atom\s*\(|\bList\.to_atom\s*\(|:erlang\.binary_to_atom\s*\(	use String.to_existing_atom or a map of allowed values		high
+shell	r	\bsystem\s*\(\s*paste0?\s*\(|\bsystem\s*\(\s*sprintf\s*\(|\bsystem2\s*\([^)]*paste0?\s*\(	processx::run(cmd, args) or system2 with shQuote()d args		critical
+sql-concat	r	\bdb(GetQuery|Execute|SendQuery|SendStatement)\s*\([^,]+,\s*(paste0?|sprintf)\s*\(	use params = list(...) or glue_sql()		critical
+xss-sink	ex,exs	\b(raw|Phoenix\.HTML\.raw)\s*\(\s*@?\w*(param|input|user|body|comment)	let HEEx escape it; never raw() on user data		high
+xss-sink	cls,trigger,apex,page,component	escape\s*=\s*"false"	keep escaping on; use JSENCODE/HTMLENCODE for the context		high

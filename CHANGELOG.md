@@ -4,6 +4,57 @@ Versions follow [Semantic Versioning](https://semver.org). To install a
 specific version, pin a tag or commit SHA:
 `npx github:nnguyensky/secure-coding#<tag-or-sha>`.
 
+## 2.5.0 — 2026-11-05
+
+### Added
+- **16 new language templates** (29 in total): C++, PowerShell, SQL (T-SQL,
+  PL/SQL), Scala, Dart/Flutter, Groovy/Jenkinsfile, COBOL, VB.NET, ABAP, Apex,
+  Objective-C, Perl, Lua, Elixir, Solidity, R. Each covers the same 25
+  controls; a control that does not apply says `N/A` and why.
+- **Patterns for the new languages** (516 in total, up from 403): SQL built by
+  string joining, shell and dynamic code calls, weak crypto, TLS turned off,
+  hard-coded secrets, plus language-specific risks — `without sharing` in
+  Apex, `CLIENT SPECIFIED` in ABAP, dynamic `CALL` in COBOL, `tx.origin`,
+  `delegatecall` and unchecked calls in Solidity, atom exhaustion in Elixir,
+  `GRANT ... TO PUBLIC` in SQL, Groovy `sh "${...}"` in Jenkinsfiles.
+- 13 new fix blocks in `checks/fixes.md` (168 in total).
+- Existing templates gained XXE, unsafe deserialization and JWT sections;
+  C gained format strings and integer overflow.
+- The scanner recognises the new file types (`.ps1`, `.sql`, `.scala`,
+  `.dart`, `.groovy`, `Jenkinsfile`, `.cbl`, `.vb`, `.abap`, `.cls`, `.m`,
+  `.pl`, `.lua`, `.ex`, `.sol`, `.r` and their variants), masks their strings
+  and comments, and follows taint from ASP.NET `Request.*` and Ktor `call.*`.
+
+### Fixed
+- **Comments no longer trigger findings.** A pattern named in a comment
+  (`// never: eval(x)`) was reported as if it were code, which made the
+  templates and docs noisy. Secrets are still caught inside comments. COBOL
+  fixed-format comments (`*` in column 7) are recognised. Rules that exist to
+  read comments (`API-9` deprecation markers, "remove before prod" notes)
+  are unchanged.
+- Safe code that was flagged: `logging.info("... %s", x)`, Ruby
+  `system("ls", "-l", dir)`, Go `crypto/rand.Read`, a parameter named
+  `upload_dir`, `EXEC sp_configure 'xp_cmdshell', 0`, Groovy
+  `sql.rows("... ${x}")` (a GString is bound as parameters), YAML loaded with a
+  data-only schema, Ruby logging that does not touch request data.
+- Missed: Groovy `sql.rows("..." + x)`.
+- JavaScript SSRF template called `dns.lookupSync`, which does not exist. It
+  now resolves with `dns.promises`, blocks all private IPv4/IPv6 ranges and
+  refuses redirects, and notes the DNS-rebinding risk that remains.
+- New test: every code block in all 29 templates must scan clean.
+- SQL concatenation was missed when the query held a quoted value
+  (`"... WHERE name = '" + x`) in Java, Kotlin, Go and PHP; Kotlin string
+  templates and Go `fmt.Sprintf` are now caught too.
+- Gaps across 32 language/class cells (shell, weak hash, weak crypto, TLS off,
+  XXE, open redirect, path traversal, log injection) are closed.
+- Upper-case secret names (`API_KEY = "..."`) are now caught; names like
+  `PASSWORD_FIELD` are not.
+- Rules that fired on safe code: `docker-digest` on digest-pinned images,
+  `API-5` on `requireAuth`, the Kubernetes NetworkPolicy and read-only root
+  filesystem rules, `npm-audit` on `--ignore-scripts`, `API-7`.
+- Templates: TypeScript integrity check now compares lengths before
+  `timingSafeEqual`; PHP CSRF check rejects an empty session token.
+
 ## 2.4.0 — 2026-11-05
 
 ### Added

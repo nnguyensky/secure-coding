@@ -233,3 +233,27 @@ string SanitizeLog(string value) {
 Logger.LogInformation("user_action user={User} input={Input}", user, SanitizeLog(userInput));
 // never: logging unsanitized user input — CR/LF can forge log entries
 ```
+
+## XML parsing — no external entities (XXE)
+```csharp
+var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null };
+using var reader = XmlReader.Create(stream, settings);
+// never: DtdProcessing.Parse with an XmlUrlResolver
+```
+
+## Deserialization — typed JSON
+```csharp
+var order = JsonSerializer.Deserialize<OrderDto>(json);
+// never: BinaryFormatter, NetDataContractSerializer, LosFormatter;
+// never Newtonsoft TypeNameHandling.All / Auto on untrusted input
+```
+
+## JWT verification — fixed algorithm, issuer and audience
+```csharp
+options.TokenValidationParameters = new TokenValidationParameters {
+    ValidateIssuer = true, ValidIssuer = "https://id.example.com",
+    ValidateAudience = true, ValidAudience = "orders-api",
+    ValidateLifetime = true, ValidateIssuerSigningKey = true,
+    ValidAlgorithms = new[] { SecurityAlgorithms.RsaSha256 },
+};
+```

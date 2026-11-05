@@ -189,25 +189,41 @@ const hash = crypto.createHash("sha256").update(fs.readFileSync(path)).digest("h
 
 ## SSRF prevention — validate URLs before server-side requests
 ```js
-const { URL } = require("url");
+const net = require("net");
+const dns = require("dns").promises;
 
 const ALLOWED_HOSTS = new Set(["api.example.com", "cdn.example.com"]);
 
-function isSafeUrl(urlStr) {
-  try {
-    const url = new URL(urlStr);
-    if (url.protocol !== "https:") return false;
-    if (!ALLOWED_HOSTS.has(url.hostname)) return false;
-    // block internal IPs
-    const ip = require("dns").lookupSync(url.hostname);
-    if (ip.startsWith("127.") || ip.startsWith("10.") || ip.startsWith("192.168.") || ip.startsWith("169.254."))
-      return false;
-    return true;
-  } catch { return false; }
+// Is this address private, loopback, link-local or otherwise internal?
+function isInternalIp(ip) {
+  if (net.isIPv6(ip)) {
+    const v = ip.toLowerCase();
+    return v === "::1" || v === "::" || v.startsWith("fc") || v.startsWith("fd") ||
+           v.startsWith("fe80") || v.startsWith("::ffff:");
+  }
+  const [a, b] = ip.split(".").map(Number);
+  return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) ||
+         (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
+         (a === 100 && b >= 64 && b <= 127);
 }
 
-if (!isSafeUrl(req.query.url)) throw new Error("URL not allowed");
-const resp = await fetch(req.query.url, { signal: AbortSignal.timeout(5000) });
+// Returns a URL object you can trust, or throws. The host must be on the
+// allowlist AND every address it resolves to must be public.
+async function validateOutboundUrl(urlStr) {
+  const url = new URL(urlStr);
+  if (url.protocol !== "https:") throw new Error("https only");
+  if (!ALLOWED_HOSTS.has(url.hostname)) throw new Error("host not allowed");
+  const addrs = await dns.lookup(url.hostname, { all: true });
+  if (addrs.some(a => isInternalIp(a.address))) throw new Error("internal address");
+  return url;
+}
+
+const target = await validateOutboundUrl(req.query.url);
+// redirect: "error" stops an allowed host from bouncing you to an internal one
+const resp = await fetch(target, { redirect: "error", signal: AbortSignal.timeout(5000) });
+// Residual risk: DNS can change between this check and the request. For
+// high-risk fetches, connect to the checked IP (custom agent/lookup) or
+// route all outbound calls through an egress proxy that blocks internal ranges.
 // never: fetch(req.query.url) without validation
 ```
 
@@ -234,4 +250,27 @@ function sanitizeLog(value) {
 
 console.info("user_action user=%s input=%s", user, sanitizeLog(userInput));
 // never: logging unsanitized user input — CR/LF can forge log entries
+```
+
+## XML parsing — no external entities (XXE)
+```js
+const { XMLParser } = require("fast-xml-parser");   // never resolves external entities
+const doc = new XMLParser({ processEntities: false }).parse(xml);
+// libxmljs: parseXml(xml, { noent: false, nonet: true }) — never noent: true
+```
+
+## Deserialization — plain data formats only
+```js
+const body = JSON.parse(raw);           // then validate with a schema (zod, ajv)
+const cfg = yaml.load(text, { schema: yaml.JSON_SCHEMA });   // data only: no custom tags
+// never: node-serialize unserialize(), eval(), vm.run*() on input
+```
+
+## JWT verification — fixed algorithm, issuer and audience
+```js
+const jwt = require("jsonwebtoken");
+const claims = jwt.verify(token, publicKey, {
+  algorithms: ["RS256"], issuer: "https://id.example.com", audience: "orders-api",
+});
+// never: jwt.decode(token) to authorize — it does not check the signature
 ```

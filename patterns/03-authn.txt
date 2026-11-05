@@ -21,3 +21,11 @@ pw-fast-hash	php	(password_hash|hash)\s*\(\s*["'](sha256|sha512|md5|sha1)["']			
 pw-fast-hash	cs	(SHA256|SHA512|MD5|SHA1)\.Create\s*\(\s*\)\s*\.ComputeHash\s*\([^)]*(password|passwd|pwd)			high
 pw-fast-hash	rs	(Sha256|Sha512|Md5|Sha1)::digest\s*\([^)]*(password|passwd|pwd)			high
 weak-hash	swift	Insecure\.(MD5|SHA1)\b|\bCC_(MD5|SHA1)\s*\(	use SHA256 from CryptoKit for integrity; a password hash (Argon2/scrypt) for passwords		high
+weak-hash	go	\b(md5|sha1)\.Sum\s*\(	use sha256 for integrity; a password hash (argon2id) for passwords		high
+weak-hash	c,h,cpp,cc,hpp,cxx	\b(MD5|SHA1|MD4)\s*\(|\bEVP_(md5|sha1|md4)\s*\(|\bCC_(MD5|SHA1)\s*\(	use SHA-256 (EVP_sha256) for integrity; argon2id for passwords		high
+weak-hash	m,mm	\bCC_(MD5|SHA1)\s*\(	use CC_SHA256 (or CryptoKit SHA256)		high
+weak-hash	pl,pm	\bDigest::(MD5|SHA1)\b|\b(md5|sha1)_hex\s*\(	use Digest::SHA sha256_hex; argon2 for passwords		high
+weak-hash	ex,exs	:crypto\.hash\s*\(\s*:(md5|sha)\s*,	use :sha256; Argon2 for passwords		high
+weak-hash	r	\bdigest\s*\([^)]*algo\s*=\s*["'](md5|sha1)["']	use algo = "sha256"		high
+weak-hash	abap	if_algorithm\s*=\s*'(MD5|SHA1)'	use SHA256		high
+weak-hash	cls,trigger,apex	Crypto\.generateDigest\s*\(\s*'(MD5|SHA1)'	use SHA-256		high

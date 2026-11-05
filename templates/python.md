@@ -258,3 +258,26 @@ def sanitize_log(value: str) -> str:
 logging.info("user_action user=%s input=%s", user, sanitize_log(user_input))
 # never: logging unsanitized user input — CR/LF can forge log entries
 ```
+
+## XML parsing — no external entities (XXE)
+```python
+import defusedxml.ElementTree as ET        # pip install defusedxml
+root = ET.fromstring(untrusted_xml)
+# lxml: etree.XMLParser(resolve_entities=False, no_network=True)
+# never: etree.XMLParser(resolve_entities=True) on input you did not write
+```
+
+## Deserialization — plain data formats only
+```python
+data = json.loads(body)          # then validate the shape (pydantic, jsonschema)
+cfg = yaml.safe_load(text)
+# never on untrusted input: pickle.loads, yaml.load, marshal.loads, shelve
+```
+
+## JWT verification — fixed algorithm, issuer and audience
+```python
+import jwt   # PyJWT
+claims = jwt.decode(token, public_key, algorithms=["RS256"],
+                    issuer="https://id.example.com", audience="orders-api")
+# never: options={"verify_signature": False}, or the algorithm taken from the token
+```

@@ -6,7 +6,7 @@
 C-1	Dockerfile,yml,yaml	USER\s+root|user:\s*root|user:\s*"root"|user:\s*'root'		C-1 Container root: container runs as root — create unprivileged user and USER it	high
 C-2	yml,yaml	privileged:\s*true|securityContext:.*privileged:\s*true		C-2 Privileged container: effectively no isolation — remove privileged flag	high
 C-3	yml,yaml	hostNetwork:\s*true|hostPID:\s*true|hostIPC:\s*true		C-3 Host namespace: container shares host network/pid/ipc — use container-scoped namespaces	high
-C-4	Dockerfile	readonlyRootFilesystem:\s*false|read_only:\s*false		C-4 Writable rootfs: container filesystem writable — set readOnlyRootFilesystem: true	medium
+C-4	yml,yaml	readOnlyRootFilesystem:\s*false|read_only:\s*false		C-4 Writable rootfs: container filesystem writable — set readOnlyRootFilesystem: true	medium
 C-5	yml,yaml	add:\s*\["SYS_ADMIN"\]|add:\s*\["ALL"\]|capabilities:.*add:.*ALL		C-5 Excessive capabilities: container has broad Linux capabilities — drop ALL, add only needed	high
 C-6	yml,yaml	volumes:.*docker\.sock|/var/run/docker\.sock		C-6 Docker socket mount: container can control Docker daemon — remove socket mount	high
 C-7	Dockerfile	HEALTHCHECK\s+NONE		C-7 No healthcheck: container has no liveness/readiness probe — add HEALTHCHECK	medium
@@ -19,7 +19,7 @@ C-10	yml,yaml	limits:.*\{\}|resources:\s*\{\}|resources:.*limits:.*null		C-10 No
 hostpath	yml,yaml	hostPath\s*:	docker: hostPath mounts host filesystem into pod — use PersistentVolumeClaim or emptyDir instead		medium
 hostpath	yml,yaml	hostPath\.path\s*:\s*[/"'](/[a-z]|/(etc|var|proc|sys|root|home))	docker: hostPath exposes sensitive host directories — use PVC or emptyDir		medium
 
-k8s-np	yml,yaml	networkPolicy\s*:\s*\{\}|kind:\s*NetworkPolicy	docker: no network policy — define NetworkPolicy to restrict pod-to-pod traffic		medium
+k8s-np	yml,yaml	networkPolicy\s*:\s*\{\}|networkPolicy\s*:\s*\n?\s*enabled\s*:\s*false	docker: no network policy — define NetworkPolicy to restrict pod-to-pod traffic		medium
 k8s-psa	yml,yaml	podSecurityAdmission\s*:\s*\{\}|pod-security.kubernetes.io/enforce\s*:\s*privileged	docker: permissive pod security standard — enforce restricted or baseline profile		high
 
 k8s-seccomp	yml,yaml	seccompProfile\s*:\s*\{\}|seccompProfile:\s*\{\}	docker: missing seccomp profile — set RuntimeDefault or custom seccomp profile		medium

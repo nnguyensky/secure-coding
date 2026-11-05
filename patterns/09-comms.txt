@@ -21,4 +21,17 @@ tls-off	java,kt	setHostnameVerifier\s*\(\s*\([^)]*\)\s*->\s*true|HostnameVerifie
 # CORS Misconfigurations
 cors-wildcard-credentials	*	(Access-Control-Allow-Origin|origin)['"]?\s*[,:=]\s*['"]\*['"].*(credentials|Access-Control-Allow-Credentials)	never combine wildcard Access-Control-Allow-Origin with credentials: true		high
 cors-origin-reflection	js,ts,py,go,java,kt,cs	(Access-Control-Allow-Origin|setHeader\(['"]Access-Control-Allow-Origin['"])\s*,\s*(req\.headers\.(origin|get\(['"]origin['"]\))|request\.headers\[['"]Origin['"]\])	validate Origin against a strict allowlist before reflecting		high
-tls-off	swift,plist	NSAllowsArbitraryLoads|NSExceptionAllowsInsecureHTTPLoads|URLCredential\s*\(\s*trust:\s*\w+\.serverTrust	keep App Transport Security on; pin or validate the server trust instead of accepting it		critical
+tls-off	swift,plist	NSAllowsArbitraryLoads|NSExceptionAllowsInsecureHTTPLoads|URLCredential\s*\(\s*trust:\s*[\w.!]*serverTrust	keep App Transport Security on; pin or validate the server trust instead of accepting it		critical
+tls-off	kt	hostnameVerifier\s*=\s*HostnameVerifier\s*\{[^}]*->\s*true|HostnameVerifier\s*\{\s*_\s*,\s*_\s*->\s*true	keep hostname verification; never accept every host		critical
+tls-off	cs	ServerCertificateCustomValidationCallback\s*=\s*[^;]*(=>\s*true|DangerousAcceptAnyServerCertificateValidator)	keep certificate validation; pin or add the CA instead		critical
+tls-off	rs	danger_accept_invalid_(certs|hostnames)\s*\(\s*true\s*\)	keep certificate checks; add the CA with add_root_certificate		critical
+tls-off	sh,bash,zsh,yml,yaml,Dockerfile	\bcurl\b[^|#]*\s(-k|--insecure)\b|\bwget\b[^|#]*--no-check-certificate	keep TLS verification; pass --cacert for a private CA		critical
+tls-off	ps1	-SkipCertificateCheck\b|ServerCertificateValidationCallback\s*=\s*\{\s*\$true\s*\}	keep certificate validation on		critical
+tls-off	dart	badCertificateCallback\s*=\s*\([^)]*\)\s*=>\s*true	keep validation; pin with SecurityContext if needed		critical
+tls-off	groovy,gradle,jenkinsfile	\bcurl\b[^\n]*\s(-k|--insecure)\b|TrustAllStrategy|NoopHostnameVerifier	keep TLS verification		critical
+tls-off	vb	ServerCertificateValidationCallback\s*=\s*Function\s*\([^)]*\)\s*True|ServerCertificateCustomValidationCallback\s*=\s*Function\s*\([^)]*\)\s*True	keep certificate validation		critical
+tls-off	m,mm	allowInvalidCertificates\s*=\s*YES|validatesDomainName\s*=\s*NO|setAllowsAnyHTTPSCertificate	keep certificate and host validation		critical
+tls-off	pl,pm	SSL_verify_mode\s*=>\s*(SSL_VERIFY_NONE|0)|verify_hostname\s*=>\s*0|PERL_LWP_SSL_VERIFY_HOSTNAME\}?\s*=\s*0	keep verify_hostname => 1		critical
+tls-off	lua	ssl_verify\s*=\s*false|lua_ssl_verify_depth\s+0	keep ssl_verify = true		critical
+tls-off	ex,exs	verify:\s*:verify_none	keep :verify_peer with a CA store		critical
+tls-off	r	ssl_verifypeer\s*=\s*(FALSE|F|0L?)\b|ssl_verifyhost\s*=\s*(FALSE|F|0L?)\b	keep certificate verification		critical

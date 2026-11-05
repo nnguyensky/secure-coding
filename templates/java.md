@@ -237,3 +237,30 @@ String sanitizeLog(String value) {
 logger.info("user_action user={} input={}", user, sanitizeLog(userInput));
 // never: logging unsanitized user input — CR/LF can forge log entries
 ```
+
+## XML parsing — no external entities (XXE)
+```java
+DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+dbf.setXIncludeAware(false);
+dbf.setExpandEntityReferences(false);
+Document doc = dbf.newDocumentBuilder().parse(input);
+```
+
+## Deserialization — data into a DTO, never Java serialization
+```java
+OrderDto order = new ObjectMapper().readValue(body, OrderDto.class);
+// never: new ObjectInputStream(untrusted).readObject(); never activateDefaultTyping()
+// if Java serialization is unavoidable: ObjectInputFilter.Config.createFilter("com.example.dto.*;!*")
+```
+
+## JWT verification — fixed algorithm, issuer and audience
+```java
+Claims claims = Jwts.parser()                 // jjwt 0.12
+    .verifyWith(publicKey)
+    .requireIssuer("https://id.example.com")
+    .requireAudience("orders-api")
+    .build()
+    .parseSignedClaims(token)
+    .getPayload();
+```

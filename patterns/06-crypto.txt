@@ -7,7 +7,7 @@ weak-rng	*	Math\.random\s*\(\)[^;]*(token|key|secret|nonce|salt|otp|reset)			med
 weak-rng	*	(token|key|secret|nonce|salt|otp|reset)[^;]*random\.(random|randint|choice|randrange)\s*\(			medium
 weak-rng	*	random\.(random|randint|choice)\s*\([^;]*(token|key|secret|nonce|salt|otp|reset)			medium
 weak-rng	*	new\s+Random\s*\(\s*\)			medium
-weak-rng	go	rand\.(Intn|Int|Float64|Read)\s*\([^)]*(token|key|secret|nonce|salt|otp|reset)|(token|key|secret|nonce|salt|otp|reset)[^;]*rand\.(Intn|Int|Float64)|(token|key|secret|nonce|salt|otp|reset)[^;]*math/rand	use crypto/rand		medium
+weak-rng	go	rand\.(Intn|Int|Float64|Read)\s*\([^)]*(token|key|secret|nonce|salt|otp|reset)|(token|key|secret|nonce|salt|otp|reset)[^;]*rand\.(Intn|Int|Float64)|(token|key|secret|nonce|salt|otp|reset)[^;]*math/rand	!!^(?![\s\S]*math/rand)[\s\S]*crypto/rand		medium
 weak-rng	java,kt	Math\.random\s*\(\s*\)\s*\*\s*\d+[^;]*(token|key|secret|nonce|salt|otp|reset)|(token|key|secret|nonce|salt|otp|reset)[^;]*new\s+Random\s*\(\)	use SecureRandom		medium
 weak-rng	rb	(token|key|secret|nonce|salt|otp|reset)[^;]*\brand\s*\(|SecureRandom\s*\.\s*random_number	use SecureRandom.urlsafe_base64		medium
 weak-rng	php	(token|key|secret|nonce|salt|otp|reset)[^;]*\b(rand|mt_rand)\s*\(			medium
@@ -28,3 +28,22 @@ weak-crypto	rb	OpenSSL::Cipher[^)]*(DES|RC4|Blowfish)|(DES|RC4|Blowfish)\.new			
 weak-crypto	php	mcrypt_\w+\s*\(|MCRYPT_(DES|RC4|BLOWFISH)|openssl_encrypt\s*\([^,]*,\s*["'](des|rc4|blowfish)			medium
 weak-crypto	cs	(DES|RC2|TripleDES)\.Create\s*\(|DESCryptoServiceProvider|RC2CryptoServiceProvider			medium
 weak-crypto	rs	(des|rc4|blowfish)::|Des::new|Rc4::new|Blowfish::new			medium
+weak-crypto	js,ts	create(Cipheriv|Decipheriv|Cipher|Decipher)\s*\(\s*["'](des|des-ede3?|des3|rc4|rc2|bf|blowfish|cast)[-"']	use aes-256-gcm or chacha20-poly1305		medium
+weak-crypto	rb	OpenSSL::Cipher(::\w+)?\.new\s*\(\s*["'](des|DES|rc4|RC4|rc2|RC2|bf|BF|blowfish)	use aes-256-gcm		medium
+weak-crypto	swift,m,mm	kCCAlgorithm(DES|3DES|RC4|RC2|Blowfish|CAST)\b|kCCOptionECBMode	use CryptoKit AES.GCM or ChaChaPoly		medium
+weak-crypto	c,h,cpp,cc,hpp,cxx	\bEVP_(des|rc4|rc2|bf|cast5)\w*\s*\(|\bEVP_aes_\d+_ecb\s*\(|\bDES_(ecb|ncbc|ede3)\w*\s*\(	use EVP_aes_256_gcm or libsodium AEAD		medium
+secret	*	\b[A-Z_]*(PASSWORD|PASSWD|SECRET|API_?KEY|ACCESS_?KEY|AUTH_?TOKEN|PRIVATE_?KEY)[A-Z_]*\s*[:=]\s*["'][^"'\s$]{8,}["']	!(?:[Yy][Oo][Uu][Rr]|[Ee][Xx][Aa][Mm][Pp][Ll][Ee]|[Pp][Ll][Aa][Cc][Ee][Hh][Oo][Ll][Dd][Ee][Rr]|[Cc][Hh][Aa][Nn][Gg][Ee][Mm][Ee]|[Dd][Uu][Mm][Mm][Yy]|[Xx]{3,}|<|\$\{|\$\(|getenv|environ|ENV\[|process\.env|(FIELD|HEADER|NAME|PARAM|ENV|VAR|PATH|FILE|URL|LABEL|PROMPT|REGEX|PATTERN|LENGTH|LEN|MIN|MAX|ID|TYPE|KEY_NAME)\s*[:=])	load secrets from the environment or a secret manager, never source	critical
+weak-rng	dart	([Tt]oken|[Kk]ey|[Ss]ecret|[Nn]once|[Ss]alt|[Oo]tp)[^;]*\bRandom\s*\(\s*\)	use Random.secure()		medium
+weak-rng	lua	(token|key|secret|nonce|salt|otp)[^\n]*math\.random\s*\(	use resty.random.bytes(n, true)		medium
+weak-rng	ex,exs	(token|key|secret|nonce|salt|otp)[^\n]*:rand\.(uniform|bytes)	use :crypto.strong_rand_bytes		medium
+weak-rng	r	(token|key|secret|nonce|salt|otp)[^\n]*\b(sample|runif)\s*\(	use sodium::random()		medium
+weak-rng	ps1	(token|key|secret|nonce|salt|otp|password)[^\n]*\bGet-Random\b	use [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(n)		medium
+weak-rng	sql	(token|key|secret|nonce|salt|otp)[^\n]*\b(RAND\s*\(|DBMS_RANDOM|random\s*\(\s*\))	use CRYPT_GEN_RANDOM / DBMS_CRYPTO.RANDOMBYTES / gen_random_bytes		medium
+weak-rng	cbl,cob,cpy,cobol	(TOKEN|KEY|SECRET|NONCE|SALT|OTP|PIN)[A-Z0-9-]*[^.]*FUNCTION\s+RANDOM	use ICSF random number generate (CSNBRNG)		medium
+weak-rng	c,h,cpp,cc,hpp,cxx	(token|key|secret|nonce|salt|otp)[^;]*\b(std::)?(rand|random)\s*\(\s*\)|(token|key|secret|nonce|salt|otp)[^;]*std::mt19937	use randombytes_buf (libsodium) or getrandom()		medium
+secret	cbl,cob,cpy,cobol	(PASSWORD|PASSWD|PWD|PASS-WORD|SECRET|API-KEY|TOKEN)[A-Z0-9-]*\s+PIC\s+X\(\d+\)\s+VALUE\s+['"][^'"\s]{6,}['"]	!VALUE\s+(SPACES|LOW-VALUES?|HIGH-VALUES?)	no credentials in VALUE clauses; use RACF PassTickets or a protected dataset	critical
+secret	ps1	ConvertTo-SecureString\s+["'][^"']{6,}["']\s+-AsPlainText	read secrets with Get-Secret (SecretManagement), never from the script		critical
+secret	sql	\bCREATE\s+(LOGIN|USER)\s+\S+\s+(WITH\s+PASSWORD|IDENTIFIED\s+BY)\s*=?\s*N?['"][^'"]{4,}	no passwords in migration scripts; inject them at deploy time		critical
+secret	cls,trigger,apex	setHeader\s*\(\s*'Authorization'\s*,\s*'(Basic|Bearer)\s+[A-Za-z0-9+/=._-]{8,}	use Named Credentials		critical
+weak-crypto	ex,exs	:crypto\.(crypto_one_time|crypto_init)\s*\(\s*:(des\w*|rc4|blowfish\w*|aes_\d+_ecb)	use :aes_256_gcm		medium
+weak-crypto	pl,pm	\bCrypt::(DES|Blowfish|RC4)\b|Crypt::Mode::ECB	use Crypt::AuthEnc::GCM		medium

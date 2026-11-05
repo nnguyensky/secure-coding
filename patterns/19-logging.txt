@@ -5,8 +5,8 @@
 # id	exts	regex	!exclude	hint  (ONE regex: !a|b|c, never !a|!b|!c)
 log-inject	*	console\.(log|warn|error|info|debug)\s*\([^)]*\$\{[^}]*(\b(?:req|request|res)\.|\b(?:userInput|user_input|userData|input|body|params|query)\b)	log injection: sanitize user input before logging; strip CR/LF		medium
 log-inject	*	console\.(log|warn|error|info|debug)\s*\([^)]*\+\s*(\b(?:req|request|res)\.|\b(?:userInput|user_input|userData|input|body|params|query)\b)			medium
-log-inject	py	(log|logging|logger)\.(debug|info|warning|error|critical|exception)\s*\([^)]*(?:\.format\s*\(|f["']|%\s*)	log injection: use structured logging, sanitize user input		medium
-log-inject	rb	Rails\.logger\.(debug|info|warn|error|fatal)\s*\([^)]*#\{|logger\.(debug|info|warn|error)\s*\([^)]*#\{			medium
+log-inject	py	(log|logging|logger)\.(debug|info|warning|error|critical|exception)\s*\([^)]*(?:\.format\s*\(|f["']|["']\s*%\s*\w)	log injection: use structured logging, sanitize user input		medium
+log-inject	rb	(Rails\.)?logger\.(debug|info|warn|error|fatal)\s*\([^)]*#\{[^}]*(params|request|req\b|user_input|input|cookies|headers)	!sanitiz\w*\s*\(	strip CR/LF from request data before logging	medium
 log-inject	go	log\.(Print|Printf|Println|Fatal|Fatalf)\s*\([^)]*\+|log\.(Debug|Info|Warn|Error)\s*\([^)]*fmt\.Sprintf			medium
 log-inject	java,kt	(Log|log|logger|Logger)\.(debug|info|warn|error|trace)\s*\([^)]*\+\s*(req\.|request\.|user|input)			medium
 log-inject	cs	(Log|log|Logger|logger)\.(Debug|Information|Warning|Error)\s*\([^)]*\+\s*(req\.|request\.|user|input)			medium
@@ -27,3 +27,6 @@ logging-disabled	java,kt	<root\s+level\s*=\s*"(OFF|NONE)"|Level\.OFF		root logge
 logging-disabled	py	logging\.disable\s*\(|logging\.CRITICAL\s*\+\s*1		logging.disable() suppresses records globally — security events are lost	high
 auth-no-log	*	(catch|except)[^)]*\)?\s*[:{][^}]{0,80}(return|res\.)\s*(status\s*\(\s*)?(401|403)	!(log|Log|audit|trace|warn|error)	auth failure returned without logging — an attacker probes silently	medium
 log-truncated	*	(log|logger|Log|Logger|console|syslog|audit)\w*\.\w+\s*\([^\n]*\.(slice|substring|substr|Substring)\s*\(\s*0\s*,\s*([0-9]|[1-4][0-9])\s*\)	!(preview|display|ui|render|title|debug)	truncating a log field to a few characters destroys the evidence it was written to preserve	low
+log-inject	py	(log|logging|logger)\.(debug|info|warning|error|critical|exception)\s*\([^)]*\+\s*request\.	pass values as arguments and strip CR/LF		medium
+log-inject	cs	(_?[Ll]og(ger)?)\.(Log)?(Debug|Information|Warning|Error|Critical|Trace)\s*\([^)]*\+\s*Request\.	use structured logging placeholders, not concatenation		medium
+log-leak	cbl,cob,cpy,cobol	\bDISPLAY\s+[^.]*(PASSWORD|PASSWD|PIN\b|CARD-?N(UM|O)|PAN\b|SSN|CVV)	mask before displaying: never PAN, PIN, CVV or passwords		high

@@ -4,7 +4,7 @@
 
 insecure-deserialization	*	pickle\.loads?\s*\(	use JSON or a safe format; validate shape after parsing		critical
 insecure-deserialization	*	cPickle\.loads?\s*\(			critical
-insecure-deserialization	*	yaml\.load\s*\(			critical
+insecure-deserialization	*	yaml\.load\s*\(	!Loader\s*=\s*(yaml\.)?(Safe|CSafe|Base)Loader|schema\s*:\s*\w+\.(JSON|CORE|FAILSAFE)_SCHEMA	use yaml.safe_load, or a data-only schema	critical
 insecure-deserialization	*	\bunserialize\s*\(			critical
 insecure-deserialization	*	readObject\s*\(\s*\)			critical
 insecure-deserialization	*	Marshal\.load\s*\(			critical
@@ -51,3 +51,14 @@ eval	js,ts	\bvm\.(runInNewContext|runInThisContext|runInContext|compileFunction)
 prototype-pollution	js,ts	\b(Object\.assign|_\.merge|_\.mergeWith|_\.defaultsDeep|lodash\.merge|deepmerge|\$\.extend)\s*\([^;]*req\.(body|query|params)	copy only allowlisted keys; reject __proto__, constructor and prototype		high
 xxe	py	XMLParser\s*\([^)]*(resolve_entities\s*=\s*True|no_network\s*=\s*False)	disable entity resolution, or parse with defusedxml		high
 xxe	java,kt	\b(DocumentBuilderFactory|SAXParserFactory|XMLInputFactory|TransformerFactory|SchemaFactory)\.newInstance\s*\(	!!FEATURE_SECURE_PROCESSING|disallow-doctype-decl|SUPPORT_DTD|IS_SUPPORTING_EXTERNAL_ENTITIES|ACCESS_EXTERNAL_DTD|external-general-entities	disable DTDs: setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)	high
+xxe	js,ts	parseXml(String)?\s*\([^)]*noent\s*:\s*true	leave entity expansion off (noent: false)		high
+xxe	cs	DtdProcessing\s*=\s*DtdProcessing\.Parse|XmlResolver\s*=\s*new\s+XmlUrlResolver|ProhibitDtd\s*=\s*false	DtdProcessing.Prohibit and XmlResolver = null		high
+xxe	php	\bLIBXML_(NOENT|DTDLOAD|DTDATTR)\b	do not pass LIBXML_NOENT / LIBXML_DTDLOAD to the parser		high
+xxe	rb	\bnoent\b|ParseOptions::(NOENT|DTDLOAD)	parse with the default options (NONET, no entity substitution)		high
+eval	ps1	\b(Invoke-Expression|iex)\b\s+[\$("]|\|\s*(Invoke-Expression|iex)\b	call the program directly; never Invoke-Expression on built strings		critical
+eval	groovy,gradle,jenkinsfile	\bEval\.(me|x|xy|xyz)\s*\(|new\s+GroovyShell\s*\([^)]*\)\s*\.\s*(evaluate|parse)\s*\(	never evaluate code built from input		critical
+eval	abap	\bGENERATE\s+SUBROUTINE\s+POOL\b|\bINSERT\s+REPORT\b	never generate code from input		critical
+eval	pl,pm	\beval\s+\$\w|\beval\s*\(\s*\$\w|\beval\s*"[^"]*\$	never eval a string built from input		critical
+eval	lua	\b(loadstring|load|dofile)\s*\(\s*[a-zA-Z_][\w.]*\s*\)	never load code from input		critical
+eval	ex,exs	\bCode\.(eval_string|eval_quoted|compile_string)\s*\(	never evaluate code from input		critical
+eval	r	\beval\s*\(\s*parse\s*\(\s*text\s*=	never eval(parse(text = ...)) on input		critical

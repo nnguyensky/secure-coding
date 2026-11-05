@@ -12,3 +12,8 @@ insecure-deserialization	cs	(BinaryFormatter|NetDataContractSerializer)|TypeName
 insecure-deserialization	php	\bunserialize\s*\(	never pass untrusted user input to unserialize(); use json_decode()		critical
 insecure-deserialization	rb	Marshal\.(load|restore)\s*\(	never use Marshal.load on untrusted input; use JSON.parse		critical
 mobile-insecure-storage	swift,kt,java	UserDefaults\.standard\.set\s*\([^)]*forKey:\s*"[^"]*([Tt]oken|[Pp]assword|[Ss]ecret|[Aa]pi_?[Kk]ey)|kSecAttrAccessibleAlways\b|getSharedPreferences\s*\([^)]*\)\.edit\s*\(\s*\)\.putString\s*\(\s*"[^"]*([Tt]oken|[Pp]assword|[Ss]ecret)	store secrets in the Keychain / Android Keystore (EncryptedSharedPreferences), not in preferences		high
+insecure-deserialization	r	\b(readRDS|load|unserialize)\s*\(\s*(url\s*\(|gzcon\s*\(\s*url)	never load R objects from a URL or upload; use JSON		critical
+insecure-deserialization	pl,pm	\bStorable::(thaw|retrieve|fd_retrieve)\s*\(|\b(thaw|retrieve)\s*\(\s*\$	use JSON; Storable can run code on load		critical
+insecure-deserialization	ex,exs	:erlang\.binary_to_term\s*\(\s*[^,)]+\)	!\[:safe\]	pass [:safe], and only decode terms from trusted peers	critical
+mobile-insecure-storage	dart	(SharedPreferences|prefs)\b[^;]*\.setString\s*\(\s*["'][^"']*([Tt]oken|[Pp]assword|[Ss]ecret|[Aa]pi_?[Kk]ey)	store secrets in flutter_secure_storage		high
+mobile-insecure-storage	m,mm	NSUserDefaults[^;]*setObject:[^;]*forKey:\s*@"[^"]*([Tt]oken|[Pp]assword|[Ss]ecret|[Aa]pi[Kk]ey)|kSecAttrAccessibleAlways\b	store secrets in the Keychain with kSecAttrAccessibleWhenUnlockedThisDeviceOnly		high

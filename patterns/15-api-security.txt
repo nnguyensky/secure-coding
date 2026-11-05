@@ -12,11 +12,11 @@ API-3	py	__init__\(self, .*kwargs\)|setattr\(self, key, value\)|\.update\(reques
 API-3	js,ts	Object\.assign\(.*, req\.(body|data)\)|\.\.\.req\.(body|data)|body: req\.body|data: req\.body		API-3 Mass assignment: user input directly binds to model — allowlist accepted fields	high
 API-4	py	@app\.route.*methods.*GET.*POST|@app\.route.*methods.*POST.*GET		API-4 Overfetch: GET endpoint returns full model — select only needed fields	medium
 API-4	js,ts	router\.(get|post)\(.*res\.json\(.*\)|\.findMany\(\)|\.findAll\(\)	!select|fields	API-4 Overfetch: endpoint returns full model — select only needed fields	medium
-API-5	py	@app\.route.*methods.*DELETE|@app\.route.*methods.*PUT|@app\.route.*methods.*PATCH	!auth|permission|login	API-5 BFLA: state-changing endpoint without explicit auth check — verify caller has admin role	high
-API-5	js,ts	router\.(delete|put|patch)\(.*\)|app\.(delete|put|patch)\(.*\)	!auth|permission|login	API-5 BFLA: state-changing endpoint without explicit auth check — verify caller has admin role	high
+API-5	py	@app\.route.*methods.*DELETE|@app\.route.*methods.*PUT|@app\.route.*methods.*PATCH	![Aa]uth|[Pp]ermission|[Ll]ogin|[Gg]uard|[Pp]rotect|[Ss]ession|[Jj]wt	API-5 BFLA: state-changing endpoint without explicit auth check — verify caller has admin role	high
+API-5	js,ts	router\.(delete|put|patch)\(.*\)|app\.(delete|put|patch)\(.*\)	![Aa]uth|[Pp]ermission|[Ll]ogin|[Gg]uard|[Pp]rotect|[Ss]ession|[Jj]wt	API-5 BFLA: state-changing endpoint without explicit auth check — verify caller has admin role	high
 API-6	py	@app\.route.*POST.*json|@app\.route.*PUT.*json	!limit|throttle|rate	API-6 Unbounded consumption: no request size limit — set max content length	medium
 API-6	js,ts	app\.use\(express\.json\(\)\)|bodyParser\.json\(\)|app\.post\(.*req\.body	!limit|size	API-6 Unbounded consumption: no request size limit — set max content length	medium
-API-7	py	pagination.*=.*None|per_page.*=.*-1|page_size.*=.*-1|no.*limit.*query		API-7 Unbounded pagination: no max page size — enforce a default and maximum	medium
+API-7	py	pagination.*=.*None|per_page.*=.*-1|page_size.*=.*-1		API-7 Unbounded pagination: no max page size — enforce a default and maximum	medium
 API-7	js,ts	limit:\s*-1|noLimit|pagination:\s*false|perPage:\s*-1		API-7 Unbounded pagination: no max page size — enforce a default and maximum	medium
 API-8	py	raise.*\(.*str\(e\)\)|raise.*\(.*traceback|except.*as.*e:.*return.*str|return.*str\(e\)|return.*str\(ex\)		API-8 Verbose errors: exception details leak to API response — return generic error message	medium
 API-8	js,ts	catch.*err.*res\.(send|json)\(err\)|catch.*error.*res\.(send|json)\(error\)|\.catch\(.*=>.*res\.(send|json)|catch\(.*\)\{.*res\.send\(		API-8 Verbose errors: exception details leak to API response — return generic error message	medium

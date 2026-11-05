@@ -41,6 +41,12 @@ const EXT_ALIASES = {
   vue: ['js', 'ts'], svelte: ['js', 'ts'], astro: ['js', 'ts'],
   kts: ['kt'], pyw: ['py'], pyi: ['py'], phtml: ['php'],
   hh: ['hpp', 'h'], hxx: ['hpp', 'h'], cxx: ['cpp'], 'c++': ['cpp'],
+  // Same platform APIs, different syntax: the JVM rules apply to Scala and
+  // the .NET rules to VB.NET, on top of their own patterns.
+  scala: ['java'], sc: ['scala', 'java'], vb: ['cs'],
+  mm: ['m', 'cpp'], psm1: ['ps1'], psd1: ['ps1'], gvy: ['groovy'],
+  pls: ['sql'], pks: ['sql'], pkb: ['sql'], plsql: ['sql'], tsql: ['sql'],
+  cob: ['cbl'], cpy: ['cbl'], cobol: ['cbl'], exs: ['ex'],
 };
 const extFamily = ext => [ext, ...(EXT_ALIASES[ext] || [])];
 // Path segments we never scan (vendored / generated).
@@ -175,23 +181,38 @@ const LEXICAL = {
   hpp: { line: ['//'], block: true, quotes: '"' }, swift: { line: ['//'], block: true, quotes: '"' },
   rs: { line: ['//'], block: true, quotes: '"' },
   php: { line: ['//', '#'], block: true, quotes: '"\'' },
-  py: HASH, rb: HASH,
+  py: HASH, rb: HASH, pl: HASH, pm: HASH, r: HASH, ex: HASH,
+  scala: C_LIKE, dart: C_LIKE, groovy: C_LIKE, gradle: C_LIKE, sol: C_LIKE, m: C_LIKE,
+  cls: { line: ['//'], block: true, quotes: "'" }, apex: { line: ['//'], block: true, quotes: "'" },
+  ps1: { line: ['#'], block: false, quotes: '"\'' },
+  lua: { line: ['--'], block: false, quotes: '"\'' },
+  sql: { line: ['--'], block: true, quotes: "'" },
+  vb: { line: ["'"], block: false, quotes: '"' },
+  cbl: { line: ['*>'], block: false, quotes: '"\'', starLine: true },
+  abap: { line: ['"'], block: false, quotes: "'`" },
 };
 
-// Boolean per character: true where the character is code.
-function codeMask(line, lang) {
+// Boolean per character: true where the character is code. With `comments`
+// given (an array), also marks the characters that are comment, not string.
+function codeMask(line, lang, comments) {
   const mask = new Array(line.length).fill(true);
   let i = 0;
+  // COBOL fixed format: `*` in column 7 (or a leading `*`) makes the line a comment.
+  if (lang.starLine && /^[\s\d]{0,6}\*/.test(line)) {
+    mask.fill(false);
+    if (comments) comments.fill(true);
+    return mask;
+  }
   while (i < line.length) {
     const c = line[i];
     if (lang.line.some(t => line.startsWith(t, i))) {
-      for (let k = i; k < line.length; k++) mask[k] = false;
+      for (let k = i; k < line.length; k++) { mask[k] = false; if (comments) comments[k] = true; }
       break;
     }
     if (lang.block && line.startsWith('/*', i)) {
       const end = line.indexOf('*/', i + 2);
       const stop = end === -1 ? line.length : end + 2;
-      for (let k = i; k < stop; k++) mask[k] = false;
+      for (let k = i; k < stop; k++) { mask[k] = false; if (comments) comments[k] = true; }
       i = stop;
       continue;
     }
@@ -206,6 +227,34 @@ function codeMask(line, lang) {
     i++;
   }
   return mask;
+}
+
+// True when every match of `p` on the line starts inside a comment. Secrets
+// are exempt (a key left in a comment is still leaked), and so are rules about
+// string contents, which `codeOnly` already handles separately.
+function blankComments(line, lang) {
+  const comments = new Array(line.length).fill(false);
+  codeMask(line, lang, comments);
+  let out = '';
+  for (let k = 0; k < line.length; k++) out += comments[k] ? ' ' : line[k];
+  return out;
+}
+
+// Rules that exist to read comments (deprecation markers, "remove before prod" notes).
+const COMMENT_RULES = new Set(['API-9', 'test-code']);
+
+function onlyInComment(p, line, lang) {
+  if (!p.reG || COMMENT_RULES.has(p.id)) return false;
+  const comments = new Array(line.length).fill(false);
+  codeMask(line, lang, comments);
+  p.reG.lastIndex = 0;
+  let m, any = false;
+  while ((m = p.reG.exec(line)) !== null) {
+    any = true;
+    if (!comments[m.index]) return false;
+    if (m[0].length === 0) p.reG.lastIndex++;
+  }
+  return any;
 }
 
 function matchesInCode(p, line, lang) {
@@ -271,7 +320,7 @@ function maskSecret(snippet, id) {
 
 // Request-controlled values. Anchored to the framework accessors the pattern
 // files already treat as untrusted.
-const TAINT_SOURCE = /(?:\breq(?:uest)?\s*\.\s*(?:query|body|params|args|form|json|get_json|values|GET|POST|cookies|headers)\b|\$_(?:GET|POST|REQUEST|COOKIE)\s*\[|\br\s*\.\s*(?:FormValue|PostFormValue|PathValue)\s*\(|\br\s*\.\s*URL\s*\.\s*Query\s*\(\s*\)|\bmux\s*\.\s*Vars\s*\(|\bc\s*\.\s*(?:Query|Param|PostForm|FormValue|QueryParam|DefaultQuery)\s*\(|\bctx\s*\.\s*(?:query|params|request\s*\.\s*body)\b|\bparams\s*\[|getParameter\s*\()/;
+const TAINT_SOURCE = /(?:\breq(?:uest)?\s*\.\s*(?:query|body|params|args|form|json|get_json|values|GET|POST|cookies|headers)\b|\$_(?:GET|POST|REQUEST|COOKIE)\s*\[|\br\s*\.\s*(?:FormValue|PostFormValue|PathValue)\s*\(|\br\s*\.\s*URL\s*\.\s*Query\s*\(\s*\)|\bmux\s*\.\s*Vars\s*\(|\bc\s*\.\s*(?:Query|Param|PostForm|FormValue|QueryParam|DefaultQuery)\s*\(|\bctx\s*\.\s*(?:query|params|request\s*\.\s*body)\b|\bRequest\s*\.\s*(?:Query|Form|QueryString|Headers|Cookies|RouteValues)\b|\bcall\s*\.\s*(?:parameters|receive\w*|request\s*\.\s*queryParameters)\b|\bparams\s*\[|getParameter\s*\()/;
 
 // Sinks where request data causes a named vulnerability, and what to call it.
 const TAINT_SINKS = [
@@ -495,6 +544,7 @@ function matchContentDetailed(content, filenameOrExt, patterns) {
       anyLineHit = true;
       if (p.exclRe && p.exclRe.test(line)) continue;
       if (p.codeOnly && maskLangs && !matchesInCode(p, line, maskLangs)) continue;
+      if (!p.codeOnly && maskLangs && !/^secret/.test(p.id) && onlyInComment(p, line, maskLangs)) continue;
       const sup = suppressionFor(line, p.id);
       if (sup) {
         lineMatchedAndSuppressed = true;
@@ -512,8 +562,12 @@ function matchContentDetailed(content, filenameOrExt, patterns) {
     // comment to Math.random() forty lines later.
     if (!anyLineHit && p.re.test(content)) {
       if ((!p.exclRe || !p.exclRe.test(content)) && !fileLines.some(l => isSuppressed(l, p.id))) {
+        // Comments are blanked first, so a word in a comment cannot join
+        // code on another line into a match.
+        const blank = maskLangs && !/^secret/.test(p.id) && !COMMENT_RULES.has(p.id);
+        const winLines = blank ? fileLines.map(l => blankComments(l, maskLangs)) : fileLines;
         for (let i = 0; i < fileLines.length; i++) {
-          const win = fileLines.slice(i, i + FALLBACK_WINDOW).join('\n');
+          const win = winLines.slice(i, i + FALLBACK_WINDOW).join('\n');
           const m = p.re.exec(win);
           if (!m || win.slice(0, m.index).includes('\n')) continue; // starts on a later line
           if (p.codeOnly && maskLangs && /^\s*(\/\/|#|\/\*|\*)/.test(fileLines[i])) continue;
@@ -535,12 +589,15 @@ function matchContentDetailed(content, filenameOrExt, patterns) {
     // `["']?` after the key: JSON and dict literals quote it ("token": "...").
     // `\w*` after the keyword: aws_secret_access_key, client_secret_value.
     // The entropy threshold below keeps the wider net from adding noise.
-    const entropyRegex = /(password|passwd|api_?key|secret|token|auth_?key|private_?key|signing_?key|crypto_?key|master_?key)\w*["']?\s*[:=]\s*["']([A-Za-z0-9+/=_-]{20,})["']/i;
+    const entropyRegex = /((?:password|passwd|api_?key|secret|token|auth_?key|private_?key|signing_?key|crypto_?key|master_?key)\w*)["']?\s*[:=]\s*["']([A-Za-z0-9+/=_-]{20,})["']/i;
+    // A name that describes the secret rather than holding it: the form
+    // field, header, env-var name or regex for a password is not one.
+    const NOT_A_SECRET_NAME = /(field|header|name|param|env|var|path|file|url|label|prompt|regex|pattern|length|len|min|max|_id|type)$/i;
     let count = 0;
     for (let i = 0; i < fileLines.length && count < MAX_OCCURRENCES; i++) {
       const line = fileLines[i];
       const m = line.match(entropyRegex);
-      if (!m || !m[2]) continue;
+      if (!m || !m[2] || NOT_A_SECRET_NAME.test(m[1])) continue;
       const secretStr = m[2];
       // A placeholder in .env.example is high-entropy but is not a secret.
       // Flagging it as critical trains people to ignore the whole rule.

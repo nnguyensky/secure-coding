@@ -399,7 +399,9 @@ function main() {
   // A template that does not exist cannot be reported as missing sections, so
   // check the roster explicitly — this is how the absent shell template hid.
   const EXPECTED_LANGS = ['c', 'csharp', 'go', 'java', 'javascript', 'kotlin', 'php',
-                          'python', 'ruby', 'rust', 'shell', 'swift', 'typescript'];
+                          'python', 'ruby', 'rust', 'shell', 'swift', 'typescript',
+                          'cpp', 'powershell', 'sql', 'scala', 'dart', 'groovy', 'cobol',
+                          'vbnet', 'abap', 'apex', 'objc', 'perl', 'lua', 'elixir', 'solidity', 'r'];
   for (const lang of EXPECTED_LANGS) {
     if (!fs.existsSync(path.join(TEMPLATES_DIR, `${lang}.md`))) {
       err(`template missing entirely: templates/${lang}.md`);

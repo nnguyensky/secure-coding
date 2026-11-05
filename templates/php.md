@@ -86,7 +86,7 @@ json_encode($user_input);                             // JSON (never concat)
 ```php
 $csrf = bin2hex(random_bytes(32));   // store in $_SESSION
 // on every state-changing request:
-if (!hash_equals($_SESSION['csrf'], $_POST['csrf'])) { /* deny */ }
+if (!hash_equals((string)($_SESSION['csrf'] ?? ''), (string)($_POST['csrf'] ?? '')) || empty($_SESSION['csrf'])) { /* deny */ }
 // never: accepting state changes without a CSRF token
 ```
 
@@ -223,4 +223,25 @@ function sanitizeLog(string $value): string {
 
 error_log("user_action user=$user input=" . sanitizeLog($userInput));
 // never: logging unsanitized user input — CR/LF can forge log entries
+```
+
+## XML parsing — no external entities (XXE)
+```php
+$doc = new DOMDocument();
+$doc->loadXML($xml, LIBXML_NONET);
+// never: LIBXML_NOENT or LIBXML_DTDLOAD on input you did not write
+```
+
+## Deserialization — JSON, never unserialize()
+```php
+$data = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+// never: unserialize($_COOKIE[...]); if unavoidable:
+// unserialize($s, ['allowed_classes' => false])
+```
+
+## JWT verification — fixed algorithm, issuer and audience
+```php
+use Firebase\JWT\JWT; use Firebase\JWT\Key;
+$claims = JWT::decode($jwt, new Key($publicKey, 'RS256'));
+if ($claims->iss !== 'https://id.example.com' || $claims->aud !== 'orders-api') { /* 401 */ }
 ```

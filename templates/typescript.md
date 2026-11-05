@@ -260,8 +260,10 @@ async function encryptData(data: Uint8Array, key: CryptoKey): Promise<{ iv: Uint
 import crypto from "crypto";
 
 function verifyChecksum(data: Buffer, expectedSha256Hex: string): boolean {
-  const actual = crypto.createHash("sha256").update(data).digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(actual), Buffer.from(expectedSha256Hex));
+  const actual = Buffer.from(crypto.createHash("sha256").update(data).digest("hex"));
+  const expected = Buffer.from(expectedSha256Hex.toLowerCase());
+  // timingSafeEqual throws on different lengths; check first
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 }
 ```
 
@@ -318,4 +320,29 @@ function sanitizeLog(input: string): string {
     .slice(0, 500);
 }
 logger.info(`User lookup: ${sanitizeLog(req.query.search as string)}`);
+```
+
+## XML parsing — no external entities (XXE)
+```ts
+import { XMLParser } from "fast-xml-parser";   // never resolves external entities
+const doc = new XMLParser({ processEntities: false }).parse(xml);
+// libxmljs: parseXml(xml, { noent: false, nonet: true }) — never noent: true
+```
+
+## Deserialization — plain data formats only
+```ts
+import { z } from "zod";
+const Order = z.object({ id: z.string().uuid(), qty: z.number().int().positive() });
+const order = Order.parse(JSON.parse(raw));
+// never: node-serialize, eval(), vm.run*() on input
+```
+
+## JWT verification — fixed algorithm, issuer and audience
+```ts
+import { createRemoteJWKSet, jwtVerify } from "jose";
+const JWKS = createRemoteJWKSet(new URL("https://id.example.com/.well-known/jwks.json"));
+const { payload } = await jwtVerify(token, JWKS, {
+  algorithms: ["RS256"], issuer: "https://id.example.com", audience: "orders-api",
+});
+// never: decodeJwt(token) to authorize — it does not check the signature
 ```
