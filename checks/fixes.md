@@ -737,6 +737,13 @@ Wrong: const id = req.params.id; db.query("SELECT * FROM u WHERE id = " + id)
 Right: parameterized queries — db.query(sql, [id]). Or the ORM's normal query API.
 Watch: table and column names cannot be parameterized — allowlist them instead.
 
+## taint-prompt-injection
+OWASP: LLM01:2025 | CWE-1427 | A05:2025
+Request text is placed in the system prompt, where the model treats it as the operator's instructions. "Ignore previous instructions and…" then works as written.
+Wrong: messages=[{"role": "system", "content": "You help " + request.json["user"]}]
+Right: keep the system prompt constant; pass user text in a {"role": "user"} message, delimited and labelled as data.
+Watch: retrieved documents and tool results are user text too — the same rule applies to RAG context.
+
 ## taint-xss
 OWASP: 17,19,20 | CWE-79 | A05:2025
 Request data is written straight into the HTTP response. Whatever HTML or script the caller sends runs in the next visitor's browser.
@@ -1023,3 +1030,66 @@ A public bucket ACL, a disabled public access block, a database marked publicly 
 Wrong: acl = "public-read"; restrict_public_buckets = false; publicly_accessible = true; ingress { cidr_blocks = ["0.0.0.0/0"] }
 Right: private buckets behind a CDN with origin access control; ingress from known ranges or a security-group reference.
 Watch: 0.0.0.0/0 on 443 for a public load balancer is expected — on 22, 3389 or a database port it is not.
+
+## mobile-insecure-storage
+OWASP: MASVS-STORAGE | CWE-312 | A04:2025
+UserDefaults and SharedPreferences are plain files in the app sandbox. Backups, jailbroken devices and other tooling read them directly.
+Wrong: UserDefaults.standard.set(token, forKey: "authToken"); kSecAttrAccessibleAlways; prefs.edit().putString("password", pw)
+Right: Keychain with kSecAttrAccessibleWhenUnlockedThisDeviceOnly; Android Keystore via EncryptedSharedPreferences.
+Watch: logs and crash reports are storage too — never print the token while debugging.
+
+## spring-csrf-disabled
+OWASP: 69,70 | CWE-352 | A01:2025
+With CSRF protection off, any site the user visits can submit requests that ride on their session cookie.
+Wrong: http.csrf().disable(); http.csrf(AbstractHttpConfigurer::disable)
+Right: keep it on for browser sessions; for a stateless API that only accepts bearer tokens, disable it for those paths alone.
+Watch: "it's an API" is not stateless if it also accepts a session cookie.
+
+## spring-permit-all
+OWASP: 76,77 | CWE-862 | A01:2025
+anyRequest().permitAll() makes every endpoint public, including ones added later.
+Wrong: .anyRequest().permitAll()
+Right: .requestMatchers("/health", "/public/**").permitAll().anyRequest().authenticated()
+Watch: method-level @PreAuthorize does not help an endpoint someone forgets to annotate — deny by default.
+
+## django-insecure-setting
+OWASP: 147,148,152 | CWE-16 | A02:2025
+Production settings that accept any Host header, any origin, or send session cookies over plain HTTP or to scripts.
+Wrong: ALLOWED_HOSTS = ["*"]; CORS_ALLOW_ALL_ORIGINS = True; SESSION_COOKIE_SECURE = False; SESSION_COOKIE_HTTPONLY = False
+Right: ALLOWED_HOSTS from the deployment's real names; CORS_ALLOWED_ORIGINS list; SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = True.
+Watch: keep dev overrides in a separate settings module that production never imports.
+
+## express-static-root
+OWASP: 147,151 | CWE-538 | A02:2025
+Serving the project root as static files publishes .env, .git, package.json and server source to anyone who guesses the path.
+Wrong: app.use(express.static(".")); app.use(express.static(__dirname))
+Right: app.use(express.static(path.join(__dirname, "public")))
+Watch: dotfiles: "deny" helps, but does not hide source files — use a dedicated directory.
+
+## dep-not-found
+OWASP: LLM09:2025 | CWE-1357 | A03:2025
+The dependency does not exist in its registry. AI assistants invent plausible package names; attackers register those names so the next install runs their code ("slopsquatting").
+Wrong: adding "react-auth-helper-pro" because the model suggested it
+Right: find the real package (its repository, its docs, its maintainers) and use that name. Remove the line until you have.
+Watch: a name that exists today but did not when the model was trained is the same risk — see dep-new-package.
+
+## dep-new-package
+OWASP: LLM09:2025 | CWE-1357 | A03:2025
+The package was first published only days ago. New packages with names an assistant suggests are the usual shape of a slopsquatting or typosquatting attack.
+Wrong: installing a week-old package because its name matched what the code expected
+Right: confirm the publisher and repository, read the code you are about to run, or pick an established package. Add it to "deps.allow" in .securecodingrc.json once reviewed.
+Watch: install scripts run before anyone reviews the code — check dep-install-script too.
+
+## dep-install-script
+OWASP: Software Supply Chain CS | CWE-829 | A08:2025
+The package runs a preinstall/install/postinstall script: arbitrary code on every developer machine and CI runner that installs it.
+Wrong: adding a dependency without knowing it executes code at install time
+Right: confirm the script is needed (native builds, binary downloads); install with --ignore-scripts where possible and rebuild only trusted packages.
+Watch: a script added in a later version runs on upgrade — pin versions and review lockfile diffs.
+
+## dep-sdist-only
+OWASP: Software Supply Chain CS | CWE-829 | A08:2025
+The package ships only a source distribution, so installing it runs its setup.py on your machine.
+Wrong: pip install of an sdist-only package in CI with secrets in the environment
+Right: prefer packages with wheels; build sdists in an isolated step without secrets, or vendor a reviewed wheel.
+Watch: --only-binary :all: makes pip refuse sdists outright.

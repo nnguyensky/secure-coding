@@ -27,3 +27,7 @@ container-priv	yml,yaml,tf,json	privileged\s*[:=]\s*true	remove privileged: true
 
 test-code	*	(TODO|FIXME|XXX)[^a-zA-Z]*(remove|delete)[^a-zA-Z]*(before|prior)[^a-zA-Z]*(prod|deploy|release)	remove before deploying		low
 test-code	*	if\s+.*(TESTING|IS_TEST|BYPASS_AUTH|SKIP_AUTH|DISABLE_AUTH)	remove auth bypass flags before deploy		low
+spring-csrf-disabled	java,kt	\.csrf\s*\(\s*\)\s*\.disable\s*\(|\bcsrf\s*\(\s*(AbstractHttpConfigurer::disable|\{?\s*\w+\s*->\s*\w+\.disable\s*\(\s*\)\s*\}?)	keep CSRF protection for cookie-authenticated endpoints; disable it only for stateless token APIs		high
+spring-permit-all	java,kt	\banyRequest\s*\(\s*\)\s*\.permitAll\s*\(	deny by default: anyRequest().authenticated(), and permit only named public paths		high
+django-insecure-setting	py	^\s*ALLOWED_HOSTS\s*=\s*\[[^\]]*["']\*["']|^\s*CORS_(ORIGIN_ALLOW_ALL|ALLOW_ALL_ORIGINS)\s*=\s*True|^\s*(SESSION|CSRF)_COOKIE_SECURE\s*=\s*False|^\s*SESSION_COOKIE_HTTPONLY\s*=\s*False	list real host names, allow named origins, and keep cookies Secure and HttpOnly in production settings		high
+express-static-root	js,ts	\bexpress\.static\s*\(\s*(["']\.\/?["']|__dirname\s*\)|process\.cwd\s*\(\s*\))	serve a dedicated public/ directory; the project root exposes .env, .git and source		high

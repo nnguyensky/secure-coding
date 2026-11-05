@@ -273,7 +273,14 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .badge.open { background: var(--danger-light); color: #fda4af; border: 1px solid var(--danger-border); }
 .badge.fixed { background: var(--success-light); color: #6ee7b7; border: 1px solid var(--success-border); }
-.badge.suppressed { background: transparent; color: #cbd5e1; border: 1px dashed #64748b; }
+.trend-panel { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; }
+.trend-panel svg { width: 100%; height: 140px; display: block; margin-top: 8px; }
+.trend-legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+.trend-legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.trend-legend .dot.open { background: var(--accent); }
+.trend-legend .dot.new { background: var(--danger); }
+.trend-legend .dot.fixed { background: var(--success); }
+.badge.suppressed, .badge.baselined { background: transparent; color: #cbd5e1; border: 1px dashed #64748b; }
 
 .sev {
   display: inline-block;
@@ -391,6 +398,20 @@ tbody tr:last-child td { border-bottom: none; }
     </div>
   </div>
 
+  <!-- Trend: open findings over time, with what was found and fixed each day -->
+  <div class="trend-panel" id="trendPanel" hidden>
+    <div class="progress-label">
+      <span>Findings over time</span>
+      <span id="trendRange"></span>
+    </div>
+    <svg id="trendChart" role="img" aria-label="Open findings per day" preserveAspectRatio="none"></svg>
+    <div class="trend-legend">
+      <span><i class="dot open"></i>Open at end of day</span>
+      <span><i class="dot new"></i>Found</span>
+      <span><i class="dot fixed"></i>Fixed</span>
+    </div>
+  </div>
+
   <!-- Navigation Tabs -->
   <div class="toolbar-tabs">
     <button class="tab-btn active" onclick="setTab('all', this)">All Findings (<span id="countAll">0</span>)</button>
@@ -458,7 +479,63 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+// Per day: findings first seen, findings resolved, and how many were open at
+// the end of the day. Computed from first_seen / resolved_at on each record.
+function trendSeries(rows) {
+  const day = s => (s || '').slice(0, 10);
+  const days = new Set();
+  for (const d of rows) {
+    if (d.status !== 'open' && d.status !== 'fixed') continue;
+    if (day(d.first)) days.add(day(d.first));
+    if (day(d.resolved)) days.add(day(d.resolved));
+  }
+  const sorted = [...days].sort().slice(-30);
+  return sorted.map(dd => {
+    let found = 0, fixed = 0, open = 0;
+    for (const d of rows) {
+      if (d.status !== 'open' && d.status !== 'fixed') continue;
+      const f = day(d.first), r = day(d.resolved);
+      if (f === dd) found++;
+      if (r === dd) fixed++;
+      if (f && f <= dd && (!r || r > dd)) open++;
+    }
+    return { day: dd, found, fixed, open };
+  });
+}
+
+function renderTrend() {
+  const series = trendSeries(DATA);
+  if (series.length < 2) return; // one day is not a trend
+  const panel = document.getElementById('trendPanel');
+  const svg = document.getElementById('trendChart');
+  panel.hidden = false;
+  document.getElementById('trendRange').textContent = series[0].day + ' → ' + series[series.length - 1].day;
+  const W = 600, H = 140, pad = 6;
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  const max = Math.max(1, ...series.map(p => Math.max(p.open, p.found, p.fixed)));
+  const step = (W - pad * 2) / series.length;
+  const y = v => H - pad - (v / max) * (H - pad * 2);
+  const ns = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs, title) => {
+    const n = document.createElementNS(ns, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (title) { const t = document.createElementNS(ns, 'title'); t.textContent = title; n.appendChild(t); }
+    svg.appendChild(n);
+    return n;
+  };
+  const bw = Math.max(2, step / 4);
+  series.forEach((p, i) => {
+    const x = pad + i * step + step / 2;
+    el('rect', { x: x - bw - 1, y: y(p.found), width: bw, height: H - pad - y(p.found), fill: 'var(--danger)', opacity: 0.8 }, p.day + ': ' + p.found + ' found');
+    el('rect', { x: x + 1, y: y(p.fixed), width: bw, height: H - pad - y(p.fixed), fill: 'var(--success)', opacity: 0.8 }, p.day + ': ' + p.fixed + ' fixed');
+  });
+  const pts = series.map((p, i) => (pad + i * step + step / 2) + ',' + y(p.open)).join(' ');
+  el('polyline', { points: pts, fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2.5, 'stroke-linejoin': 'round' });
+  series.forEach((p, i) => el('circle', { cx: pad + i * step + step / 2, cy: y(p.open), r: 3, fill: 'var(--accent)' }, p.day + ': ' + p.open + ' open'));
+}
+
 function initDashboard() {
+  try { renderTrend(); } catch (e) { /* the chart is optional */ }
   const openCount = DATA.filter(d => d.status === 'open').length;
   const fixedCount = DATA.filter(d => d.status === 'fixed').length;
   const auditCount = Array.isArray(AUDIT_DATA) ? AUDIT_DATA.length : 0;
@@ -473,7 +550,7 @@ function initDashboard() {
   document.getElementById('countAll').textContent = DATA.length;
   document.getElementById('countOpen').textContent = openCount;
   document.getElementById('countFixed').textContent = fixedCount;
-  document.getElementById('countSuppressed').textContent = DATA.filter(d => d.status === 'suppressed').length;
+  document.getElementById('countSuppressed').textContent = DATA.filter(d => d.status === 'suppressed' || d.status === 'baselined').length;
   document.getElementById('countAudit').textContent = auditCount;
 
   document.getElementById('progressText').textContent = `${fixedCount} / ${total} Resolved (${rate}%)`;
@@ -539,7 +616,7 @@ function renderTable() {
   let filtered = DATA.filter(d => {
     if (activeTab === 'open' && d.status !== 'open') return false;
     if (activeTab === 'fixed' && d.status !== 'fixed') return false;
-    if (activeTab === 'suppressed' && d.status !== 'suppressed') return false;
+    if (activeTab === 'suppressed' && d.status !== 'suppressed' && d.status !== 'baselined') return false;
     if (sevFilter && d.severity !== sevFilter) return false;
     if (secFilter && d.secName !== secFilter) return false;
     if (search) {

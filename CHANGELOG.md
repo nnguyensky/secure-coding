@@ -4,6 +4,52 @@ Versions follow [Semantic Versioning](https://semver.org). To install a
 specific version, pin a tag or commit SHA:
 `npx github:nnguyensky/secure-coding#<tag-or-sha>`.
 
+## 2.3.0 — 2026-11-05
+
+### Added
+- **Baseline** (`scan.js --baseline`): record a repository's existing
+  findings in `.securecoding-baseline.json`; afterwards only new findings
+  block. Matched by file, rule and line text, not line number.
+- **Edit-scoped hook**: for an Edit/MultiEdit, only findings on the lines the
+  edit wrote block the agent; others are named but do not stop it.
+  `"hookScope": "file"` restores whole-file blocking.
+- **Dependency guard** (`hooks/deps.js`): packages a change adds to
+  `package.json`, `requirements*.txt` or `pyproject.toml` are checked against
+  npm/PyPI — missing (hallucinated) names and packages under 30 days old
+  block; install scripts and sdist-only packages are reported. Runs from the
+  write-time hook, `scan.js --staged` and CI. Honours `HTTPS_PROXY`. Only
+  names of newly added public dependencies are sent; names from private
+  registries/indexes (`.npmrc` scopes, pip `--index-url`) or listed in
+  `deps.private` never leave the machine.
+- **Secrets in git history** (`scan.js --history`), with whether each key is
+  still in `HEAD`.
+- MCP: resources (SKILL.md, checks, every fix block), prompts
+  (`secure_design_review`, `fix_finding`), and tools `explain_finding`,
+  `check_dependencies`, `scan_git_history`.
+- HTML report: findings-over-time chart.
+- Patterns: Swift (CryptoKit MD5/SHA1, App Transport Security, UserDefaults
+  secrets, SQLite interpolation), Android SharedPreferences secrets,
+  `Runtime.exec` / shell `ProcessBuilder`, Spring JDBC string SQL,
+  `csrf().disable()`, `anyRequest().permitAll()`, Django insecure settings,
+  `express.static` on the project root.
+- Taint: Go (`r.URL.Query()`, gin/echo `c.Query`, `mux.Vars`), Spring
+  `@RequestParam`/`@PathVariable`/`@RequestBody` parameters, JDBC/JPA sinks,
+  and request text reaching an LLM system prompt (`taint-prompt-injection`).
+- CI: tests on Linux, macOS and Windows with Node 18, 20 and 22; added
+  dependencies checked on PRs. Release workflow tags `v<version>` from
+  `package.json` and publishes to npm with provenance when `NPM_TOKEN` is set.
+
+### Fixed
+- `.tsx`, `.jsx`, `.mjs`, `.cjs`, `.mts`, `.vue`, `.svelte` (and `.kts`)
+  files only got the language-neutral patterns.
+- `.pre-commit-hooks.yaml` used `node hooks/…` paths that only exist inside
+  this repository, so the hooks failed in every consumer repository.
+- `scan.js --all` spawned `git` three times per file: 22s → 5s on 2,000 files.
+- Taint: a tainted variable used inside an assignment
+  (`data, _ := os.ReadFile(f)`) was skipped; a word inside a SQL string was
+  mistaken for the tainted variable.
+- The test suite runs fixtures in-process: 34s → 15s.
+
 ## 2.2.0 — 2026-11-05
 
 Two review rounds. Several changes alter behaviour; read **Changed** before

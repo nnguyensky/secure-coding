@@ -202,8 +202,11 @@ function checkDocCounts() {
   const truth = {
     patterns: rules,
     templates: fs.readdirSync(TEMPLATES_DIR).filter(f => f.endsWith('.md')).length,
-    mcpTools: (fs.readFileSync(path.join(DIR, 'mcp', 'server.js'), 'utf8')
-      .match(/^\s*name: '/gm) || []).length,
+    // The exported TOOLS array, not a text count: the server also declares
+    // prompts with `name:` lines, which a regex would count as tools.
+    mcpTools: (() => {
+      try { return require(path.join(DIR, 'mcp', 'server.js')).TOOLS.length; } catch { return null; }
+    })(),
     cleanRules: (() => {
       try { return require('./clean.js').RULES.length; } catch { return null; }
     })(),

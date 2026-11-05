@@ -122,9 +122,11 @@ function generateMarkdown(rows, audit) {
   const openRows = rows.filter(r => r.status === 'open');
   const fixedRows = rows.filter(r => r.status === 'fixed');
   const supRows = rows.filter(r => r.status === 'suppressed');
+  const baseRows = rows.filter(r => r.status === 'baselined');
   let md = '### 🛡️ Security Scan Summary\n\n';
   md += `**Findings:** ${openRows.length} open, ${fixedRows.length} resolved`
-    + (supRows.length ? `, ${supRows.length} suppressed inline` : '') + '.\n\n';
+    + (supRows.length ? `, ${supRows.length} suppressed inline` : '')
+    + (baseRows.length ? `, ${baseRows.length} in the baseline` : '') + '.\n\n';
 
   if (openRows.length > 0) {
     md += '| Severity | Finding ID | Location | Remediation |\n';
@@ -166,7 +168,7 @@ function generateSarif(rows) {
   // Suppressed findings are emitted too, marked as in-source suppressions:
   // code scanning then shows them as dismissed, with the reason, rather than
   // the finding vanishing without a trace.
-  const openRows = rows.filter(r => r.status === 'open' || r.status === 'suppressed');
+  const openRows = rows.filter(r => r.status === 'open' || r.status === 'suppressed' || r.status === 'baselined');
   const levelMap = {
     critical: 'error',
     high: 'error',
@@ -207,7 +209,9 @@ function generateSarif(rows) {
     const relFile = path.isAbsolute(r.file) ? path.relative(process.cwd(), r.file) : r.file;
     const suppression = r.status === 'suppressed'
       ? { suppressions: [{ kind: 'inSource', justification: r.reason || 'no reason given' }] }
-      : {};
+      : r.status === 'baselined'
+        ? { suppressions: [{ kind: 'external', justification: 'in .securecoding-baseline.json (known before adoption)' }] }
+        : {};
     return {
       ...suppression,
       ruleId: r.id,

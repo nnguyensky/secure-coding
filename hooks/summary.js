@@ -75,7 +75,9 @@ const sevStr = sevOrder
   .join(', ');
 
 const suppressedCount = findings.filter(f => f.status === 'suppressed').length;
-console.log(`${open.length} open, ${fixed.length} fixed` + (suppressedCount ? `, ${suppressedCount} suppressed` : '') + (sevStr ? ` [${sevStr}]` : '') + (openBySection ? ` (${openBySection})` : ''));
+const baselinedCount = findings.filter(f => f.status === 'baselined').length;
+console.log(`${open.length} open, ${fixed.length} fixed` + (suppressedCount ? `, ${suppressedCount} suppressed` : '')
+  + (baselinedCount ? `, ${baselinedCount} baselined` : '') + (sevStr ? ` [${sevStr}]` : '') + (openBySection ? ` (${openBySection})` : ''));
 
 if (open.length > 0) {
   process.exit(2);

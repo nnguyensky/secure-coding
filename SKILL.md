@@ -96,7 +96,7 @@ Run verification to confirm zero open issues:
    Disable with `"taintTracking": false` in `.securecodingrc.json`.
 2. **Review Guidance:** Fix any flagged patterns using the provided `When / Wrong / Right / Watch` blocks.
 3. **Autofix:** Run `node hooks/fix.js --dry-run` to see the line-by-line change, then `--apply`. Only a handful of rules are automatic; everything else prints the manual fix.
-4. **Audit Dependencies:** `node hooks/audit.js` (scans package lockfiles).
+4. **Audit Dependencies:** `node hooks/deps.js` before installing any package you added — it fails on names that do not exist (never invent a package name; look it up) and on packages published in the last 30 days. Then `node hooks/audit.js` (known advisories in lockfiles).
 5. **Quality Check:** `node hooks/clean.js <path>` (or `--all` for the whole repo).
 6. **Done Gate:** Run `node hooks/summary.js && node hooks/audit.js && node hooks/gate.js --check`.
 
@@ -208,6 +208,9 @@ Even when no automated pattern flags, check for these design smells:
 | **`summary.js`** | One-line status check & automated done gate | `node hooks/summary.js` |
 | **`audit.js`** | Dependency vulnerability scan across 9 ecosystems | `node hooks/audit.js` |
 | **`fix.js`** | View remediation guidance or apply automated refactors | `node hooks/fix.js --apply` |
+| **`deps.js`** | Before installing a package you suggested: does it exist, is it brand new, does it run install scripts | `node hooks/deps.js` |
+| **`scan.js --history`** | Secrets in past commits, including deleted ones | `node hooks/scan.js --history` |
+| **`scan.js --baseline`** | Adopting on an existing repo: record current findings so only new ones block | `node hooks/scan.js --baseline` |
 | **`sbom.js`** | CycloneDX v1.5 & SPDX v2.3 SBOM with AI-SBOM & VEX | `node hooks/sbom.js --ai --vex` |
 | **`clean.js`** | Universal clean code linter (14 rules) | `node hooks/clean.js <f>` / `--all` |
 | **`report.js`** | Export HTML report, PR Markdown, or SARIF v2.1.0 | `node hooks/report.js --sarif` |

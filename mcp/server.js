@@ -20,6 +20,10 @@ const CLEAN_SCRIPT = path.join(ROOT_DIR, 'hooks', 'clean.js');
 const GATE_SCRIPT = path.join(ROOT_DIR, 'hooks', 'gate.js');
 const SBOM_SCRIPT = path.join(ROOT_DIR, 'hooks', 'sbom.js');
 const SUMMARY_SCRIPT = path.join(ROOT_DIR, 'hooks', 'summary.js');
+const DEPS_SCRIPT = path.join(ROOT_DIR, 'hooks', 'deps.js');
+const HISTORY_SCRIPT = path.join(ROOT_DIR, 'hooks', 'history.js');
+const FIXES_FILE = path.join(ROOT_DIR, 'checks', 'fixes.md');
+const CHECKS_DIR = path.join(ROOT_DIR, 'checks');
 
 const SERVER_NAME = 'secure-coding-mcp';
 // Read from package.json rather than a second literal: a hardcoded copy
@@ -32,6 +36,7 @@ const JSONRPC_PARSE_ERROR = -32700;
 const JSONRPC_INVALID_REQUEST = -32600;
 const JSONRPC_METHOD_NOT_FOUND = -32601;
 const JSONRPC_INTERNAL_ERROR = -32603;
+const JSONRPC_INVALID_PARAMS = -32602;
 // Protocol versions this server can speak. initialize answers with the
 // client's version when it is one of these, else the newest.
 const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
@@ -59,7 +64,7 @@ function run(script, args, opts = {}) {
 const TOOLS = [
   {
     name: 'secure_code_scan',
-    description: 'Scans source code or files against 393 OWASP, Secure by Design, IoT, LLM, and Shannon entropy secret patterns. Returns precise line numbers, code snippets, and remediation guidance.',
+    description: 'Scans source code or files against 403 OWASP, Secure by Design, IoT, LLM, and Shannon entropy secret patterns. Returns precise line numbers, code snippets, and remediation guidance.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -224,9 +229,99 @@ const TOOLS = [
       properties: {},
     },
   },
+  {
+    name: 'explain_finding',
+    description: 'Explains one finding id (e.g. sql-concat, taint-ssrf, dep-not-found): why it is dangerous, the wrong and right code, what to watch for, and its CWE / OWASP mapping.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'The finding or pattern id, as printed by a scan.' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'check_dependencies',
+    description: 'Checks dependencies a change ADDS to package.json, requirements*.txt or pyproject.toml against npm/PyPI: packages that do not exist (hallucinated names), packages published in the last 30 days, and install scripts. Call it before installing anything an AI suggested.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', description: 'One manifest to check against HEAD. Omit to check every changed manifest.' },
+        staged: { type: 'boolean', description: 'Compare the git index with HEAD instead of the working tree.' },
+      },
+    },
+  },
+  {
+    name: 'scan_git_history',
+    description: 'Looks for secrets in lines added by past commits — keys that were deleted from the code but are still in every clone and must be rotated.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        since: { type: 'string', description: 'Only commits after this revision (e.g. origin/main).' },
+        allRefs: { type: 'boolean', description: 'Every branch and tag, not just the current branch.' },
+      },
+    },
+  }
 ];
 
 const { loadPatterns, matchContent, fixBlock } = require(SCAN_SCRIPT);
+
+// --- resources: the guidance itself, readable by the agent on demand ---
+// secure-coding://skill            SKILL.md
+// secure-coding://checks/<name>    checks/<name>.md (threat model, LLM top 10, ...)
+// secure-coding://fix/<id>         one fix block from checks/fixes.md
+function fixIds() {
+  try {
+    return fs.readFileSync(FIXES_FILE, 'utf8').split(/^## /m).slice(1)
+      .map(part => part.split('\n')[0].trim()).filter(id => id && !id.startsWith('#'));
+  } catch { return []; }
+}
+
+function listResources() {
+  const out = [{ uri: 'secure-coding://skill', name: 'SKILL.md', description: 'How the skill works: trigger groups, workflow, tools.', mimeType: 'text/markdown' }];
+  try {
+    for (const f of fs.readdirSync(CHECKS_DIR).filter(n => n.endsWith('.md')).sort()) {
+      const name = f.replace(/\.md$/, '');
+      if (name === 'fixes') continue;
+      out.push({ uri: `secure-coding://checks/${name}`, name: `checks/${f}`, mimeType: 'text/markdown' });
+    }
+  } catch { /* no checks directory */ }
+  for (const id of fixIds()) out.push({ uri: `secure-coding://fix/${id}`, name: `fix: ${id}`, mimeType: 'text/markdown' });
+  return out;
+}
+
+function readResource(uri) {
+  if (uri === 'secure-coding://skill') {
+    try { return fs.readFileSync(path.join(ROOT_DIR, 'SKILL.md'), 'utf8'); } catch { return null; }
+  }
+  let m = uri.match(/^secure-coding:\/\/checks\/([a-z0-9-]+)$/);
+  if (m) {
+    try { return fs.readFileSync(path.join(CHECKS_DIR, `${m[1]}.md`), 'utf8'); } catch { return null; }
+  }
+  m = uri.match(/^secure-coding:\/\/fix\/([A-Za-z0-9_-]+)$/);
+  if (m) return fixBlock(m[1]) || null;
+  return null;
+}
+
+// --- prompts: reusable starting points a client can offer the user ---
+const PROMPTS = [
+  {
+    name: 'secure_design_review',
+    description: 'Before writing a feature: ask the five security frontiers (identity, tenancy, data classification, failure direction, irreversibility) with a recommended secure default for each.',
+    arguments: [{ name: 'feature', description: 'What is about to be built.', required: true }],
+    build: a => {
+      const { render } = require(path.join(ROOT_DIR, 'hooks', 'frontiers.js'));
+      return `I am about to build: ${a.feature || '(not described)'}\n\nBefore any code, ask me these in one round, each with your recommended secure default, then wait for my answers:\n\n${render('all')}`;
+    },
+  },
+  {
+    name: 'fix_finding',
+    description: 'Fix one scanner finding properly, using its remediation block, then re-scan.',
+    arguments: [
+      { name: 'id', description: 'Finding id, e.g. sql-concat.', required: true },
+      { name: 'file', description: 'File the finding is in.', required: false },
+    ],
+    build: a => `Fix the ${a.id} finding${a.file ? ` in ${a.file}` : ''}. Follow this guidance exactly — the Right form, not a suppression:\n\n${fixBlock(String(a.id || '')) || '(no fix block found for that id)'}\n\nThen re-run the scan on the file and confirm the finding is gone.`,
+  },
+];
 
 function handleToolCall(name, args) {
   args = args || {};
@@ -341,6 +436,29 @@ function handleToolCall(name, args) {
       return { content: [{ type: 'text', text: (res.stdout || res.stderr || 'Status unknown.').trim() }] };
     }
 
+    case 'explain_finding': {
+      const id = String(args.id || '').trim();
+      const block = id && fixBlock(id);
+      if (!block) {
+        return { content: [{ type: 'text', text: `No explanation for "${id}". Ids are the names a scan prints, e.g. sql-concat or taint-ssrf.` }], isError: true };
+      }
+      return { content: [{ type: 'text', text: block }] };
+    }
+
+    case 'check_dependencies': {
+      const depArgs = args.file ? ['--file', String(args.file)] : args.staged ? ['--staged'] : [];
+      const res = run(DEPS_SCRIPT, depArgs);
+      return { content: [{ type: 'text', text: (res.stdout || res.stderr || 'No output.').trim() }], isError: res.status !== 0 && res.status !== 2 };
+    }
+
+    case 'scan_git_history': {
+      const hArgs = [];
+      if (args.since) hArgs.push('--since', String(args.since));
+      if (args.allRefs) hArgs.push('--all-refs');
+      const res = run(HISTORY_SCRIPT, hArgs, { timeout: AUDIT_TIMEOUT_MS });
+      return { content: [{ type: 'text', text: (res.stdout || res.stderr || 'No output.').trim() }], isError: res.status !== 0 && res.status !== 2 };
+    }
+
     default:
       return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true };
   }
@@ -364,6 +482,8 @@ function processMessage(message) {
             ? params.protocolVersion : PROTOCOL_VERSION,
           capabilities: {
             tools: {},
+            resources: {},
+            prompts: {},
           },
           serverInfo: {
             name: SERVER_NAME,
@@ -377,6 +497,26 @@ function processMessage(message) {
 
     case 'ping':
       return { jsonrpc: '2.0', id, result: {} };
+
+    case 'resources/list':
+      return { jsonrpc: '2.0', id, result: { resources: listResources() } };
+
+    case 'resources/read': {
+      const text = readResource(String(params.uri || ''));
+      if (text === null) {
+        return { jsonrpc: '2.0', id, error: { code: JSONRPC_INVALID_PARAMS, message: `Unknown resource: ${params.uri}` } };
+      }
+      return { jsonrpc: '2.0', id, result: { contents: [{ uri: params.uri, mimeType: 'text/markdown', text }] } };
+    }
+
+    case 'prompts/list':
+      return { jsonrpc: '2.0', id, result: { prompts: PROMPTS.map(({ build, ...p }) => p) } };
+
+    case 'prompts/get': {
+      const p = PROMPTS.find(x => x.name === params.name);
+      if (!p) return { jsonrpc: '2.0', id, error: { code: JSONRPC_INVALID_PARAMS, message: `Unknown prompt: ${params.name}` } };
+      return { jsonrpc: '2.0', id, result: { description: p.description, messages: [{ role: 'user', content: { type: 'text', text: p.build(params.arguments || {}) } }] } };
+    }
 
     case 'tools/list':
       return {

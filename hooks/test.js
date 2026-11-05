@@ -34,15 +34,20 @@ process.env.SECURE_CODING_REPORT = 'off';
 let pass = 0, fail = 0;
 const seen = new Set();
 
+// Fixtures run through the scanner in this process. Spawning the hook for
+// each of ~300 fixtures cost most of the suite's 34 seconds; the hook's own
+// path (stdin payload, stderr, exit code) has dedicated tests further down.
+// Mirrors the hook: the same scanSingleFile(), the first MAX_HITS (4) hits,
+// each as a `## id` block header.
+let _scanMod = null;
+let _scanPatterns = null;
 function runScan(file) {
-  const payload = JSON.stringify({ tool_input: { file_path: file } });
-  const r = spawnSync('node', [SCAN], {
-    input: payload,
-    env: { ...process.env, SECURE_CODING_STATE: path.join(TMP, 'findings.jsonl'), SECURE_CODING_REPORT: 'off' },
-    encoding: 'utf8',
-  });
-  // Hook mode reports on stderr (exit 2 feeds only stderr to the agent).
-  return (r.stdout || '') + (r.stderr || '');
+  if (!_scanMod) {
+    _scanMod = require('./scan');
+    _scanPatterns = _scanMod.loadPatterns();
+  }
+  const hits = _scanMod.scanSingleFile(file, _scanPatterns);
+  return hits.slice(0, 4).map(h => `## ${h.id} (Line ${h.line})`).join('\n');
 }
 
 function uniq(name) {
@@ -1078,9 +1083,14 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   // unnoticed while the server grew to 9.
   uniq('mcp-tool-count-is-exact');
   const listed = pm({ jsonrpc: '2.0', id: 97, method: 'tools/list' }).result.tools.length;
-  const declared = (fs.readFileSync(path.join(DIR, 'mcp', 'server.js'), 'utf8')
-    .match(/^\s*name: '/gm) || []).length;
-  if (listed === declared) pass++;
+  // Count the declarations inside the TOOLS array only: the server also
+  // declares prompts with `name:` lines. Also no holes or duplicates.
+  const src = fs.readFileSync(path.join(DIR, 'mcp', 'server.js'), 'utf8');
+  const toolsSrc = src.slice(src.indexOf('const TOOLS = ['), src.indexOf('\n];\n', src.indexOf('const TOOLS = [')));
+  const declared = (toolsSrc.match(/^\s{4}name: '/gm) || []).length;
+  const served = pm({ jsonrpc: '2.0', id: 96, method: 'tools/list' }).result.tools;
+  const unique = new Set(served.map(t => t && t.name)).size === served.length && served.every(Boolean);
+  if (listed === declared && unique) pass++;
   else { fail++; console.log(`mcp-tool-count-is-exact: serves ${listed}, declares ${declared}`); }
 })();
 
@@ -2933,6 +2943,289 @@ good('bm_param_query', 'js', 'db.query("SELECT * FROM users WHERE id = $1", [req
       && Array.isArray(v.analysis.response)) pass++;
   else { fail++; console.log(`MISS  sbom-vex-refs-resolve: ${JSON.stringify(v)}`); }
   try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
+})();
+
+// --- 2026-11 upgrade: language coverage, framework packs, taint sources ---
+bad('ux_tsx_exec', 'tsx', 'const out = execSync(`git log ${branch}`);', 'shell');
+bad('ux_mjs_vm', 'mjs', 'vm.runInNewContext(req.body.code);', 'eval');
+bad('ux_jsx_proto', 'jsx', 'Object.assign(cfg, req.body);', 'prototype-pollution');
+bad('ux_kts_exec', 'kts', 'val r = Runtime.getRuntime().exec(cmd)', 'shell');
+bad('ux_java_exec', 'java', 'Runtime.getRuntime().exec(cmd);', 'shell');
+bad('ux_spring_jdbc', 'java', 'return jdbc.queryForObject("SELECT * FROM u WHERE n=" + name, String.class);', 'sql-concat');
+good('ux_spring_jdbc_bound', 'java', 'return jdbc.queryForObject("SELECT * FROM u WHERE n=?", String.class, name);');
+bad('ux_spring_csrf', 'java', 'http.csrf().disable();', 'spring-csrf-disabled');
+bad('ux_spring_csrf_lambda', 'java', 'http.csrf(AbstractHttpConfigurer::disable);', 'spring-csrf-disabled');
+bad('ux_spring_permit', 'java', 'http.authorizeRequests().anyRequest().permitAll();', 'spring-permit-all');
+good('ux_spring_authenticated', 'java', 'http.authorizeHttpRequests(a -> a.requestMatchers("/health").permitAll().anyRequest().authenticated());');
+bad('ux_django_hosts', 'py', 'ALLOWED_HOSTS = ["*"]', 'django-insecure-setting');
+bad('ux_django_cors', 'py', 'CORS_ALLOW_ALL_ORIGINS = True', 'django-insecure-setting');
+bad('ux_django_cookie', 'py', 'SESSION_COOKIE_SECURE = False', 'django-insecure-setting');
+good('ux_django_ok', 'py', 'ALLOWED_HOSTS = ["api.example.com"]\nSESSION_COOKIE_SECURE = True\n');
+bad('ux_express_static', 'js', 'app.use(express.static("."));', 'express-static-root');
+good('ux_express_public', 'js', 'app.use(express.static(path.join(__dirname, "public")));');
+bad('ux_swift_md5', 'swift', 'let hash = Insecure.MD5.hash(data: d)', 'weak-hash');
+bad('ux_swift_defaults', 'swift', 'UserDefaults.standard.set(token, forKey: "authToken")', 'mobile-insecure-storage');
+good('ux_swift_defaults_ok', 'swift', 'UserDefaults.standard.set(true, forKey: "onboarded")');
+bad('ux_swift_ats', 'plist', '<key>NSAllowsArbitraryLoads</key><true/>', 'tls-off');
+bad('ux_swift_sql', 'swift', 'sqlite3_exec(db, "SELECT * FROM u WHERE n = \\(name)", nil, nil, nil)', 'sql-concat');
+bad('ux_android_prefs', 'kt', 'getSharedPreferences("p", 0).edit().putString("password", pw).apply()', 'mobile-insecure-storage');
+bad('ux_go_query_source', 'go', 'func h(w http.ResponseWriter, r *http.Request) {\n  f := r.URL.Query().Get("f")\n  data, _ := os.ReadFile(f)\n  w.Write(data)\n}\n', 'taint-path-traversal');
+bad('ux_gin_source', 'go', 'func h(c *gin.Context) {\n  u := c.Query("url")\n  resp, _ := http.Get(u)\n  _ = resp\n}\n', 'taint-ssrf');
+bad('ux_spring_param', 'java', '@GetMapping("/f")\npublic String f(@RequestParam String path) {\n  return Files.readString(Paths.get(path));\n}\n', 'taint-path-traversal');
+bad('ux_prompt_system', 'py', 'prompt = f"You help {request.json[\'user\']}"\nresp = client.chat.completions.create(model=m, max_tokens=300, messages=[{"role": "system", "content": prompt}])\n', 'taint-prompt-injection');
+bad('ux_prompt_inline', 'js', 'const r = await openai.chat.completions.create({ max_tokens: 100, messages: [{ role: "system", content: SYS + req.body.persona }] });', 'taint-prompt-injection');
+good('ux_prompt_user_role', 'py', 'msgs = [{"role": "system", "content": SYS}]\nmsgs.append({"role": "user", "content": request.json["q"]})\n');
+good('ux_queryselector', 'js', 'document.querySelector(req.query.sel);');
+
+// --- pre-commit hooks run from the consumer's repository ---
+(function preCommitEntries() {
+  uniq('pre-commit-entries-are-bins');
+  const y = fs.readFileSync(path.join(DIR, '.pre-commit-hooks.yaml'), 'utf8');
+  const bins = Object.keys(require(path.join(DIR, 'package.json')).bin || {});
+  const entries = [...y.matchAll(/^\s*entry:\s*(\S+)/gm)].map(m => m[1]);
+  const bad = entries.filter(e => !bins.includes(e));
+  if (entries.length >= 4 && bad.length === 0) pass++;
+  else { fail++; console.log(`MISS  pre-commit-entries-are-bins: ${bad.join(', ') || 'no entries'}`); }
+})();
+
+// --- config is cached, but an edit to it is still seen ---
+(function configCache() {
+  uniq('config-cache-sees-edits');
+  const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-cfg-')));
+  const cwd0 = process.cwd();
+  let ok = false;
+  try {
+    process.chdir(d);
+    const { loadConfig } = require('./config');
+    fs.writeFileSync(path.join(d, '.securecodingrc.json'), JSON.stringify({ failOn: 'critical' }));
+    const a = loadConfig().failOn;
+    const later = new Date(Date.now() + 5000);
+    fs.writeFileSync(path.join(d, '.securecodingrc.json'), JSON.stringify({ failOn: 'medium' }));
+    fs.utimesSync(path.join(d, '.securecodingrc.json'), later, later);
+    const b = loadConfig().failOn;
+    ok = a === 'critical' && b === 'medium';
+  } finally { process.chdir(cwd0); fs.rmSync(d, { recursive: true, force: true }); }
+  if (ok) pass++;
+  else { fail++; console.log('MISS  config-cache-sees-edits'); }
+})();
+
+// --- baseline and edit-scoped hook blocking ---
+(function baselineAndScope() {
+  const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-bl-')));
+  const env = { ...process.env, SECURE_CODING_STATE: path.join(d, 'st.jsonl'), SECURE_CODING_REPORT: 'off' };
+  delete env.SECURE_CODING_NO_BASELINE;
+  const g = (...a) => spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd: d, encoding: 'utf8' });
+  const sc = (...a) => spawnSync('node', [SCAN, ...a], { cwd: d, env, encoding: 'utf8' });
+  g('init', '-q');
+  fs.writeFileSync(path.join(d, 'a.py'), 'h = hashlib.md5(a)\nx = 1\n');
+  g('add', '-A'); g('commit', '-qm', 'i');
+
+  uniq('baseline-hides-known');
+  const w = sc('--baseline');
+  const after = sc('--all');
+  if (w.status === 0 && fs.existsSync(path.join(d, '.securecoding-baseline.json')) && after.status === 0 && /baseline/.test(after.stdout)) pass++;
+  else { fail++; console.log(`MISS  baseline-hides-known: ${w.status}/${after.status} ${after.stdout.slice(0, 80)}`); }
+
+  uniq('baseline-new-finding-blocks');
+  fs.writeFileSync(path.join(d, 'a.py'), 'h = hashlib.md5(a)\nx = 1\ny = hashlib.sha1(b)\n');
+  const nw = sc('--all');
+  if (nw.status === 2 && /line 3/.test(nw.stdout) && !/line 1\)/.test(nw.stdout)) pass++;
+  else { fail++; console.log(`MISS  baseline-new-finding-blocks: ${nw.status} ${nw.stdout.slice(0, 120)}`); }
+
+  uniq('baseline-bypass-flag');
+  const all = sc('--all', '--no-baseline');
+  if (all.status === 2 && /line 1\)/.test(all.stdout)) pass++;
+  else { fail++; console.log('MISS  baseline-bypass-flag'); }
+
+  uniq('baseline-in-sarif');
+  sc('--all'); // the --no-baseline run above recorded everything as open
+  const sarif = spawnSync('node', [REPORT, '--sarif'], { cwd: d, env, encoding: 'utf8' });
+  let ext = false;
+  try { ext = JSON.parse(sarif.stdout).runs[0].results.some(r => r.suppressions && r.suppressions[0].kind === 'external'); } catch { ext = false; }
+  if (ext) pass++;
+  else { fail++; console.log('MISS  baseline-in-sarif'); }
+
+  // The hook blocks on what the edit wrote, not on what was already there.
+  fs.writeFileSync(path.join(d, 'b.py'), 'h = hashlib.md5(a)\nx = 2\n');
+  const hook = (newString, extraEnv = {}) => spawnSync('node', [SCAN], {
+    cwd: d, env: { ...env, ...extraEnv }, encoding: 'utf8',
+    input: JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: path.join(d, 'b.py'), old_string: 'x = 1', new_string: newString } }),
+  });
+  uniq('hook-scope-unrelated-edit-passes');
+  const un = hook('x = 2');
+  if (un.status === 0) pass++;
+  else { fail++; console.log(`MISS  hook-scope-unrelated-edit-passes: ${un.status}`); }
+
+  uniq('hook-scope-edited-line-blocks');
+  fs.writeFileSync(path.join(d, 'b.py'), 'x = 2\nh = hashlib.md5(a)\n');
+  const ed = hook('h = hashlib.md5(a)');
+  if (ed.status === 2 && /weak-hash/.test(ed.stderr)) pass++;
+  else { fail++; console.log(`MISS  hook-scope-edited-line-blocks: ${ed.status}`); }
+
+  uniq('hook-scope-file-option');
+  fs.writeFileSync(path.join(d, 'b.py'), 'h = hashlib.md5(a)\nx = 2\n');
+  fs.writeFileSync(path.join(d, '.securecodingrc.json'), JSON.stringify({ hookScope: 'file' }));
+  const wf = hook('x = 2');
+  fs.rmSync(path.join(d, '.securecodingrc.json'));
+  if (wf.status === 2) pass++;
+  else { fail++; console.log(`MISS  hook-scope-file-option: ${wf.status}`); }
+  try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
+})();
+
+// --- secrets in git history ---
+(function historyScan() {
+  uniq('history-finds-removed-secret');
+  const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-hist-')));
+  const g = (...a) => spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd: d, encoding: 'utf8' });
+  g('init', '-q');
+  fs.writeFileSync(path.join(d, 'c.js'), 'const k = "AKI' + 'AIOSFODNN7ABCDEFG";\n');
+  g('add', '-A'); g('commit', '-qm', 'add');
+  fs.writeFileSync(path.join(d, 'c.js'), 'const k = process.env.K;\n');
+  g('commit', '-qam', 'remove');
+  const r = spawnSync('node', [SCAN, '--history', '--json'], { cwd: d, encoding: 'utf8', env: { ...process.env, SECURE_CODING_REPORT: 'off' } });
+  let res = [];
+  try { res = JSON.parse(r.stdout); } catch { res = []; }
+  if (r.status === 2 && res.length === 1 && res[0].id === 'secret-aws-key' && res[0].stillPresent === false) pass++;
+  else { fail++; console.log(`MISS  history-finds-removed-secret: ${r.status} ${r.stdout.slice(0, 100)}`); }
+  try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
+})();
+
+// --- dependency guard, against a local fake registry ---
+(function depsGuard() {
+  const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sc-deps-')));
+  const g = (...a) => spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd: d, encoding: 'utf8' });
+  g('init', '-q');
+  fs.writeFileSync(path.join(d, 'package.json'), JSON.stringify({ name: 'x', dependencies: { 'old-pkg': '^1.0.0' } }, null, 2));
+  fs.writeFileSync(path.join(d, 'requirements.txt'), 'oldpy==1.0\n');
+  g('add', '-A'); g('commit', '-qm', 'i');
+  fs.writeFileSync(path.join(d, 'package.json'), JSON.stringify({ name: 'x', dependencies: { 'old-pkg': '^1.0.0', 'made-up-pkg': '^1.0.0', 'fresh-pkg': '^0.1.0', 'scripted-pkg': '^2.0.0', local: 'file:../local' } }, null, 2));
+  fs.writeFileSync(path.join(d, 'requirements.txt'), 'oldpy==1.0\nghost-lib\nflask>=2\n');
+  const script = `
+    const http = require('http');
+    const { spawn } = require('child_process');
+    const now = Date.now(), day = 864e5;
+    const npm = {
+      'fresh-pkg': { abbrev: { 'dist-tags': { latest: '0.1.0' }, versions: { '0.1.0': {} } }, full: { time: { created: new Date(now - 2 * day).toISOString() } } },
+      'scripted-pkg': { abbrev: { 'dist-tags': { latest: '2.0.0' }, versions: Object.fromEntries(Array.from({ length: 9 }, (_, i) => [i + '.0.0', {}]).concat([['2.0.0', { hasInstallScript: true }]])) } },
+    };
+    const pypi = { flask: { releases: { '0.1': [{ upload_time_iso_8601: '2010-04-01T00:00:00Z' }] }, urls: [{ packagetype: 'bdist_wheel' }] } };
+    const srv = http.createServer((req, res) => {
+      const u = decodeURIComponent(req.url);
+      let body = null;
+      if (u.startsWith('/pypi/')) { const n = u.split('/')[2]; body = pypi[n] || null; }
+      else { const n = u.slice(1); const e = npm[n]; if (e) body = /install-v1/.test(req.headers.accept || '') ? e.abbrev : { ...e.abbrev, ...(e.full || {}) }; }
+      if (!body) { res.statusCode = 404; return res.end('{}'); }
+      res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(body));
+    }).listen(0, '127.0.0.1', () => {
+      const base = 'http://127.0.0.1:' + srv.address().port;
+      const c = spawn(process.execPath, [${JSON.stringify(path.join(DIR, 'hooks', 'deps.js'))}, '--json'],
+        { cwd: ${JSON.stringify(d)}, env: { ...process.env, SECURE_CODING_NPM_REGISTRY: base, SECURE_CODING_PYPI_URL: base, SECURE_CODING_DEPS_OFFLINE: '' } });
+      let out = ''; c.stdout.on('data', x => { out += x; });
+      c.on('close', code => { srv.close(); process.stdout.write(JSON.stringify({ code, out })); });
+    });`;
+  const r = spawnSync(process.execPath, ['-e', script], { encoding: 'utf8', timeout: 30000 });
+  let res = {}; let code = -1;
+  try { const o = JSON.parse(r.stdout); code = o.code; res = JSON.parse(o.out); } catch { /* reported below */ }
+  const has = (id, name) => (res.findings || []).some(f => f.id === id && f.name === name);
+
+  uniq('deps-flags-missing-packages');
+  if (has('dep-not-found', 'made-up-pkg') && has('dep-not-found', 'ghost-lib') && code === 2) pass++;
+  else { fail++; console.log(`MISS  deps-flags-missing-packages: code=${code} ${r.stdout.slice(0, 200)} ${r.stderr.slice(0, 200)}`); }
+
+  uniq('deps-flags-new-and-scripts');
+  if (has('dep-new-package', 'fresh-pkg') && has('dep-install-script', 'scripted-pkg')) pass++;
+  else { fail++; console.log('MISS  deps-flags-new-and-scripts'); }
+
+  uniq('deps-ignores-existing-and-local');
+  const names = (res.findings || []).map(f => f.name);
+  if (!names.includes('old-pkg') && !names.includes('oldpy') && !names.includes('local') && !names.includes('flask')) pass++;
+  else { fail++; console.log(`MISS  deps-ignores-existing-and-local: ${names.join(',')}`); }
+
+  // Private names must never be sent to the public registry: that leaks
+  // them and is the first step of a dependency-confusion attack.
+  uniq('deps-never-sends-private-names');
+  fs.writeFileSync(path.join(d, '.npmrc'), '@acme:registry=https://npm.acme.internal/\n');
+  fs.writeFileSync(path.join(d, '.securecodingrc.json'), JSON.stringify({ deps: { private: ['corp-*'] } }));
+  fs.writeFileSync(path.join(d, 'package.json'), JSON.stringify({ name: 'x', dependencies: { 'old-pkg': '^1.0.0', '@acme/auth': '^1.0.0', 'corp-billing': '^1.0.0' } }, null, 2));
+  fs.writeFileSync(path.join(d, 'requirements.txt'), '--index-url https://pypi.acme.internal/simple\noldpy==1.0\ninternal-ml\n');
+  // A registry that records every name it is asked about.
+  const spy = `
+    const http = require('http'); const { spawn } = require('child_process'); const asked = [];
+    const srv = http.createServer((req, res) => { asked.push(decodeURIComponent(req.url)); res.statusCode = 404; res.end('{}'); })
+      .listen(0, '127.0.0.1', () => {
+        const c = spawn(process.execPath, [${JSON.stringify(path.join(DIR, 'hooks', 'deps.js'))}, '--json'],
+          { cwd: ${JSON.stringify(d)}, env: { ...process.env, HTTPS_PROXY: '', SECURE_CODING_DEPS_OFFLINE: '', SECURE_CODING_NPM_REGISTRY: '', SECURE_CODING_PYPI_URL: '' } });
+        let out = ''; c.stdout.on('data', x => { out += x; });
+        c.on('close', () => { srv.close(); process.stdout.write(JSON.stringify({ asked, out })); });
+      });`;
+  const sp = spawnSync(process.execPath, ['-e', spy], { encoding: 'utf8', timeout: 30000 });
+  let spyRes = {};
+  try { const o = JSON.parse(sp.stdout); spyRes = JSON.parse(o.out); } catch { spyRes = {}; }
+  const notSent = (spyRes.skipped || []).map(k => k.name).sort().join(',');
+  if (notSent === '@acme/auth,corp-billing,internal-ml' && (spyRes.findings || []).length === 0 && spyRes.checked === 0) pass++;
+  else { fail++; console.log(`MISS  deps-never-sends-private-names: skipped=${notSent} checked=${spyRes.checked}`); }
+  fs.rmSync(path.join(d, '.npmrc')); fs.rmSync(path.join(d, '.securecodingrc.json'));
+  fs.writeFileSync(path.join(d, 'package.json'), JSON.stringify({ name: 'x', dependencies: { 'old-pkg': '^1.0.0', 'made-up-pkg': '^1.0.0', 'fresh-pkg': '^0.1.0', 'scripted-pkg': '^2.0.0', local: 'file:../local' } }, null, 2));
+  fs.writeFileSync(path.join(d, 'requirements.txt'), 'oldpy==1.0\nghost-lib\nflask>=2\n');
+
+  uniq('deps-offline-is-unverified');
+  const off = spawnSync('node', [path.join(DIR, 'hooks', 'deps.js'), '--json'], { cwd: d, encoding: 'utf8', env: { ...process.env, SECURE_CODING_DEPS_OFFLINE: '1' } });
+  const strict = spawnSync('node', [path.join(DIR, 'hooks', 'deps.js'), '--strict'], { cwd: d, encoding: 'utf8', env: { ...process.env, SECURE_CODING_DEPS_OFFLINE: '1' } });
+  let offRes = {};
+  try { offRes = JSON.parse(off.stdout); } catch { offRes = {}; }
+  if (off.status === 0 && (offRes.unverified || []).length >= 4 && strict.status === 2) pass++;
+  else { fail++; console.log(`MISS  deps-offline-is-unverified: ${off.status}/${strict.status}`); }
+  try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
+})();
+
+// --- MCP resources and prompts ---
+(function mcpResources() {
+  const MCP = path.join(DIR, 'mcp', 'server.js');
+  const input = [
+    { jsonrpc: '2.0', id: 1, method: 'resources/list' },
+    { jsonrpc: '2.0', id: 2, method: 'resources/read', params: { uri: 'secure-coding://fix/sql-concat' } },
+    { jsonrpc: '2.0', id: 3, method: 'resources/read', params: { uri: 'secure-coding://checks/../../package' } },
+    { jsonrpc: '2.0', id: 4, method: 'prompts/get', params: { name: 'secure_design_review', arguments: { feature: 'file upload' } } },
+    { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'explain_finding', arguments: { id: 'taint-ssrf' } } },
+  ].map(m => JSON.stringify(m)).join('\n') + '\n';
+  const r = spawnSync('node', [MCP], { input, encoding: 'utf8', timeout: 20000 });
+  const by = {};
+  for (const l of (r.stdout || '').split('\n').filter(Boolean)) { try { const m = JSON.parse(l); by[m.id] = m; } catch { /* skip */ } }
+
+  uniq('mcp-resources-list-and-read');
+  const list = by[1] && by[1].result && by[1].result.resources || [];
+  const text = by[2] && by[2].result && by[2].result.contents[0].text || '';
+  if (list.some(x => x.uri === 'secure-coding://skill') && list.length > 100 && /CWE-89/.test(text)) pass++;
+  else { fail++; console.log(`MISS  mcp-resources-list-and-read: ${list.length}`); }
+
+  uniq('mcp-resource-no-traversal');
+  if (by[3] && by[3].error) pass++;
+  else { fail++; console.log('MISS  mcp-resource-no-traversal'); }
+
+  uniq('mcp-prompts-and-explain');
+  const p = by[4] && by[4].result && by[4].result.messages[0].content.text || '';
+  const e = by[5] && by[5].result && by[5].result.content[0].text || '';
+  if (/file upload/.test(p) && /tenancy|identity/i.test(p) && /CWE-918/.test(e)) pass++;
+  else { fail++; console.log('MISS  mcp-prompts-and-explain'); }
+})();
+
+// --- report trend series ---
+(function trendSeries() {
+  uniq('report-trend-series');
+  const html = fs.readFileSync(path.join(DIR, 'reports', 'security.html'), 'utf8');
+  const src = html.match(/function trendSeries\(rows\) \{[\s\S]*?\n\}\n/);
+  let ok = false;
+  if (src) {
+    const fn = new Function(`${src[0]}; return trendSeries;`)(); // secure-coding-ignore: eval -- the report's own function, loaded to test it
+    const s = fn([
+      { status: 'fixed', first: '2026-10-01T00:00:00Z', resolved: '2026-10-03T00:00:00Z' },
+      { status: 'open', first: '2026-10-02T00:00:00Z', resolved: '' },
+      { status: 'suppressed', first: '2026-10-02T00:00:00Z', resolved: '' },
+    ]);
+    ok = JSON.stringify(s.map(p => [p.day.slice(8), p.found, p.fixed, p.open])) === JSON.stringify([['01', 1, 0, 1], ['02', 1, 0, 2], ['03', 0, 1, 1]]);
+  }
+  if (ok) pass++;
+  else { fail++; console.log('MISS  report-trend-series'); }
 })();
 
 // --- fix.js --apply autofix engine ---

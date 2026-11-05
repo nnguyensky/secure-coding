@@ -1,0 +1,84 @@
+name: Release
+
+# Tags and publishes the version in package.json when it changes on main.
+# A release is the commit that introduced the version: install it with
+#   npx github:nnguyensky/secure-coding#v<version>
+on:
+  push:
+    branches: [ main ]
+    paths: [ package.json ]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Commit to tag (default: the head of main)'
+        required: false
+      version:
+        description: 'Version to tag, without the v (default: package.json at that commit)'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the tag and the GitHub release
+      id-token: write   # npm provenance
+    env:
+      # Step-level env is not visible to `if:`; expose whether a token exists.
+      HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Read version
+        id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          v="${INPUT_VERSION:-$(node -p "require('./package.json').version")}"
+          case "$v" in (*[!0-9A-Za-z.+-]*|'') echo "bad version: $v"; exit 1;; esac
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Test before tagging
+        if: steps.v.outputs.exists == 'false'
+        env:
+          SECURE_CODING_DEPS_OFFLINE: '1'
+        run: |
+          git config --global user.email ci@example.invalid
+          git config --global user.name ci
+          node hooks/sync.js && node hooks/test.js
+
+      - name: Tag and create the GitHub release
+        if: steps.v.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          # Release notes: this version's section of CHANGELOG.md.
+          awk -v v="$VERSION" '$0 ~ "^## " v "( |$)" {on=1; next} /^## / && on {exit} on' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "See CHANGELOG.md." > notes.md
+          gh release create "v$VERSION" --target "$(git rev-parse HEAD)" --title "v$VERSION" --notes-file notes.md
+
+      # Publishes only when an NPM_TOKEN secret is configured; provenance
+      # links the package on npm to this workflow run and commit.
+      - name: Publish to npm
+        if: steps.v.outputs.exists == 'false' && env.HAS_NPM_TOKEN == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
