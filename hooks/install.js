@@ -606,18 +606,22 @@ Always write secure code from the start. Never defer security fixes.
         const scanPath = path.join(DIR, 'hooks', 'scan.js');
         // Quoted: an install path with a space (/Users/Jane Doe/…,
         // C:\Program Files\…) split into two arguments and the hook never ran.
-        const cmd = `node ${JSON.stringify(scanPath)}`;
+        // Plain double quotes, not JSON.stringify: that doubled every
+        // backslash of a Windows path, so the command no longer contained
+        // scanPath and each re-install added another hook.
+        const cmd = `node "${scanPath.replace(/"/g, '\\"')}"`;
         // MultiEdit and NotebookEdit write files too; Write|Edit missed them.
         const matcher = 'Write|Edit|MultiEdit|NotebookEdit';
         // Compare against each command string, not the JSON-escaped settings
         // text: on Windows the escaped backslashes never matched, so every
         // re-install appended a duplicate hook.
-        const existing = entries.find(e => Array.isArray(e && e.hooks)
-          && e.hooks.some(h => typeof h.command === 'string' && h.command.includes(scanPath)));
+        // Also recognise hooks written by older versions (JSON-escaped path).
+        const mentions = c => typeof c === 'string' && (c.includes(scanPath) || c.replace(/\\\\/g, '\\').includes(scanPath));
+        const existing = entries.find(e => Array.isArray(e && e.hooks) && e.hooks.some(h => mentions(h.command)));
         if (existing) {
           existing.matcher = matcher;
           for (const h of existing.hooks) {
-            if (typeof h.command === 'string' && h.command.includes(scanPath)) h.command = cmd;
+            if (mentions(h.command)) h.command = cmd;
           }
           settings.hooks.PostToolUse = entries;
           fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
