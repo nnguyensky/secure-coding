@@ -9,7 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { statePath, writeState, withFileLock, projectRoot, loadConfig, helpRequested } = require('./config');
+const { statePath, writeState, withFileLock, projectRoot, canonicalPath, loadConfig, helpRequested } = require('./config');
 const { execFileSync } = require('child_process');
 
 const DIR = path.resolve(__dirname, '..');
@@ -612,7 +612,7 @@ function isIgnoredPath(file) {
   // Relative to the project being scanned, not the installed skill: resolving
   // against DIR made every downstream path start with '..', so ignorePaths
   // matched nothing at all outside this repository.
-  const rel = path.relative(projectRoot(), path.resolve(file)).split(path.sep).join('/');
+  const rel = path.relative(projectRoot(), canonicalPath(file)).split(path.sep).join('/');
   if (rel.startsWith('..')) return false; // genuinely outside the project
   return globs.some(g => {
     const re = new RegExp('^' + g.split('/').map(part =>
@@ -668,7 +668,7 @@ function lineHash(text) {
 }
 
 function relToRoot(file) {
-  return path.relative(projectRoot(), path.resolve(file)).split(path.sep).join('/');
+  return path.relative(projectRoot(), canonicalPath(file)).split(path.sep).join('/');
 }
 
 let _baseline;

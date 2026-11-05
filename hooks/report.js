@@ -86,7 +86,8 @@ try {
 function cweFor(id) {
   const text = fixesRaw();
   if (!text) return null;
-  const m = text.match(new RegExp('^## ' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\n([^\\n]*)', 'm'));
+  // \r?: a Windows checkout with autocrlf has CRLF line endings.
+  const m = text.match(new RegExp('^## ' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\r?\\n([^\\r\\n]*)', 'm'));
   if (!m) return null;
   const cwe = m[1].match(/CWE-(\d+)/);
   const cat = m[1].match(/(A\d\d):2025/);

@@ -970,7 +970,9 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
     inProject = statePath('findings.jsonl');
   } finally { process.chdir(cwd0); }
   // fs.realpath: macOS /tmp is a symlink to /private/tmp.
-  const under = inProject.startsWith(fs.realpathSync(tmp)) || inProject.startsWith(tmp);
+  // realpath.native: on Windows os.tmpdir() can be an 8.3 short name.
+  const under = [fs.realpathSync.native(tmp), fs.realpathSync(tmp), tmp]
+    .some(p => inProject.toLowerCase().startsWith(p.toLowerCase()));
   if (under && !inProject.startsWith(DIR)) pass++;
   else { fail++; console.log(`state-path-follows-cwd: got ${inProject}`); }
 
@@ -2359,7 +2361,8 @@ bad('sbd_eval_reflection', 'js', 'const res = eval(req.body.code);', 'eval');
   spawnSync('git', ['init', '-q'], { cwd: proj });
   const install = () => spawnSync('node', [path.join(DIR, 'install.js'),
     '--target', proj, '--agent', 'claude', '--yes'],
-    { env: { ...process.env, HOME: home }, encoding: 'utf8' });
+    // USERPROFILE too: os.homedir() reads it on Windows, not HOME.
+    { env: { ...process.env, HOME: home, USERPROFILE: home }, encoding: 'utf8' });
   const settingsPath = path.join(home, '.claude', 'settings.json');
 
   uniq('ptu-configured');

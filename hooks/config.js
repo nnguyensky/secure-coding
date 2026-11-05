@@ -159,11 +159,22 @@ function projectRoot() {
 }
 
 function findProjectRoot() {
+  let root;
   try {
-    return require('child_process')
+    root = require('child_process')
       .execFileSync('git', ['rev-parse', '--show-toplevel'],
         { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || process.cwd();
-  } catch { return process.cwd(); } // not a git repo: cwd is the project
+  } catch { root = process.cwd(); } // not a git repo: cwd is the project
+  return canonicalPath(root);
+}
+
+// One spelling per directory. On Windows git prints C:/Users/runneradmin/...
+// while the working directory may be C:\Users\RUNNER~1\... (an 8.3 short
+// name); path.relative() between the two starts with '..', so ignorePaths and
+// the baseline matched nothing. realpath.native expands short names and
+// resolves symlinks (macOS /tmp -> /private/tmp) the same way for both sides.
+function canonicalPath(p) {
+  try { return fs.realpathSync.native(path.resolve(p)); } catch { return path.resolve(p); }
 }
 
 function stateDir() {
@@ -276,4 +287,4 @@ function helpRequested(argv, usage) {
   return true;
 }
 
-module.exports = { loadConfig, DEFAULT_CONFIG, projectRoot, stateDir, statePath, writeState, withFileLock, helpRequested, normalizeSeverity, openPath };
+module.exports = { canonicalPath, loadConfig, DEFAULT_CONFIG, projectRoot, stateDir, statePath, writeState, withFileLock, helpRequested, normalizeSeverity, openPath };
